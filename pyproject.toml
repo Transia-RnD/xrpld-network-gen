@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "xrpld-netgen"
+version = "1.0.0"
+description = "Xrpld network generator"
+authors = ["Denis Angell <dangell@transia.co>"]
+
+[tool.poetry.dependencies]
+python = "^3.9.6"
+pytest = "^7.2.1"
+
+[tool.poetry.dev-dependencies]
+flake8 = "^3.8.4"
+black = "22.10.0"
+flake8-black = "^0.3.3"
+flake8-docstrings = "^1.5.0"
+isort = "^5.7.0"
+flake8-isort = "^5.0.0"
+flake8-annotations = "2.7.0"
+flake8-absolute-import = "^1.0"
+MarkupSafe = "2.1.1"
+mypy = "^0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
