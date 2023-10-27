@@ -7,6 +7,10 @@ authors = ["Denis Angell <dangell@transia.co>"]
 [tool.poetry.dependencies]
 python = "^3.9.6"
 pytest = "^7.2.1"
+pyyaml = "^6.0.1"
+requests = "^2.31.0"
+xrpld-publisher = "^1.0.4"
+xrpl-helpers = "^1.0.2"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.8.4"

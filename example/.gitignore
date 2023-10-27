@@ -7,5 +7,3 @@ __pycache__/
 .venv
 
 dist
-bin
-myvl.json

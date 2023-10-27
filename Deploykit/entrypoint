@@ -1,0 +1,27 @@
+#!/bin/bash
+# ./entrypoint.sh ledgerfile quorum
+# ./entrypoint.sh /genesis.json 5
+
+rippledconfig=`/bin/cat /config/rippled.cfg 2>/dev/null | wc -l`
+validatorstxt=`/bin/cat /config/validators.txt 2>/dev/null | wc -l`
+
+mkdir -p /config
+
+if [[ "$rippledconfig" -gt "0" && "$validatorstxt" -gt "0" ]]; then
+
+    echo "Existing rippled config at host /config/, using them."
+    mkdir -p /etc/opt/ripple
+
+    /bin/cat /config/rippled.cfg > /etc/opt/ripple/rippled.cfg
+    /bin/cat /config/validators.txt > /etc/opt/ripple/validators.txt
+
+fi
+
+# Check if arguments are passed
+if [[ -n "$1" && -n "$2" ]]; then
+    # Start rippled with ledgerfile and quorum
+    exec /app/rippled --ledgerfile $1 --quorum=$2 --conf /etc/opt/ripple/rippled.cfg
+else
+    # Start rippled without ledgerfile and quorum
+    exec /app/rippled --conf /etc/opt/ripple/rippled.cfg
+fi
