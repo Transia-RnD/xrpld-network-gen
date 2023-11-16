@@ -17,11 +17,26 @@ if [[ "$rippledconfig" -gt "0" && "$validatorstxt" -gt "0" ]]; then
 
 fi
 
-# Check if arguments are passed
-if [[ -n "$1" && -n "$2" ]]; then
-    # Start rippled with ledgerfile and quorum
-    exec /app/rippled --ledgerfile $1 --quorum=$2 --conf /etc/opt/ripple/rippled.cfg
+# Check if $1 is passed
+if [[ -n "$1" ]]; then
+    ledgerfile="--ledgerfile $1"
 else
-    # Start rippled without ledgerfile and quorum
-    exec /app/rippled --conf /etc/opt/ripple/rippled.cfg
+    ledgerfile=""
 fi
+
+# Check if $2 is passed
+if [[ -n "$2" ]]; then
+    quorum="--quorum=$2"
+else
+    quorum=""
+fi
+
+# Check if $3 is passed
+if [[ -n "$3" ]]; then
+    standalone="$3"
+else
+    standalone=""
+fi
+
+# Start rippled with or without ledgerfile and quorum
+exec /app/rippled $ledgerfile $quorum $standalone --conf /etc/opt/ripple/rippled.cfg

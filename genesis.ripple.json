@@ -1,0 +1,43 @@
+{
+  "ledger": {
+    "accepted": true,
+    "accountState": [
+      {
+        "Account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "Balance": "100000000000000000",
+        "Flags": 0,
+        "LedgerEntryType": "AccountRoot",
+        "OwnerCount": 0,
+        "PreviousTxnID": "",
+        "PreviousTxnLgrSeq": 0,
+        "Sequence": 1,
+        "index": "2B6AC232AA4C4BE41BF49D2459FA4A0347E1B543A4C92FCEE0821C0201E2E9A8"
+      },
+      {
+        "Amendments": [],
+        "Flags": 0,
+        "LedgerEntryType": "Amendments",
+        "index": "7DB0788C020F02780A673DC74757F23823FA3014C1866E72CC4CD8B226CD6EF4"
+      }
+    ],
+    "account_hash": "5DF3A98772FB73E782B8740E87885C6BAD9BA486422E3626DEF968AD2CB2C514",
+    "close_flags": 0,
+    "close_time": 0,
+    "close_time_human": "",
+    "close_time_resolution": 10,
+    "closed": true,
+    "hash": "56DA0940767AC2F17F0E384F04816002403D0756432B9D503DDA20128A2AAF11",
+    "ledger_hash": "56DA0940767AC2F17F0E384F04816002403D0756432B9D503DDA20128A2AAF11",
+    "ledger_index": "1",
+    "parent_close_time": 0,
+    "parent_hash": "",
+    "seqNum": "1",
+    "totalCoins": "100000000000000000",
+    "total_coins": "100000000000000000",
+    "transaction_hash": "9A77D1D1A4B36DA77B9C4DC63FDEB8F821741D157802F9C42A6ED86003D8B4A0",
+    "transactions": []
+  },
+  "ledger_current_index": 1,
+  "status": "success",
+  "validated": true
+}

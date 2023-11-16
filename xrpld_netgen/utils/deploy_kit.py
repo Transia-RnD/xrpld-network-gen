@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+import requests
+import os
 from xrpl_helpers.common.utils import write_file
 
 
@@ -41,8 +46,7 @@ fi
 
 
 def create_dockerfile(
-    name,
-    node_dir,
+    binary,
     image_name,
     rpc_public_port,
     rpc_admin_port,
@@ -50,7 +54,8 @@ def create_dockerfile(
     ws_admin_port,
     peer_port,
     include_genesis=False,
-    quorum=0,
+    quorum=None,
+    standalone=None,
 ):
     dockerfile = f"""
     FROM {image_name} as base
@@ -68,6 +73,9 @@ def create_dockerfile(
     if include_genesis:
         dockerfile += "COPY genesis.json /genesis.json\n"
 
+    if binary:
+        dockerfile += "COPY rippled /app/rippled\n"
+
     dockerfile += f"""
     RUN chmod +x /entrypoint.sh && \
         echo '#!/bin/bash' > /usr/bin/server_info && echo '/entrypoint.sh server_info' >> /usr/bin/server_info && \
@@ -77,9 +85,27 @@ def create_dockerfile(
     """
 
     if include_genesis:
-        dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", {quorum} ]'
+        dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", "{quorum}", "{standalone}" ]'
     else:
         dockerfile += 'ENTRYPOINT [ "/entrypoint.sh" ]'
 
-    with open(f"{name}-cluster/{node_dir}/Dockerfile", "w") as file:
-        file.write(dockerfile)
+    return dockerfile
+
+
+def download_binary(url, save_path):
+    try:
+        # Send a GET request to the URL
+        response = requests.get(url, stream=True)
+
+        # Raise an exception if the request was unsuccessful
+        response.raise_for_status()
+
+        # Open the file in binary write mode and save the content to the file
+        with open(save_path, "wb") as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+
+        os.chmod(save_path, 0o755)
+        print(f"Download complete. File saved as {save_path}")
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")

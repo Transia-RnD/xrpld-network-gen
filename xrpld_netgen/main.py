@@ -7,7 +7,7 @@ import shutil
 from typing import List, Any, Dict, Tuple
 
 from xrpld_netgen.rippled_cfg import generate_rippled_cfg, RippledBuild
-from xrpld_netgen.utils.deploy_kit import create_dockerfile
+from xrpld_netgen.utils.deploy_kit import create_dockerfile, download_binary
 from xrpl_helpers.common.utils import write_file
 from xrpl_helpers.rippled.utils import update_amendments
 
@@ -27,6 +27,7 @@ def gen_config(
     v_token: str,
     vl_site: str,
     vl_key: str,
+    ivl_key: str,
     ips_fixed_urls: List[str] = [],
 ) -> List[RippledBuild]:
     configs: List[RippledBuild] = generate_rippled_cfg(
@@ -63,6 +64,7 @@ def gen_config(
         v_token=v_token,
         validator_list_sites=[vl_site],
         validator_list_keys=[vl_key],
+        import_vl_keys=[ivl_key],
         ips_urls=[],
         ips_fixed_urls=ips_fixed_urls,
         amendment_majority_time=None,
@@ -91,6 +93,12 @@ def generate_ports(index, node_type):
         ws_public = WS_PUBLIC + (index * 10)
         ws_admin = WS_ADMIN + (index * 10)
         peer = PEER + (index * 10)
+    elif node_type == "standalone":
+        rpc_public = RPC_PUBLIC
+        rpc_admin = RPC_ADMIN
+        ws_public = WS_PUBLIC
+        ws_admin = WS_ADMIN
+        peer = PEER
     else:
         raise ValueError("Invalid node type. Must be 'validator' or 'peer'.")
 
@@ -165,6 +173,7 @@ def create_node_folders(
     genesis: bool,
     quorum: int,
     vl_key: str,
+    ivl_key: str,
     protocol: str,
 ):
     # Create directories for validator nodes
@@ -204,6 +213,7 @@ def create_node_folders(
             peer,
             token,
             f"http://vl/vl.json",
+            ivl_key,
             vl_key,
             [ips for ips in ips_fixed if ips != f"{node_dir} {peer}"],
         )
@@ -218,17 +228,12 @@ def create_node_folders(
             genesis_json: Any = update_amendments(features_json, protocol)
             write_file("genesis.json", genesis_json)
 
-        create_dockerfile(
-            name,
-            node_dir,
-            image,
-            rpc_public,
-            rpc_admin,
-            ws_public,
-            ws_admin,
-            peer,
-            genesis,
+        dockerfile: str = create_dockerfile(
+            image, rpc_public, rpc_admin, ws_public, ws_admin, peer, genesis, 0, False
         )
+        with open(f"{name}-cluster/{node_dir}/Dockerfile", "w") as file:
+            file.write(dockerfile)
+
         shutil.copyfile("Deploykit/entrypoint", f"{name}-cluster/{node_dir}/entrypoint")
 
         pwd_str: str = "${PWD}"
@@ -269,6 +274,7 @@ def create_node_folders(
             peer,
             None,
             f"http://vl/vl.json",
+            ivl_key,
             vl_key,
             ips_fixed,
         )
@@ -276,17 +282,12 @@ def create_node_folders(
         os.makedirs(f"{name}-cluster/{node_dir}", exist_ok=True)
         os.makedirs(f"{name}-cluster/{node_dir}/config", exist_ok=True)
         save_local_config(root_path, cfg_path, configs[0].data, configs[1].data)
-        create_dockerfile(
-            name,
-            node_dir,
-            image,
-            rpc_public,
-            rpc_admin,
-            ws_public,
-            ws_admin,
-            peer,
-            False,
+        dockerfile: str = create_dockerfile(
+            image, rpc_public, rpc_admin, ws_public, ws_admin, peer, False, 0, False
         )
+        with open(f"{name}-cluster/{node_dir}/Dockerfile", "w") as file:
+            file.write(dockerfile)
+
         shutil.copyfile("Deploykit/entrypoint", f"{name}-cluster/{node_dir}/entrypoint")
         pwd_str: str = "${PWD}"
         services[f"pnode{i}"] = {
@@ -312,7 +313,9 @@ def create_node_folders(
     return manifests
 
 
-def update_stop_sh(name: str, num_validators: int, num_peers: int) -> None:
+def update_stop_sh(
+    name: str, num_validators: int, num_peers: int, standalone: bool
+) -> str:
     stop_sh_content = (
         "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
     )
@@ -325,12 +328,17 @@ def update_stop_sh(name: str, num_validators: int, num_peers: int) -> None:
         stop_sh_content += f"rm -r pnode{i}/lib\n"
         stop_sh_content += f"rm -r pnode{i}/log\n"
 
-    write_file(f"{name}-cluster/stop.sh", stop_sh_content)
+    if standalone:
+        stop_sh_content += f"rm -r xrpld/lib\n"
+        stop_sh_content += f"rm -r xrpld/log\n"
+
+    return stop_sh_content
 
 
 def create_network(
-    publicKey: str,
-    privateKey: str,
+    public_key: str,
+    import_key: str,
+    private_key: str,
     manifest: str,
     protocol: str,
     name: str,
@@ -356,7 +364,8 @@ def create_network(
         network_id,
         genesis,
         quorum,
-        publicKey,
+        public_key,
+        import_key,
         protocol,
     )
     services["explorer"] = {
@@ -396,12 +405,207 @@ def create_network(
 docker compose -f docker-compose.yml up --build --force-recreate -d
 """,
     )
-    update_stop_sh(name, num_validators, num_peers)
+    stop_sh_content: str = update_stop_sh(name, num_validators, num_peers, False)
+    write_file(f"{name}-cluster/stop.sh", stop_sh_content)
 
     os.makedirs(f"{name}-cluster/vl", exist_ok=True)
     client = PublisherClient(manifest)
     for manifest in manifests:
         client.add_validator(manifest)
 
-    client.sign_unl(privateKey, f"{name}-cluster/vl/vl.json")
+    client.sign_unl(private_key, f"{name}-cluster/vl/vl.json")
     shutil.copyfile("Deploykit/nginx.dockerfile", f"{name}-cluster/vl/Dockerfile")
+
+
+def create_standalone_folder(
+    binary: bool,
+    name: str,
+    image: str,
+    storage_url: str,
+    network_id: int,
+    vl_key: str,
+    ivl_key: str,
+    protocol: str,
+):
+    root_path = f"xrpld-{name}"
+    cfg_path = f"xrpld-{name}/config"
+    rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
+    configs: List[RippledBuild] = gen_config(
+        name,
+        network_id,
+        0,
+        rpc_public,
+        rpc_admin,
+        ws_public,
+        ws_admin,
+        peer,
+        None,
+        f"http://vl/vl.json",
+        vl_key,
+        ivl_key,
+        [f"0.0.0.0 {peer}"],
+    )
+    os.makedirs(f"xrpld-{name}", exist_ok=True)
+    os.makedirs(f"xrpld-{name}/config", exist_ok=True)
+    save_local_config(root_path, cfg_path, configs[0].data, configs[1].data)
+    features_json: Dict[str, Any] = download_json(
+        f"{storage_url}/features.json", f"xrpld-{name}"
+    )
+    genesis_json: Any = update_amendments(features_json, protocol)
+    write_file(
+        f"xrpld-{name}/genesis.json", json.dumps(genesis_json, indent=4, sort_keys=True)
+    )
+    dockerfile: str = create_dockerfile(
+        binary,
+        image,
+        rpc_public,
+        rpc_admin,
+        ws_public,
+        ws_admin,
+        peer,
+        True,
+        "",
+        "-a",
+    )
+    with open(f"xrpld-{name}/Dockerfile", "w") as file:
+        file.write(dockerfile)
+
+    shutil.copyfile("Deploykit/entrypoint", f"xrpld-standalone/entrypoint")
+    pwd_str: str = "${PWD}"
+    services["xrpld"] = {
+        "build": {
+            "context": ".",
+            "dockerfile": "Dockerfile",
+        },
+        "platform": "linux/x86_64",
+        "container_name": "xrpld",
+        "ports": [
+            f"{rpc_public}:{rpc_public}",
+            f"{rpc_admin}:{rpc_admin}",
+            f"{ws_public}:{ws_public}",
+            f"{ws_admin}:{ws_admin}",
+            f"{peer}:{peer}",
+        ],
+        "volumes": [
+            f"{pwd_str}/xrpld/config:/etc/opt/ripple",
+            f"{pwd_str}/xrpld/log:/var/log/rippled",
+            f"{pwd_str}/xrpld/lib:/var/lib/rippled",
+        ],
+        "networks": ["standalone-network"],
+    }
+
+
+def create_standalone_image(
+    public_key: str,
+    import_key: str,
+    protocol: str,
+    network_id: int,
+    build_system: str,
+    build_name: str,
+) -> None:
+    name: str = "standalone"
+    image_name, version = parse_image_name(build_name)
+    root_url = f"https://storage.googleapis.com/thelab-builds/"
+    storage_url: str = (
+        root_url + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}"
+    )
+    image: str = f"{build_system}/{build_name}"
+    create_standalone_folder(
+        False,
+        name,
+        image,
+        storage_url,
+        network_id,
+        public_key,
+        import_key,
+        protocol,
+    )
+    services["explorer"] = {
+        "image": "transia/explorer:latest",
+        "container_name": "explorer",
+        "environment": [
+            "PORT=4000",
+            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6018}",
+        ],
+        "ports": ["4000:4000"],
+        "networks": [f"{name}-network"],
+    }
+
+    compose = {
+        "version": "3.4",
+        "services": services,
+        "networks": {f"{name}-network": {"driver": "bridge"}},
+    }
+
+    with open(f"xrpld-{name}/docker-compose.yml", "w") as f:
+        yaml.dump(compose, f, default_flow_style=False)
+
+    write_file(
+        f"xrpld-{name}/start.sh",
+        """\
+#! /bin/bash
+docker compose -f docker-compose.yml up --build --force-recreate -d
+""",
+    )
+    stop_sh_content: str = update_stop_sh(name, 0, 0, True)
+    write_file(f"xrpld-{name}/stop.sh", stop_sh_content)
+
+
+def create_standalone_binary(
+    public_key: str,
+    import_key: str,
+    protocol: str,
+    network_id: int,
+    build_server: str,
+    build_version: str,
+) -> None:
+    name: str = "standalone"
+    _build_name: str = "dangell7-xahau-binary:2023.10.24"
+    image_name, version = parse_image_name(_build_name)
+    root_url = f"https://storage.googleapis.com/thelab-builds/"
+    storage_url: str = (
+        root_url + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}"
+    )
+
+    url: str = f"{build_server}/{build_version}"
+    # download_binary(url, f"xrpld-{name}/rippled")
+    image: str = "ubuntu:jammy"
+    create_standalone_folder(
+        True,
+        name,
+        image,
+        storage_url,
+        network_id,
+        public_key,
+        import_key,
+        protocol,
+    )
+    services["explorer"] = {
+        "image": "transia/explorer:latest",
+        "container_name": "explorer",
+        "environment": [
+            "PORT=4000",
+            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6018}",
+        ],
+        "ports": ["4000:4000"],
+        "networks": [f"{name}-network"],
+    }
+
+    compose = {
+        "version": "3.9",
+        "services": services,
+        "networks": {f"{name}-network": {"driver": "bridge"}},
+    }
+
+    with open(f"xrpld-{name}/docker-compose.yml", "w") as f:
+        yaml.dump(compose, f, default_flow_style=False)
+
+    write_file(
+        f"xrpld-{name}/start.sh",
+        """\
+#! /bin/bash
+docker compose -f docker-compose.yml up --build --force-recreate -d
+""",
+    )
+    stop_sh_content: str = update_stop_sh(name, 0, 0, True)
+    write_file(f"xrpld-{name}/stop.sh", stop_sh_content)

@@ -10,4 +10,5 @@ dist
 bin
 keystore/
 test-cluster
+xrpld-standalone
 playground.py
