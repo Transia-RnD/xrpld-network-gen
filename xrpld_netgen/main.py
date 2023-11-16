@@ -568,7 +568,7 @@ def create_standalone_binary(
     )
 
     url: str = f"{build_server}/{build_version}"
-    # download_binary(url, f"xrpld-{name}/rippled")
+    download_binary(url, f"xrpld-{name}/rippled")
     image: str = "ubuntu:jammy"
     create_standalone_folder(
         True,
