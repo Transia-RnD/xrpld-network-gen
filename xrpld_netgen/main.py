@@ -10,7 +10,7 @@ from typing import List, Any, Dict, Tuple
 from xrpld_netgen.rippled_cfg import generate_rippled_cfg, RippledBuild
 from xrpld_netgen.utils.deploy_kit import create_dockerfile, download_binary
 from xrpl_helpers.common.utils import write_file
-from xrpl_helpers.rippled.utils import update_amendments
+from xrpl_helpers.rippled.utils import update_amendments, parse_rippled_amendments
 
 from xrpld_publisher.publisher import PublisherClient
 from xrpld_publisher.validator import ValidatorClient
@@ -53,6 +53,9 @@ def gen_config(
     ws_public: int,
     ws_admin: int,
     peer: int,
+    nudb_path: str,
+    db_path: str,
+    debug_path: str,
     v_token: str,
     vl_site: str,
     vl_key: str,
@@ -82,10 +85,10 @@ def gen_config(
         key_path=None,
         crt_path=None,
         size_node="medium",
-        nudb_path="/var/lib/rippled/db/nudb",
-        db_path="/var/lib/rippled/db",
+        nudb_path=nudb_path,
+        db_path=db_path,
         num_ledgers=256,
-        debug_path="/var/log/rippled/debug.log",
+        debug_path=debug_path,
         log_level="trace",
         # private_peer=1 if _node.private_peer and i == 1 else 0,
         private_peer=0,
@@ -137,19 +140,12 @@ def generate_ports(index, node_type):
 deploykit_path: str = ""
 
 
-def save_local_config(root_path: str, cfg_path: str, cfg_out: str, validators_out: str):
+def save_local_config(cfg_path: str, cfg_out: str, validators_out: str):
     with open(f"{cfg_path}/rippled.cfg", "w") as text_file:
         text_file.write(cfg_out)
 
     with open(f"{cfg_path}/validators.txt", "w") as text_file:
         text_file.write(validators_out)
-
-    # # Copy Dockerfile
-    # with open(deploykit_path + '/Dockerfile', 'rb') as src, open(root_path + '/Dockerfile', 'wb') as dst:
-    #     dst.write(src.read())
-
-    # # Copy Entrypoint
-    # with open(deploykit_path + '/entrypoint', 'rb') as src, open(root_path + '/entrypoint', 'wb') as dst: dst.write(src.read())
 
 
 def parse_image_name(image_name: str) -> str:
@@ -240,6 +236,9 @@ def create_node_folders(
             ws_public,
             ws_admin,
             peer,
+            "/var/lib/rippled/db/nudb",
+            "/var/lib/rippled/db",
+            "/var/log/rippled/debug.log",
             token,
             f"http://vl/vl.json",
             ivl_key,
@@ -249,7 +248,7 @@ def create_node_folders(
 
         os.makedirs(f"{name}-cluster/{node_dir}", exist_ok=True)
         os.makedirs(f"{name}-cluster/{node_dir}/config", exist_ok=True)
-        save_local_config(root_path, cfg_path, configs[0].data, configs[1].data)
+        save_local_config(cfg_path, configs[0].data, configs[1].data)
         features_json: Dict[str, Any] = download_json(
             f"{storage_url}/features.json", f"{name}-cluster"
         )
@@ -303,6 +302,9 @@ def create_node_folders(
             ws_public,
             ws_admin,
             peer,
+            "/var/lib/rippled/db/nudb",
+            "/var/lib/rippled/db",
+            "/var/log/rippled/debug.log",
             None,
             f"http://vl/vl.json",
             ivl_key,
@@ -312,7 +314,7 @@ def create_node_folders(
         # print(f'CONFIG: {configs}')
         os.makedirs(f"{name}-cluster/{node_dir}", exist_ok=True)
         os.makedirs(f"{name}-cluster/{node_dir}/config", exist_ok=True)
-        save_local_config(root_path, cfg_path, configs[0].data, configs[1].data)
+        save_local_config(cfg_path, configs[0].data, configs[1].data)
         dockerfile: str = create_dockerfile(
             image, rpc_public, rpc_admin, ws_public, ws_admin, peer, False, 0, False
         )
@@ -347,9 +349,14 @@ def create_node_folders(
 
 
 def update_stop_sh(
-    name: str, num_validators: int, num_peers: int, standalone: bool
+    name: str,
+    num_validators: int,
+    num_peers: int,
+    standalone: bool = False,
+    local: bool = False,
 ) -> str:
-    stop_sh_content = f"#! /bin/bash\ndocker compose -f {basedir}/xrpld-{name}/docker-compose.yml down --remove-orphans\n"
+    if num_validators > 0 and num_peers > 0 or standalone:
+        stop_sh_content = f"#! /bin/bash\ndocker compose -f {basedir}/xrpld-{name}/docker-compose.yml down --remove-orphans\n"
 
     for i in range(1, num_validators + 1):
         stop_sh_content += f"rm -r /vnode{i}/config\n"
@@ -368,6 +375,11 @@ def update_stop_sh(
         stop_sh_content += f"rm -r xrpld/lib\n"
         stop_sh_content += f"rm -r xrpld/log\n"
         stop_sh_content += f"rm -r xrpld\n"
+
+    if local:
+        stop_sh_content = f"#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
+        stop_sh_content += f"rm -r db\n"
+        stop_sh_content += f"rm -r debug.log\n"
 
     return stop_sh_content
 
@@ -442,7 +454,7 @@ def create_network(
 docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force-recreate -d
 """,
     )
-    stop_sh_content: str = update_stop_sh(name, num_validators, num_peers, False)
+    stop_sh_content: str = update_stop_sh(name, num_validators, num_peers)
     write_file(f"{name}-cluster/stop.sh", stop_sh_content)
 
     os.makedirs(f"{name}-cluster/vl", exist_ok=True)
@@ -478,6 +490,9 @@ def create_standalone_folder(
         ws_public,
         ws_admin,
         peer,
+        "/var/lib/rippled/db/nudb",
+        "/var/lib/rippled/db",
+        "/var/log/rippled/debug.log",
         None,
         f"http://vl/vl.json",
         vl_key,
@@ -485,7 +500,7 @@ def create_standalone_folder(
         [f"0.0.0.0 {peer}"],
     )
     os.makedirs(f"{basedir}/xrpld-{name}/config", exist_ok=True)
-    save_local_config(root_path, cfg_path, configs[0].data, configs[1].data)
+    save_local_config(cfg_path, configs[0].data, configs[1].data)
     features_json: Dict[str, Any] = download_json(
         f"{storage_url}/features.json", f"{basedir}/xrpld-{name}"
     )
@@ -653,3 +668,92 @@ docker compose -f {basedir}/xrpld-{name}/docker-compose.yml up --build --force-r
     stop_sh_content: str = update_stop_sh(name, 0, 0, True)
     write_file(f"{basedir}/xrpld-{name}/stop.sh", stop_sh_content)
     os.chmod(f"{basedir}/xrpld-{name}/stop.sh", 0o755)
+
+
+def create_local_folder(
+    name: str,
+    network_id: int,
+    vl_key: str,
+    ivl_key: str,
+    protocol: str,
+):
+    cfg_path = f"config"
+    rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
+    configs: List[RippledBuild] = gen_config(
+        name,
+        network_id,
+        0,
+        rpc_public,
+        rpc_admin,
+        ws_public,
+        ws_admin,
+        peer,
+        "db/nudb",
+        "db",
+        "debug.log",
+        None,
+        f"http://vl/vl.json",
+        vl_key,
+        ivl_key,
+        [f"0.0.0.0 {peer}"],
+    )
+    os.makedirs(f"config", exist_ok=True)
+    save_local_config(cfg_path, configs[0].data, configs[1].data)
+    features_json: Dict[str, Any] = parse_rippled_amendments(
+        "../src/ripple/protocol/impl/Feature.cpp"
+    )
+    genesis_json: Any = update_amendments(features_json, protocol)
+    write_file(
+        f"config/genesis.json",
+        json.dumps(genesis_json, indent=4, sort_keys=True),
+    )
+
+
+def start_local(
+    public_key: str,
+    import_key: str,
+    protocol: str,
+    network_id: int,
+) -> None:
+    name: str = "local"
+    os.makedirs(f"{basedir}/xrpld-{name}", exist_ok=True)
+    create_local_folder(
+        name,
+        network_id,
+        public_key,
+        import_key,
+        protocol,
+    )
+    services["explorer"] = {
+        "image": "transia/explorer:latest",
+        "container_name": "explorer",
+        "environment": [
+            "PORT=4000",
+            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6018}",
+        ],
+        "ports": ["4000:4000"],
+        "networks": ["standalone-network"],
+    }
+
+    compose = {
+        "version": "3.9",
+        "services": services,
+        "networks": {"standalone-network": {"driver": "bridge"}},
+    }
+
+    with open(f"docker-compose.yml", "w") as f:
+        yaml.dump(compose, f, default_flow_style=False)
+
+    write_file(
+        "start.sh",
+        f"""\
+#! /bin/bash
+docker compose -f docker-compose.yml up --build --force-recreate -d
+./rippled -a --conf config/rippled.cfg --ledgerfile config/genesis.json
+""",
+    )
+    os.chmod("start.sh", 0o755)
+    stop_sh_content: str = update_stop_sh(name, 0, 0, False, True)
+    write_file("stop.sh", stop_sh_content)
+    os.chmod("stop.sh", 0o755)
+    run_file("./start.sh")

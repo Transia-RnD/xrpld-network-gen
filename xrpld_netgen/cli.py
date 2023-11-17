@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+# create:standalone
 # xrpld-netgen create:standalone --protocol "xahau" --build_version "2023.11.10-dev+549"
+# start:local
+# xrpld-netgen start:local --protocol "xahau"
 
 import os
 import argparse
@@ -10,6 +13,7 @@ from xrpld_netgen.main import (
     create_standalone_binary,
     run_file,
     remove_directory,
+    start_local,
 )
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -24,9 +28,22 @@ def main():
     # start
     parser_st = subparsers.add_parser("start", help="Start Network")
     parser_st.add_argument("--name", required=True, help="The name of the network")
+    # start:local
+    parser_sl = subparsers.add_parser("start:local", help="Start Local Network")
+    parser_sl.add_argument("--public_key", required=False, help="The public vl key")
+    parser_sl.add_argument("--import_key", required=False, help="The import vl key")
+    parser_sl.add_argument(
+        "--protocol", required=False, help="The protocol of the network"
+    )
+    parser_sl.add_argument(
+        "--network_id", type=int, required=False, help="The network id"
+    )
     # stop
     parser_sp = subparsers.add_parser("stop", help="Stop Network")
     parser_sp.add_argument("--name", required=True, help="The name of the network")
+    # stop:local
+    parser_spl = subparsers.add_parser("stop:local", help="Stop Local Network")
+
     # remove
     parser_r = subparsers.add_parser("remove", help="Remove Network")
     parser_r.add_argument("--name", required=True, help="The name of the network")
@@ -78,9 +95,30 @@ def main():
         NAME = args.name
         run_file(f"{basedir}/{NAME}/start.sh")
 
+    if args.command == "start:local":
+        PUBLIC_KEY = args.public_key
+        IMPORT_KEY = args.import_key
+        PROTOCOL = args.protocol
+        NETWORK_ID = args.network_id
+
+        if not PUBLIC_KEY:
+            PUBLIC_KEY: str = (
+                "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
+            )
+        if PROTOCOL == "xahau" and not IMPORT_KEY:
+            IMPORT_KEY: str = (
+                "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1"
+            )
+        if not NETWORK_ID:
+            NETWORK_ID: int = 21337
+        start_local(PUBLIC_KEY, IMPORT_KEY, PROTOCOL, NETWORK_ID)
+
     if args.command == "stop":
         NAME = args.name
         run_file(f"{basedir}/{NAME}/stop.sh")
+
+    if args.command == "stop:local":
+        run_file("./stop.sh")
 
     if args.command == "remove":
         NAME = args.name
