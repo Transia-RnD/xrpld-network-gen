@@ -25,8 +25,8 @@ def main():
     parser_st = subparsers.add_parser("start", help="Start Network")
     parser_st.add_argument("--name", required=True, help="The name of the network")
     # stop
-    parser_s = subparsers.add_parser("stop", help="Start Network")
-    parser_s.add_argument("--name", required=True, help="The name of the network")
+    parser_sp = subparsers.add_parser("stop", help="Stop Network")
+    parser_sp.add_argument("--name", required=True, help="The name of the network")
     # remove
     parser_r = subparsers.add_parser("remove", help="Remove Network")
     parser_r.add_argument("--name", required=True, help="The name of the network")
@@ -77,6 +77,10 @@ def main():
     if args.command == "start":
         NAME = args.name
         run_file(f"{basedir}/{NAME}/start.sh")
+
+    if args.command == "stop":
+        NAME = args.name
+        run_file(f"{basedir}/{NAME}/stop.sh")
 
     if args.command == "remove":
         NAME = args.name
@@ -135,7 +139,7 @@ def main():
             PROTOCOL: str = "rippled"
         if PROTOCOL == "xahau" and not IMPORT_KEY:
             IMPORT_KEY: str = (
-                "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
+                "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1"
             )
         if PROTOCOL == "xahau" and not BUILD_SERVER:
             BUILD_SERVER: str = "https://build.xahau.tech"

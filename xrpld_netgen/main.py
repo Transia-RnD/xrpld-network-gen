@@ -352,16 +352,22 @@ def update_stop_sh(
     stop_sh_content = f"#! /bin/bash\ndocker compose -f {basedir}/xrpld-{name}/docker-compose.yml down --remove-orphans\n"
 
     for i in range(1, num_validators + 1):
-        stop_sh_content += f"rm -r {basedir}/vnode{i}/lib\n"
-        stop_sh_content += f"rm -r {basedir}/vnode{i}/log\n"
+        stop_sh_content += f"rm -r /vnode{i}/config\n"
+        stop_sh_content += f"rm -r /vnode{i}/lib\n"
+        stop_sh_content += f"rm -r vnode{i}/log\n"
+        stop_sh_content += f"rm -r xrpld\n"
 
     for i in range(1, num_peers + 1):
-        stop_sh_content += f"rm -r {basedir}/pnode{i}/lib\n"
-        stop_sh_content += f"rm -r {basedir}/pnode{i}/log\n"
+        stop_sh_content += f"rm -r pnode{i}/config\n"
+        stop_sh_content += f"rm -r pnode{i}/lib\n"
+        stop_sh_content += f"rm -r pnode{i}/log\n"
+        stop_sh_content += f"rm -r xrpld\n"
 
     if standalone:
-        stop_sh_content += f"rm -r {basedir}/xrpld/lib\n"
-        stop_sh_content += f"rm -r {basedir}/xrpld/log\n"
+        stop_sh_content += f"rm -r xrpld/config\n"
+        stop_sh_content += f"rm -r xrpld/lib\n"
+        stop_sh_content += f"rm -r xrpld/log\n"
+        stop_sh_content += f"rm -r xrpld\n"
 
     return stop_sh_content
 
@@ -426,14 +432,14 @@ def create_network(
         "networks": {f"{name}-network": {"driver": "bridge"}},
     }
 
-    with open(f"{name}-cluster/docker-compose.yml", "w") as f:
+    with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
         yaml.dump(compose, f, default_flow_style=False)
 
     write_file(
         f"{name}-cluster/start.sh",
         f"""\
 #! /bin/bash
-docker compose -f {basedir}/xrpld-{name}/docker-compose.yml up --build --force-recreate -d
+docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force-recreate -d
 """,
     )
     stop_sh_content: str = update_stop_sh(name, num_validators, num_peers, False)
