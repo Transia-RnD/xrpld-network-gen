@@ -4,6 +4,7 @@
 import os
 import yaml
 import shutil
+import subprocess
 from typing import List, Any, Dict, Tuple
 
 from xrpld_netgen.rippled_cfg import generate_rippled_cfg, RippledBuild
@@ -13,6 +14,34 @@ from xrpl_helpers.rippled.utils import update_amendments
 
 from xrpld_publisher.publisher import PublisherClient
 from xrpld_publisher.validator import ValidatorClient
+
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+
+def remove_directory(directory_path: str):
+    try:
+        shutil.rmtree(directory_path)
+        print(f"Directory '{directory_path}' has been removed successfully.")
+    except FileNotFoundError:
+        print(f"The directory '{directory_path}' does not exist.")
+    except PermissionError:
+        print(f"Permission denied: Unable to remove '{directory_path}'.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
+def run_file(file_path):
+    try:
+        # Run the file as a subprocess
+        result = subprocess.run(file_path, check=True)
+        print(result)
+        print(f"File {file_path} executed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while trying to run the file: {e}")
+    except FileNotFoundError:
+        print(f"The file {file_path} does not exist or cannot be found.")
+    except OSError as e:
+        print(f"An error occurred while trying to run the file: {e}")
 
 
 def gen_config(
@@ -234,7 +263,9 @@ def create_node_folders(
         with open(f"{name}-cluster/{node_dir}/Dockerfile", "w") as file:
             file.write(dockerfile)
 
-        shutil.copyfile("Deploykit/entrypoint", f"{name}-cluster/{node_dir}/entrypoint")
+        shutil.copyfile(
+            f"{basedir}/deploykit/entrypoint", f"{name}-cluster/{node_dir}/entrypoint"
+        )
 
         pwd_str: str = "${PWD}"
         services[f"vnode{i}"] = {
@@ -288,7 +319,9 @@ def create_node_folders(
         with open(f"{name}-cluster/{node_dir}/Dockerfile", "w") as file:
             file.write(dockerfile)
 
-        shutil.copyfile("Deploykit/entrypoint", f"{name}-cluster/{node_dir}/entrypoint")
+        shutil.copyfile(
+            f"{basedir}/deploykit/entrypoint", f"{name}-cluster/{node_dir}/entrypoint"
+        )
         pwd_str: str = "${PWD}"
         services[f"pnode{i}"] = {
             "build": {
@@ -316,21 +349,19 @@ def create_node_folders(
 def update_stop_sh(
     name: str, num_validators: int, num_peers: int, standalone: bool
 ) -> str:
-    stop_sh_content = (
-        "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
-    )
+    stop_sh_content = f"#! /bin/bash\ndocker compose -f {basedir}/xrpld-{name}/docker-compose.yml down --remove-orphans\n"
 
     for i in range(1, num_validators + 1):
-        stop_sh_content += f"rm -r vnode{i}/lib\n"
-        stop_sh_content += f"rm -r vnode{i}/log\n"
+        stop_sh_content += f"rm -r {basedir}/vnode{i}/lib\n"
+        stop_sh_content += f"rm -r {basedir}/vnode{i}/log\n"
 
     for i in range(1, num_peers + 1):
-        stop_sh_content += f"rm -r pnode{i}/lib\n"
-        stop_sh_content += f"rm -r pnode{i}/log\n"
+        stop_sh_content += f"rm -r {basedir}/pnode{i}/lib\n"
+        stop_sh_content += f"rm -r {basedir}/pnode{i}/log\n"
 
     if standalone:
-        stop_sh_content += f"rm -r xrpld/lib\n"
-        stop_sh_content += f"rm -r xrpld/log\n"
+        stop_sh_content += f"rm -r {basedir}/xrpld/lib\n"
+        stop_sh_content += f"rm -r {basedir}/xrpld/log\n"
 
     return stop_sh_content
 
@@ -400,9 +431,9 @@ def create_network(
 
     write_file(
         f"{name}-cluster/start.sh",
-        """\
+        f"""\
 #! /bin/bash
-docker compose -f docker-compose.yml up --build --force-recreate -d
+docker compose -f {basedir}/xrpld-{name}/docker-compose.yml up --build --force-recreate -d
 """,
     )
     stop_sh_content: str = update_stop_sh(name, num_validators, num_peers, False)
@@ -414,7 +445,9 @@ docker compose -f docker-compose.yml up --build --force-recreate -d
         client.add_validator(manifest)
 
     client.sign_unl(private_key, f"{name}-cluster/vl/vl.json")
-    shutil.copyfile("Deploykit/nginx.dockerfile", f"{name}-cluster/vl/Dockerfile")
+    shutil.copyfile(
+        f"{basedir}/deploykit/nginx.dockerfile", f"{name}-cluster/vl/Dockerfile"
+    )
 
 
 def create_standalone_folder(
@@ -427,8 +460,8 @@ def create_standalone_folder(
     ivl_key: str,
     protocol: str,
 ):
-    root_path = f"xrpld-{name}"
-    cfg_path = f"xrpld-{name}/config"
+    root_path = f"{basedir}/xrpld-{name}"
+    cfg_path = f"{basedir}/xrpld-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
     configs: List[RippledBuild] = gen_config(
         name,
@@ -445,15 +478,15 @@ def create_standalone_folder(
         ivl_key,
         [f"0.0.0.0 {peer}"],
     )
-    os.makedirs(f"xrpld-{name}", exist_ok=True)
-    os.makedirs(f"xrpld-{name}/config", exist_ok=True)
+    os.makedirs(f"{basedir}/xrpld-{name}/config", exist_ok=True)
     save_local_config(root_path, cfg_path, configs[0].data, configs[1].data)
     features_json: Dict[str, Any] = download_json(
-        f"{storage_url}/features.json", f"xrpld-{name}"
+        f"{storage_url}/features.json", f"{basedir}/xrpld-{name}"
     )
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
-        f"xrpld-{name}/genesis.json", json.dumps(genesis_json, indent=4, sort_keys=True)
+        f"{basedir}/xrpld-{name}/genesis.json",
+        json.dumps(genesis_json, indent=4, sort_keys=True),
     )
     dockerfile: str = create_dockerfile(
         binary,
@@ -467,10 +500,12 @@ def create_standalone_folder(
         "",
         "-a",
     )
-    with open(f"xrpld-{name}/Dockerfile", "w") as file:
+    with open(f"{basedir}/xrpld-{name}/Dockerfile", "w") as file:
         file.write(dockerfile)
 
-    shutil.copyfile("Deploykit/entrypoint", f"xrpld-standalone/entrypoint")
+    shutil.copyfile(
+        f"{basedir}/deploykit/entrypoint", f"{basedir}/xrpld-{name}/entrypoint"
+    )
     pwd_str: str = "${PWD}"
     services["xrpld"] = {
         "build": {
@@ -528,27 +563,27 @@ def create_standalone_image(
             f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6018}",
         ],
         "ports": ["4000:4000"],
-        "networks": [f"{name}-network"],
+        "networks": ["standalone-network"],
     }
 
     compose = {
         "version": "3.4",
         "services": services,
-        "networks": {f"{name}-network": {"driver": "bridge"}},
+        "networks": {"standalone-network": {"driver": "bridge"}},
     }
 
-    with open(f"xrpld-{name}/docker-compose.yml", "w") as f:
+    with open(f"{basedir}/xrpld-{name}/docker-compose.yml", "w") as f:
         yaml.dump(compose, f, default_flow_style=False)
 
     write_file(
-        f"xrpld-{name}/start.sh",
-        """\
+        f"{basedir}/xrpld-{name}/start.sh",
+        f"""\
 #! /bin/bash
-docker compose -f docker-compose.yml up --build --force-recreate -d
+docker compose -f {basedir}/xrpld-{name}/docker-compose.yml up --build --force-recreate -d
 """,
     )
     stop_sh_content: str = update_stop_sh(name, 0, 0, True)
-    write_file(f"xrpld-{name}/stop.sh", stop_sh_content)
+    write_file(f"{basedir}/xrpld-{name}/stop.sh", stop_sh_content)
 
 
 def create_standalone_binary(
@@ -559,7 +594,8 @@ def create_standalone_binary(
     build_server: str,
     build_version: str,
 ) -> None:
-    name: str = "standalone"
+    name: str = build_version
+    os.makedirs(f"{basedir}/xrpld-{name}", exist_ok=True)
     _build_name: str = "dangell7-xahau-binary:2023.10.24"
     image_name, version = parse_image_name(_build_name)
     root_url = f"https://storage.googleapis.com/thelab-builds/"
@@ -568,7 +604,7 @@ def create_standalone_binary(
     )
 
     url: str = f"{build_server}/{build_version}"
-    download_binary(url, f"xrpld-{name}/rippled")
+    download_binary(url, f"{basedir}/xrpld-{name}/rippled")
     image: str = "ubuntu:jammy"
     create_standalone_folder(
         True,
@@ -588,24 +624,26 @@ def create_standalone_binary(
             f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6018}",
         ],
         "ports": ["4000:4000"],
-        "networks": [f"{name}-network"],
+        "networks": ["standalone-network"],
     }
 
     compose = {
         "version": "3.9",
         "services": services,
-        "networks": {f"{name}-network": {"driver": "bridge"}},
+        "networks": {"standalone-network": {"driver": "bridge"}},
     }
 
-    with open(f"xrpld-{name}/docker-compose.yml", "w") as f:
+    with open(f"{basedir}/xrpld-{name}/docker-compose.yml", "w") as f:
         yaml.dump(compose, f, default_flow_style=False)
 
     write_file(
-        f"xrpld-{name}/start.sh",
-        """\
+        f"{basedir}/xrpld-{name}/start.sh",
+        f"""\
 #! /bin/bash
-docker compose -f docker-compose.yml up --build --force-recreate -d
+docker compose -f {basedir}/xrpld-{name}/docker-compose.yml up --build --force-recreate -d
 """,
     )
+    os.chmod(f"{basedir}/xrpld-{name}/start.sh", 0o755)
     stop_sh_content: str = update_stop_sh(name, 0, 0, True)
-    write_file(f"xrpld-{name}/stop.sh", stop_sh_content)
+    write_file(f"{basedir}/xrpld-{name}/stop.sh", stop_sh_content)
+    os.chmod(f"{basedir}/xrpld-{name}/stop.sh", 0o755)

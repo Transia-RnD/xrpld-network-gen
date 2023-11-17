@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "xrpld-netgen"
-version = "1.1.0"
+version = "1.2.0"
 description = "Xrpld network generator"
 authors = ["Denis Angell <dangell@transia.co>"]
 
@@ -9,8 +9,8 @@ python = "^3.9.6"
 pytest = "^7.2.1"
 pyyaml = "^6.0.1"
 requests = "^2.31.0"
-xrpld-publisher = "^1.0.4"
-xrpl-helpers = "^1.0.2"
+xrpld-publisher = "^1.0.5"
+xrpl-helpers = "^1.0.3"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.8.4"
@@ -27,3 +27,7 @@ mypy = "^0"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+xrpld-netgen = "xrpld_netgen.cli:main"
+create-standalone = "xrpld_netgen.cli.create_standalone:main"

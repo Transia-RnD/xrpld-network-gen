@@ -92,7 +92,12 @@ def create_dockerfile(
     return dockerfile
 
 
-def download_binary(url, save_path):
+def download_binary(url: str, save_path: str):
+    # Check if the file already exists
+    if os.path.exists(save_path):
+        print(f"The file {save_path} already exists.")
+        return
+
     try:
         # Send a GET request to the URL
         response = requests.get(url, stream=True)
@@ -105,6 +110,7 @@ def download_binary(url, save_path):
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
 
+        # Set the file permissions to be readable and executable by the owner
         os.chmod(save_path, 0o755)
         print(f"Download complete. File saved as {save_path}")
     except requests.exceptions.RequestException as e:
