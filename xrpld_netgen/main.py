@@ -126,10 +126,10 @@ def generate_ports(index, node_type):
         ws_admin = WS_ADMIN + (index * 10)
         peer = PEER + (index * 10)
     elif node_type == "standalone":
-        rpc_public = RPC_PUBLIC
-        rpc_admin = RPC_ADMIN
-        ws_public = WS_PUBLIC
-        ws_admin = WS_ADMIN
+        rpc_public = 5007
+        rpc_admin = 5005
+        ws_public = 6008
+        ws_admin = 6006
         peer = PEER
     else:
         raise ValueError("Invalid node type. Must be 'validator' or 'peer'.")
@@ -729,7 +729,7 @@ def start_local(
         "container_name": "explorer",
         "environment": [
             "PORT=4000",
-            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6018}",
+            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6006}",
         ],
         "ports": ["4000:4000"],
         "networks": ["standalone-network"],

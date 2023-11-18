@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "xrpld-netgen"
-version = "1.3.0"
+version = "1.4.0"
 description = "Xrpld network generator"
 authors = ["Denis Angell <dangell@transia.co>"]
 

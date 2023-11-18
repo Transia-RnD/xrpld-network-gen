@@ -2,7 +2,7 @@
 # coding: utf-8
 
 # create:standalone
-# xrpld-netgen create:standalone --protocol "xahau" --build_version "2023.11.10-dev+549"
+# xrpld-netgen create:standalone --protocol "xahau" --version "2023.11.10-dev+549"
 # start:local
 # xrpld-netgen start:local --protocol "xahau"
 
@@ -84,10 +84,10 @@ def main():
         "--network_id", type=int, required=False, help="The network id"
     )
     parser_cs.add_argument(
-        "--binary_server", required=False, help="The build server for the network"
+        "--server", required=False, help="The build server for the network"
     )
     parser_cs.add_argument(
-        "--build_version", required=True, help="The build version for the network"
+        "--version", required=True, help="The build version for the network"
     )
 
     args = parser.parse_args()
@@ -166,8 +166,8 @@ def main():
         IMPORT_KEY = args.import_key
         PROTOCOL = args.protocol
         NETWORK_ID = args.network_id
-        BUILD_SERVER = args.binary_server
-        BUILD_VERSION = args.build_version
+        BUILD_SERVER = args.server
+        BUILD_VERSION = args.version
 
         if not PUBLIC_KEY:
             PUBLIC_KEY: str = (
