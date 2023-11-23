@@ -105,7 +105,7 @@ def gen_config(
         v_token=v_token,
         validator_list_sites=[vl_site],
         validator_list_keys=[vl_key],
-        import_vl_keys=[ivl_key],
+        import_vl_keys=[ivl_key] if ivl_key else [],
         ips_urls=[],
         ips_fixed_urls=ips_fixed_urls,
         amendment_majority_time=None,
@@ -507,6 +507,7 @@ def create_standalone_folder(
         ivl_key,
         [f"0.0.0.0 {peer}"],
     )
+    print(configs)
     os.makedirs(f"{basedir}/xrpld-{name}/config", exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     features_json: Dict[str, Any] = download_json(
