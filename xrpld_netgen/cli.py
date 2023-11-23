@@ -37,6 +37,7 @@ def main():
     parser_sl.add_argument(
         "--protocol", required=False, help="The protocol of the network"
     )
+    parser_sl.add_argument("--net_type", required=False, help="The type of the network")
     parser_sl.add_argument(
         "--network_id", type=int, required=False, help="The network id"
     )
@@ -101,19 +102,13 @@ def main():
         PUBLIC_KEY = args.public_key
         IMPORT_KEY = args.import_key
         PROTOCOL = args.protocol
+        NET_TYPE = args.net_type
         NETWORK_ID = args.network_id
 
-        if not PUBLIC_KEY:
-            PUBLIC_KEY: str = (
-                "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
-            )
-        if PROTOCOL == "xahau" and not IMPORT_KEY:
-            IMPORT_KEY: str = (
-                "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1"
-            )
-        if not NETWORK_ID:
-            NETWORK_ID: int = 21337
-        start_local(PUBLIC_KEY, IMPORT_KEY, PROTOCOL, NETWORK_ID)
+        if not NET_TYPE:
+            NET_TYPE: str = "standalone"
+
+        start_local(PUBLIC_KEY, IMPORT_KEY, PROTOCOL, NET_TYPE, NETWORK_ID)
 
     if args.command == "stop":
         NAME = args.name

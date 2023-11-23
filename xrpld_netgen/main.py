@@ -13,7 +13,7 @@ from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
     download_file_at_commit,
 )
-from xrpl_helpers.common.utils import write_file
+from xrpl_helpers.common.utils import write_file, read_json
 from xrpl_helpers.rippled.utils import (
     update_amendments,
     parse_rippled_amendments,
@@ -66,9 +66,10 @@ def gen_config(
     db_path: str,
     debug_path: str,
     v_token: str,
-    vl_site: str,
-    vl_key: str,
-    ivl_key: str,
+    vl_sites: List[str],
+    vl_keys: List[str],
+    ivl_keys: List[str],
+    ips_urls: List[str] = [],
     ips_fixed_urls: List[str] = [],
 ) -> List[RippledBuild]:
     configs: List[RippledBuild] = generate_rippled_cfg(
@@ -103,10 +104,10 @@ def gen_config(
         private_peer=0,
         genesis=False,
         v_token=v_token,
-        validator_list_sites=[vl_site],
-        validator_list_keys=[vl_key],
-        import_vl_keys=[ivl_key] if ivl_key else [],
-        ips_urls=[],
+        validator_list_sites=vl_sites,
+        validator_list_keys=vl_keys,
+        import_vl_keys=ivl_keys,
+        ips_urls=ips_urls,
         ips_fixed_urls=ips_fixed_urls,
         amendment_majority_time=None,
         amendments_dict={},
@@ -144,6 +145,14 @@ def generate_ports(index, node_type):
         raise ValueError("Invalid node type. Must be 'validator' or 'peer'.")
 
     return rpc_public, rpc_admin, ws_public, ws_admin, peer
+
+
+def generate_validator_config(protocol: str, network: str):
+    try:
+        config = read_json(f"{basedir}/deploykit/config.json")
+        return config[protocol][network]
+    except Exception as e:
+        return None
 
 
 deploykit_path: str = ""
@@ -249,9 +258,10 @@ def create_node_folders(
             "/var/lib/rippled/db",
             "/var/log/rippled/debug.log",
             token,
-            f"http://vl/vl.json",
-            ivl_key,
-            vl_key,
+            [f"http://vl/vl.json"],
+            [ivl_key] if ivl_key else [],
+            [vl_key],
+            [],
             [ips for ips in ips_fixed if ips != f"{node_dir} {peer}"],
         )
 
@@ -315,9 +325,10 @@ def create_node_folders(
             "/var/lib/rippled/db",
             "/var/log/rippled/debug.log",
             None,
-            f"http://vl/vl.json",
-            ivl_key,
-            vl_key,
+            [f"http://vl/vl.json"],
+            [ivl_key] if ivl_key else [],
+            [vl_key],
+            [],
             ips_fixed,
         )
         # print(f'CONFIG: {configs}')
@@ -486,12 +497,24 @@ def create_standalone_folder(
     vl_key: str,
     ivl_key: str,
     protocol: str,
+    net_type: str,
 ):
     cfg_path = f"{basedir}/xrpld-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
+    vl_config: Dict[str, Any] = generate_validator_config(protocol, net_type)
+
+    if network_id:
+        vl_config["network_id"] = network_id
+
+    if vl_key:
+        vl_config["validator_list_keys"] = [vl_key]
+
+    if ivl_key:
+        vl_config["import_vl_keys"] = [ivl_key]
+
     configs: List[RippledBuild] = gen_config(
         name,
-        network_id,
+        vl_config["network_id"],
         0,
         rpc_public,
         rpc_admin,
@@ -502,12 +525,12 @@ def create_standalone_folder(
         "/var/lib/rippled/db",
         "/var/log/rippled/debug.log",
         None,
-        f"http://vl/vl.json",
-        vl_key,
-        ivl_key,
-        [f"0.0.0.0 {peer}"],
+        vl_config["validator_list_sites"],
+        vl_config["validator_list_keys"],
+        vl_config["import_vl_keys"] if protocol == "xahau" else [],
+        vl_config["ips"],
+        vl_config["ips_fixed"],
     )
-    print(configs)
     os.makedirs(f"{basedir}/xrpld-{name}/config", exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     features_json: Dict[str, Any] = download_json(
@@ -564,6 +587,7 @@ def create_standalone_image(
     public_key: str,
     import_key: str,
     protocol: str,
+    net_type: str,
     network_id: int,
     build_system: str,
     build_name: str,
@@ -584,6 +608,7 @@ def create_standalone_image(
         public_key,
         import_key,
         protocol,
+        net_type,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",
@@ -641,9 +666,10 @@ def create_binary_folder(
         "/var/lib/rippled/db",
         "/var/log/rippled/debug.log",
         None,
-        f"http://vl/vl.json",
-        vl_key,
-        ivl_key,
+        [f"http://vl/vl.json"],
+        [vl_key],
+        [ivl_key],
+        [],
         [f"0.0.0.0 {peer}"],
     )
     os.makedirs(f"{basedir}/{protocol}-{name}/config", exist_ok=True)
@@ -767,12 +793,24 @@ def create_local_folder(
     vl_key: str,
     ivl_key: str,
     protocol: str,
+    net_type: str,
 ):
     cfg_path = f"config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
+    vl_config: Dict[str, Any] = generate_validator_config(protocol, net_type)
+
+    if network_id:
+        vl_config["network_id"] = network_id
+
+    if vl_key:
+        vl_config["validator_list_keys"] = [vl_key]
+
+    if ivl_key:
+        vl_config["import_vl_keys"] = [ivl_key]
+
     configs: List[RippledBuild] = gen_config(
         name,
-        network_id,
+        vl_config["network_id"],
         0,
         rpc_public,
         rpc_admin,
@@ -783,10 +821,11 @@ def create_local_folder(
         "db",
         "debug.log",
         None,
-        f"http://vl/vl.json",
-        vl_key,
-        ivl_key,
-        [f"0.0.0.0 {peer}"],
+        vl_config["validator_list_sites"],
+        vl_config["validator_list_keys"],
+        vl_config["import_vl_keys"] if protocol == "xahau" else [],
+        vl_config["ips"],
+        vl_config["ips_fixed"],
     )
     os.makedirs(f"config", exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
@@ -805,6 +844,7 @@ def start_local(
     public_key: str,
     import_key: str,
     protocol: str,
+    net_type: str,
     network_id: int,
 ) -> None:
     name: str = "local"
@@ -815,6 +855,7 @@ def start_local(
         public_key,
         import_key,
         protocol,
+        net_type,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",
@@ -841,7 +882,7 @@ def start_local(
         f"""\
 #! /bin/bash
 docker compose -f docker-compose.yml up --build --force-recreate -d
-./rippled -a --conf config/rippled.cfg --ledgerfile config/genesis.json
+./rippled {'-a' if net_type == 'standalone' else ''} --conf config/rippled.cfg --ledgerfile config/genesis.json
 """,
     )
     os.chmod("start.sh", 0o755)
