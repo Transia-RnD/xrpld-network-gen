@@ -3,6 +3,8 @@
 
 # create:standalone
 # xrpld-netgen create:standalone --protocol "xahau" --version "2023.11.10-dev+549"
+# start
+# xrpld-netgen start --name xrpld-2023.11.10-dev+549
 # start:local
 # xrpld-netgen start:local --protocol "xahau"
 
@@ -192,6 +194,7 @@ def main():
             BUILD_SERVER,
             BUILD_VERSION,
         )
+        print(f"Run with: xrpld-netgen start --name {PROTOCOL}-{BUILD_VERSION}")
 
 
 if __name__ == "__main__":

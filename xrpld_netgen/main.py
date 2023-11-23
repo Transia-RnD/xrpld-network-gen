@@ -9,8 +9,17 @@ from typing import List, Any, Dict, Tuple
 
 from xrpld_netgen.rippled_cfg import generate_rippled_cfg, RippledBuild
 from xrpld_netgen.utils.deploy_kit import create_dockerfile, download_binary
+from xrpld_netgen.libs.github import (
+    get_commit_hash_from_server_version,
+    download_file_at_commit,
+)
 from xrpl_helpers.common.utils import write_file
-from xrpl_helpers.rippled.utils import update_amendments, parse_rippled_amendments
+from xrpl_helpers.rippled.utils import (
+    update_amendments,
+    parse_rippled_amendments,
+    get_feature_lines_from_content,
+    get_feature_lines_from_path,
+)
 
 from xrpld_publisher.publisher import PublisherClient
 from xrpld_publisher.validator import ValidatorClient
@@ -439,7 +448,7 @@ def create_network(
     }
 
     compose = {
-        "version": "3.4",
+        "version": "3.9",
         "services": services,
         "networks": {f"{name}-network": {"driver": "bridge"}},
     }
@@ -472,13 +481,12 @@ def create_standalone_folder(
     binary: bool,
     name: str,
     image: str,
-    storage_url: str,
+    features_url: str,
     network_id: int,
     vl_key: str,
     ivl_key: str,
     protocol: str,
 ):
-    root_path = f"{basedir}/xrpld-{name}"
     cfg_path = f"{basedir}/xrpld-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
     configs: List[RippledBuild] = gen_config(
@@ -502,7 +510,7 @@ def create_standalone_folder(
     os.makedirs(f"{basedir}/xrpld-{name}/config", exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     features_json: Dict[str, Any] = download_json(
-        f"{storage_url}/features.json", f"{basedir}/xrpld-{name}"
+        features_url, f"{basedir}/xrpld-{name}"
     )
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
@@ -570,7 +578,7 @@ def create_standalone_image(
         False,
         name,
         image,
-        storage_url,
+        f"{storage_url}/features.json",
         network_id,
         public_key,
         import_key,
@@ -581,14 +589,14 @@ def create_standalone_image(
         "container_name": "explorer",
         "environment": [
             "PORT=4000",
-            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6018}",
+            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6006}",
         ],
         "ports": ["4000:4000"],
         "networks": ["standalone-network"],
     }
 
     compose = {
-        "version": "3.4",
+        "version": "3.9",
         "services": services,
         "networks": {"standalone-network": {"driver": "bridge"}},
     }
@@ -607,6 +615,88 @@ docker compose -f {basedir}/xrpld-{name}/docker-compose.yml up --build --force-r
     write_file(f"{basedir}/xrpld-{name}/stop.sh", stop_sh_content)
 
 
+def create_binary_folder(
+    binary: bool,
+    name: str,
+    image: str,
+    feature_content: str,
+    network_id: int,
+    vl_key: str,
+    ivl_key: str,
+    protocol: str,
+):
+    cfg_path = f"{basedir}/{protocol}-{name}/config"
+    rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
+    configs: List[RippledBuild] = gen_config(
+        name,
+        network_id,
+        0,
+        rpc_public,
+        rpc_admin,
+        ws_public,
+        ws_admin,
+        peer,
+        "/var/lib/rippled/db/nudb",
+        "/var/lib/rippled/db",
+        "/var/log/rippled/debug.log",
+        None,
+        f"http://vl/vl.json",
+        vl_key,
+        ivl_key,
+        [f"0.0.0.0 {peer}"],
+    )
+    os.makedirs(f"{basedir}/{protocol}-{name}/config", exist_ok=True)
+    save_local_config(cfg_path, configs[0].data, configs[1].data)
+
+    lines: List[str] = get_feature_lines_from_content(feature_content)
+    features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+    genesis_json: Any = update_amendments(features_json, protocol)
+    write_file(
+        f"{basedir}/{protocol}-{name}/genesis.json",
+        json.dumps(genesis_json, indent=4, sort_keys=True),
+    )
+    dockerfile: str = create_dockerfile(
+        binary,
+        image,
+        rpc_public,
+        rpc_admin,
+        ws_public,
+        ws_admin,
+        peer,
+        True,
+        "",
+        "-a",
+    )
+    with open(f"{basedir}/{protocol}-{name}/Dockerfile", "w") as file:
+        file.write(dockerfile)
+
+    shutil.copyfile(
+        f"{basedir}/deploykit/entrypoint", f"{basedir}/{protocol}-{name}/entrypoint"
+    )
+    pwd_str: str = "${PWD}"
+    services[f"{protocol}"] = {
+        "build": {
+            "context": ".",
+            "dockerfile": "Dockerfile",
+        },
+        "platform": "linux/x86_64",
+        "container_name": f"{protocol}",
+        "ports": [
+            f"{rpc_public}:{rpc_public}",
+            f"{rpc_admin}:{rpc_admin}",
+            f"{ws_public}:{ws_public}",
+            f"{ws_admin}:{ws_admin}",
+            f"{peer}:{peer}",
+        ],
+        "volumes": [
+            f"{pwd_str}/{protocol}/config:/etc/opt/ripple",
+            f"{pwd_str}/{protocol}/log:/var/log/rippled",
+            f"{pwd_str}/{protocol}/lib:/var/lib/rippled",
+        ],
+        "networks": ["standalone-network"],
+    }
+
+
 def create_standalone_binary(
     public_key: str,
     import_key: str,
@@ -616,22 +706,22 @@ def create_standalone_binary(
     build_version: str,
 ) -> None:
     name: str = build_version
-    os.makedirs(f"{basedir}/xrpld-{name}", exist_ok=True)
-    _build_name: str = "dangell7-xahau-binary:2023.10.24"
-    image_name, version = parse_image_name(_build_name)
-    root_url = f"https://storage.googleapis.com/thelab-builds/"
-    storage_url: str = (
-        root_url + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}"
+    os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
+    # Usage
+    owner = "Xahau"
+    repo = "xahaud"
+    commit_hash = get_commit_hash_from_server_version(build_server, build_version)
+    content: str = download_file_at_commit(
+        owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
     )
-
     url: str = f"{build_server}/{build_version}"
-    download_binary(url, f"{basedir}/xrpld-{name}/rippled")
+    download_binary(url, f"{basedir}/{protocol}-{name}/rippled")
     image: str = "ubuntu:jammy"
-    create_standalone_folder(
+    create_binary_folder(
         True,
         name,
         image,
-        storage_url,
+        content,
         network_id,
         public_key,
         import_key,
@@ -654,20 +744,20 @@ def create_standalone_binary(
         "networks": {"standalone-network": {"driver": "bridge"}},
     }
 
-    with open(f"{basedir}/xrpld-{name}/docker-compose.yml", "w") as f:
+    with open(f"{basedir}/{protocol}-{name}/docker-compose.yml", "w") as f:
         yaml.dump(compose, f, default_flow_style=False)
 
     write_file(
-        f"{basedir}/xrpld-{name}/start.sh",
+        f"{basedir}/{protocol}-{name}/start.sh",
         f"""\
 #! /bin/bash
-docker compose -f {basedir}/xrpld-{name}/docker-compose.yml up --build --force-recreate -d
+docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml up --build --force-recreate -d
 """,
     )
-    os.chmod(f"{basedir}/xrpld-{name}/start.sh", 0o755)
+    os.chmod(f"{basedir}/{protocol}-{name}/start.sh", 0o755)
     stop_sh_content: str = update_stop_sh(name, 0, 0, True)
-    write_file(f"{basedir}/xrpld-{name}/stop.sh", stop_sh_content)
-    os.chmod(f"{basedir}/xrpld-{name}/stop.sh", 0o755)
+    write_file(f"{basedir}/{protocol}-{name}/stop.sh", stop_sh_content)
+    os.chmod(f"{basedir}/{protocol}-{name}/stop.sh", 0o755)
 
 
 def create_local_folder(
@@ -699,9 +789,10 @@ def create_local_folder(
     )
     os.makedirs(f"config", exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
-    features_json: Dict[str, Any] = parse_rippled_amendments(
+    content: str = get_feature_lines_from_path(
         "../src/ripple/protocol/impl/Feature.cpp"
     )
+    features_json: Dict[str, Any] = parse_rippled_amendments(content)
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
         f"config/genesis.json",

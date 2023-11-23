@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "xrpld-netgen"
-version = "1.4.0"
+version = "1.5.0"
 description = "Xrpld network generator"
 authors = ["Denis Angell <dangell@transia.co>"]
 
@@ -10,7 +10,7 @@ pytest = "^7.2.1"
 pyyaml = "^6.0.1"
 requests = "^2.31.0"
 xrpld-publisher = "^1.0.5"
-xrpl-helpers = "^1.0.3"
+xrpl-helpers = "^1.0.4"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.8.4"
