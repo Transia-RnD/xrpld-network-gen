@@ -4,13 +4,6 @@ This is a command-line interface (CLI) for building xrpld networks and standalon
 
 ## Commands
 
-### start
-
-This command starts a network.
-
-Parameters:
-- `--name`: The name of the network. This parameter is required.
-
 ### start:local
 
 The `start:local` command is used to start a local network. This command is typically run in the build directory of the rippled or xahau build. 
@@ -21,25 +14,20 @@ Parameters:
 - `--public_key`: The public vl key. This parameter is optional.
 - `--import_key`: The import vl key. This parameter is optional.
 - `--protocol`: The protocol of the network. This parameter is optional.
+- `--net_type`: The type of network. This parameter is optional. ("testnet", "standalone")
 - `--network_id`: The network id. This parameter is optional and should be an integer.
 
-### stop
-
-This command stops a network.
-
-Parameters:
-- `--name`: The name of the network. This parameter is required.
+```
+xrpld-netgen start:local --protocol ripple
+```
 
 ### stop:local
 
 This command stops a local network. It does not require any parameters.
 
-### remove
-
-This command removes a network.
-
-Parameters:
-- `--name`: The name of the network. This parameter is required.
+```
+xrpld-netgen stop:local
+```
 
 ### create:network
 
@@ -65,12 +53,35 @@ Parameters:
 - `--server`: The build server. This parameter is optional.
 - `--version`: The build version. This parameter is required.
 
-## Usage
+### start
 
-To use the CLI, simply call the desired command with the appropriate parameters. For example:
+This command starts a network.
+
+Parameters:
+- `--name`: The name of the network. This parameter is required.
 
 ```
-xrpld-netgen start --name MyNetwork
+xrpld-netgen start --name my-network
 ```
 
-This will start a network named "MyNetwork".
+### stop
+
+This command stops a network.
+
+Parameters:
+- `--name`: The name of the network. This parameter is required.
+
+```
+xrpld-netgen stop --name my-network
+```
+
+### remove
+
+This command removes a network.
+
+Parameters:
+- `--name`: The name of the network. This parameter is required.
+
+```
+xrpld-netgen remove --name my-network
+```
