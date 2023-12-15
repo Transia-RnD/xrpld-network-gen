@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import requests
+import re
 import os
 from xrpl_helpers.common.utils import write_file
 
@@ -47,6 +48,7 @@ fi
 
 def create_dockerfile(
     binary,
+    version,
     image_name,
     rpc_public_port,
     rpc_admin_port,
@@ -74,7 +76,7 @@ def create_dockerfile(
         dockerfile += "COPY genesis.json /genesis.json\n"
 
     if binary:
-        dockerfile += "COPY rippled /app/rippled\n"
+        dockerfile += f"COPY rippled.{version} /app/rippled\n"
 
     dockerfile += f"""
     RUN chmod +x /entrypoint.sh && \
@@ -115,3 +117,23 @@ def download_binary(url: str, save_path: str):
         print(f"Download complete. File saved as {save_path}")
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
+
+
+def update_dockerfile(build_version: str, save_path: str):
+    # Read the Dockerfile
+    with open(save_path, "r") as file:
+        lines = file.readlines()
+
+    # Define the pattern to search for any rippled COPY line
+    pattern = re.compile(r"^COPY rippled.* /app/rippled$")
+
+    # Replace the line with the new version
+    with open(save_path, "w") as file:
+        for line in lines:
+            if pattern.match(line):
+                # Replace the line with the new rippled version
+                file.write(f"COPY rippled.{build_version} /app/rippled\n")
+            else:
+                file.write(line)
+
+    print(f"Dockerfile has been updated with the new rippled version: {build_version}")

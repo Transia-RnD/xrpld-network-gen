@@ -305,3 +305,65 @@ def generate_rippled_cfg(
         print(ips_fixed_urls)
         print(ips_urls)
         print(amendments_dict)
+
+
+def gen_config(
+    name: str,
+    network_id: int,
+    index: int,
+    rpc_public: int,
+    rpc_admin: int,
+    ws_public: int,
+    ws_admin: int,
+    peer: int,
+    nudb_path: str,
+    db_path: str,
+    debug_path: str,
+    v_token: str,
+    vl_sites: List[str],
+    vl_keys: List[str],
+    ivl_keys: List[str],
+    ips_urls: List[str] = [],
+    ips_fixed_urls: List[str] = [],
+) -> List[RippledBuild]:
+    configs: List[RippledBuild] = generate_rippled_cfg(
+        # App
+        build_path="/",
+        node_index=index,
+        network=name,
+        network_id=network_id,
+        # Rippled
+        is_rpc_public=True,
+        rpc_public_port=rpc_public,
+        is_rpc_admin=True,
+        rpc_admin_port=rpc_admin,
+        is_ws_public=True,
+        ws_public_port=ws_public,
+        is_ws_admin=True,
+        ws_admin_port=ws_admin,
+        is_peer=True,
+        peer_port=peer,
+        # ssl_verify=1 if _node.ssl_verify else 0,
+        ssl_verify=0,
+        is_ssl=True,
+        key_path=None,
+        crt_path=None,
+        size_node="medium",
+        nudb_path=nudb_path,
+        db_path=db_path,
+        num_ledgers=256,
+        debug_path=debug_path,
+        log_level="trace",
+        # private_peer=1 if _node.private_peer and i == 1 else 0,
+        private_peer=0,
+        genesis=False,
+        v_token=v_token,
+        validator_list_sites=vl_sites,
+        validator_list_keys=vl_keys,
+        import_vl_keys=ivl_keys,
+        ips_urls=ips_urls,
+        ips_fixed_urls=ips_fixed_urls,
+        amendment_majority_time=None,
+        amendments_dict={},
+    )
+    return configs
