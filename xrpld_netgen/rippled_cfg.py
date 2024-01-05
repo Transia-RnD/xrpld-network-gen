@@ -53,6 +53,15 @@ def generate_rippled_cfg(
     ips_urls: List[str] = [],
     amendment_majority_time: str = None,
     amendments_dict: Dict[str, str] = {},
+    max_transactions: int = 1000,
+    ledgers_in_queue: int = 200,
+    minimum_queue_size: int = 10000,
+    minimum_txn_in_ledger: int = 500,
+    target_txn_in_ledger: int = 10000,
+    normal_consensus_increase_percent: int = 50,
+    slow_consensus_decrease_percent: int = 10,
+    maximum_txn_in_ledger: int = 10000,
+    maximum_txn_per_account: int = 10000,
 ):
     try:
         node_config_path: str = build_path + "/config"
@@ -137,7 +146,7 @@ def generate_rippled_cfg(
         cfg_out += "type=NuDB" + "\n"
         cfg_out += f"path={nudb_path}" + "\n"
         cfg_out += "advisory_delete=0" + "\n"
-        # cfg_out += f"""online_delete={num_ledgers}""" + "\n"
+        cfg_out += f"online_delete={num_ledgers}" + "\n"
         cfg_out += "\n"
 
         fee_account_reserve: int = 5000000
@@ -226,6 +235,27 @@ def generate_rippled_cfg(
         cfg_out += "[ssl_verify]" + "\n"
         cfg_out += f"{ssl_verify}" + "\n"
 
+        cfg_out += "\n"
+        cfg_out += "[max_transactions]" + "\n"
+        cfg_out += f"{max_transactions}" + "\n"
+
+        cfg_out += "\n"
+        cfg_out += "[transaction_queue]" + "\n"
+        cfg_out += f"ledgers_in_queue = {ledgers_in_queue}" + "\n"
+        cfg_out += f"minimum_queue_size = {minimum_queue_size}" + "\n"
+        cfg_out += f"minimum_txn_in_ledger = {minimum_txn_in_ledger}" + "\n"
+        cfg_out += f"target_txn_in_ledger = {target_txn_in_ledger}" + "\n"
+        cfg_out += (
+            f"normal_consensus_increase_percent = {normal_consensus_increase_percent}"
+            + "\n"
+        )
+        cfg_out += (
+            f"slow_consensus_decrease_percent = {slow_consensus_decrease_percent}"
+            + "\n"
+        )
+        cfg_out += f"maximum_txn_in_ledger = {maximum_txn_in_ledger}" + "\n"
+        cfg_out += f"maximum_txn_per_account = {maximum_txn_per_account}" + "\n"
+
         if amendment_majority_time:
             cfg_out += "\n"
             cfg_out += "[amendment_majority_time]" + "\n"
@@ -305,6 +335,14 @@ def generate_rippled_cfg(
         print(ips_fixed_urls)
         print(ips_urls)
         print(amendments_dict)
+        print(max_transactions)
+        print(ledgers_in_queue)
+        print(minimum_txn_in_ledger)
+        print(target_txn_in_ledger)
+        print(normal_consensus_increase_percent)
+        print(slow_consensus_decrease_percent)
+        print(maximum_txn_in_ledger)
+        print(maximum_txn_per_account)
 
 
 def gen_config(
@@ -348,7 +386,7 @@ def gen_config(
         is_ssl=True,
         key_path=None,
         crt_path=None,
-        size_node="medium",
+        size_node="huge",
         nudb_path=nudb_path,
         db_path=db_path,
         num_ledgers=256,
@@ -363,7 +401,7 @@ def gen_config(
         import_vl_keys=ivl_keys,
         ips_urls=ips_urls,
         ips_fixed_urls=ips_fixed_urls,
-        amendment_majority_time=None,
+        amendment_majority_time="5 minutes",
         amendments_dict={},
     )
     return configs
