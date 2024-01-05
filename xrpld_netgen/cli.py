@@ -3,7 +3,7 @@
 
 # NETWORK
 # create:network
-# xrpld-netgen create:network --protocol "xahau" --version "2023.11.10-dev+549"
+# xrpld-netgen create:network --protocol "xahau" --build_version "2023.11.10-dev+549"
 # add:peer
 # xrpld-netgen add:peer --network_name xrpld-2023.11.10-dev+549 --protocol "xahau" --version "2023.11.10-dev+549"
 # remove:peer
@@ -53,7 +53,7 @@ from xrpld_netgen.utils.misc import (
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-XAHAU_RELEASE: str = "2023.11.10-dev+549"
+XAHAU_RELEASE: str = "2023.12.29-release+689"
 XRPL_RELEASE: str = "1.12.0"
 
 
@@ -97,6 +97,7 @@ def main():
     parser_cn = subparsers.add_parser("create:network", help="Create Network")
     parser_cn.add_argument(
         "--protocol",
+        type=str,
         required=False,
         help="The protocol of the network",
         default="xahau",
@@ -116,33 +117,63 @@ def main():
         default=1,
     )
     parser_cn.add_argument(
-        "--network_id", type=int, required=False, help="The network id", default=21339
+        "--network_id",
+        type=int,
+        required=False,
+        help="The id of the network",
+        default=21339,
     )
     parser_cn.add_argument(
-        "--build_server", required=False, help="The build server for the network"
+        "--build_server",
+        type=str,
+        required=False,
+        help="The build server for the network",
     )
     parser_cn.add_argument(
-        "--build_version", required=False, help="The build version for the network"
+        "--build_version",
+        type=str,
+        required=False,
+        help="The build version for the network",
+    )
+    parser_cn.add_argument(
+        "--genesis",
+        type=bool,
+        required=False,
+        help="Is this a genesis network?",
+        default=False,
+    )
+    parser_cn.add_argument(
+        "--quorum",
+        type=int,
+        required=False,
+        help="The quorum required for the network",
     )
     # update:node
     parser_un = subparsers.add_parser("update:node", help="Update Node Version")
-    parser_un.add_argument("--name", required=True, help="The name of the network")
+    parser_un.add_argument(
+        "--name", type=str, required=True, help="The name of the network"
+    )
     parser_un.add_argument(
         "--node_id",
+        type=str,
         required=True,
         help="The node id you want to update",
     )
     parser_un.add_argument(
         "--node_type",
+        type=str,
         required=True,
         help="The node type you want to update",
         choices=["validator", "peer"],
     )
     parser_un.add_argument(
-        "--build_server", required=False, help="The build server for the node"
+        "--build_server", type=str, required=False, help="The build server for the node"
     )
     parser_un.add_argument(
-        "--build_version", required=False, help="The build version for the node"
+        "--build_version",
+        type=str,
+        required=False,
+        help="The build version for the node",
     )
     # enable:amendment
     parser_ea = subparsers.add_parser("enable:amendment", help="Enable Amendment")
@@ -307,6 +338,8 @@ def main():
         NETWORK_ID = args.network_id
         BUILD_SERVER = args.build_server
         BUILD_VERSION = args.build_version
+        GENESIS = args.genesis
+        QUORUM = args.quorum
 
         public_key: str = (
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
@@ -325,6 +358,9 @@ def main():
         if not BUILD_VERSION:
             BUILD_VERSION: str = XAHAU_RELEASE
 
+        if not QUORUM:
+            QUORUM = NUM_VALIDATORS - 1
+
         create_network_binary(
             public_key,
             import_vl_key,
@@ -336,8 +372,8 @@ def main():
             NETWORK_ID,
             BUILD_SERVER,
             BUILD_VERSION,
-            True,
-            3,
+            GENESIS,
+            QUORUM,
         )
 
     if args.command == "update:node":
