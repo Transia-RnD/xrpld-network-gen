@@ -26,6 +26,7 @@ from xrpld_netgen.utils.misc import (
     generate_ports,
     save_local_config,
     get_node_port,
+    sha512_half,
 )
 
 from xrpl_helpers.common.utils import write_file, read_json
@@ -40,12 +41,6 @@ from xrpld_publisher.publisher import PublisherClient
 from xrpld_publisher.validator import ValidatorClient
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-
-RPC_PUBLIC: int = 5005
-RPC_ADMIN: int = 5015
-WS_PUBLIC: int = 6016
-WS_ADMIN: int = 6018
-PEER: int = 51235
 
 deploykit_path: str = ""
 
@@ -74,7 +69,7 @@ def create_node_folders(
     num_validators: int,
     num_peers: int,
     network_id: int,
-    genesis: bool,
+    enable_all: bool,
     quorum: int,
     vl_key: str,
     ivl_key: str,
@@ -129,14 +124,19 @@ def create_node_folders(
         os.makedirs(f"{basedir}/{name}-cluster/{node_dir}/config", exist_ok=True)
         save_local_config(cfg_path, configs[0].data, configs[1].data)
 
-        lines: List[str] = get_feature_lines_from_content(feature_content)
-        features_json: Dict[str, Any] = parse_rippled_amendments(lines)
-        if genesis:
-            genesis_json: Any = update_amendments(features_json, protocol)
-            write_file(
-                f"{basedir}/{name}-cluster/{node_dir}/genesis.json",
-                json.dumps(genesis_json, indent=4, sort_keys=True),
-            )
+        # default features
+        features_json: Any = read_json("default.xahaud.features.json")
+
+        # genesis (enable all features)
+        if enable_all:
+            lines: List[str] = get_feature_lines_from_content(feature_content)
+            features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+
+        genesis_json: Any = update_amendments(features_json, protocol)
+        write_file(
+            f"{basedir}/{name}-cluster/{node_dir}/genesis.json",
+            json.dumps(genesis_json, indent=4, sort_keys=True),
+        )
 
         write_file(
             f"{basedir}/{name}-cluster/{node_dir}/features.json",
@@ -158,7 +158,7 @@ def create_node_folders(
             ws_public,
             ws_admin,
             peer,
-            genesis,
+            True,
             quorum,
             "",
         )
@@ -191,18 +191,8 @@ def create_node_folders(
             ],
             "networks": [f"{name}-network"],
         }
-        services[f"vnode{i}-explorer"] = {
-            "image": "transia/explorer:latest",
-            "container_name": f"vnode{i}-explorer",
-            "environment": [
-                f"PORT=410{i}",
-                f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{ws_admin}",
-            ],
-            "ports": [f"410{i}:410{i}"],
-            "networks": [f"{name}-network"],
-        }
 
-    for i in range(1, num_peers + 1):
+    for i in range(0, num_peers):
         node_dir = f"pnode{i}"
         cfg_path = f"{basedir}/{name}-cluster/{node_dir}/config"
         rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(i, "peer")
@@ -230,14 +220,19 @@ def create_node_folders(
         os.makedirs(f"{basedir}/{name}-cluster/{node_dir}/config", exist_ok=True)
         save_local_config(cfg_path, configs[0].data, configs[1].data)
 
-        lines: List[str] = get_feature_lines_from_content(feature_content)
-        features_json: Dict[str, Any] = parse_rippled_amendments(lines)
-        if genesis:
-            genesis_json: Any = update_amendments(features_json, protocol)
-            write_file(
-                f"{basedir}/{name}-cluster/{node_dir}/genesis.json",
-                json.dumps(genesis_json, indent=4, sort_keys=True),
-            )
+        # default features
+        features_json: Any = read_json("default.xahaud.features.json")
+
+        # genesis (enable all features)
+        if enable_all:
+            lines: List[str] = get_feature_lines_from_content(feature_content)
+            features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+
+        genesis_json: Any = update_amendments(features_json, protocol)
+        write_file(
+            f"{basedir}/{name}-cluster/{node_dir}/genesis.json",
+            json.dumps(genesis_json, indent=4, sort_keys=True),
+        )
 
         write_file(
             f"{basedir}/{name}-cluster/{node_dir}/features.json",
@@ -259,7 +254,7 @@ def create_node_folders(
             ws_public,
             ws_admin,
             peer,
-            genesis,
+            True,
             quorum,
             "",
         )
@@ -289,16 +284,6 @@ def create_node_folders(
                 f"{pwd_str}/pnode{i}/log:/var/log/rippled",
                 f"{pwd_str}/pnode{i}/lib:/var/lib/rippled",
             ],
-            "networks": [f"{name}-network"],
-        }
-        services[f"pnode{i}-explorer"] = {
-            "image": "transia/explorer:latest",
-            "container_name": f"pnode{i}-explorer",
-            "environment": [
-                f"PORT=401{i}",
-                f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{ws_admin}",
-            ],
-            "ports": [f"401{i}:401{i}"],
             "networks": [f"{name}-network"],
         }
 
@@ -391,6 +376,16 @@ def create_network_binary(
         "networks": [f"{name}-network"],
     }
 
+    services[f"network-explorer"] = {
+        "image": "transia/explorer-main:latest",
+        "container_name": f"network-explorer",
+        "environment": [
+            f"PORT=4000",
+        ],
+        "ports": [f"4000:4000"],
+        "networks": [f"{name}-network"],
+    }
+
     compose = {
         "version": "3.9",
         "services": services,
@@ -455,9 +450,7 @@ def enable_node_amendment(
     node_id: str,
     node_type: str,
 ) -> None:
-    node_dir: str = f"{'v' if node_type == 'validator' else 'p'}node{node_id}"
-    features: Dict[str, Any] = read_json(f"{basedir}/{name}/{node_dir}/features.json")
-    amendment_hash: str = features[amendment_name]
+    amendment_hash: str = sha512_half(amendment_name.encode("utf-8").hex())
     command: Dict[str, Any] = {
         "method": "feature",
         "params": [
