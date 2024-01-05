@@ -7,6 +7,7 @@ import requests
 import shutil
 import subprocess
 import shlex
+import hashlib
 
 from xrpl_helpers.common.utils import read_json
 
@@ -103,10 +104,10 @@ def parse_image_name(image_name: str) -> str:
     return name, version
 
 
-RPC_PUBLIC: int = 5005
-RPC_ADMIN: int = 5015
-WS_PUBLIC: int = 6016
-WS_ADMIN: int = 6018
+RPC_PUBLIC: int = 5007
+RPC_ADMIN: int = 5005
+WS_PUBLIC: int = 6008
+WS_ADMIN: int = 6006
 PEER: int = 51235
 
 
@@ -140,3 +141,11 @@ def generate_ports(index, node_type):
         raise ValueError("Invalid node type. Must be 'validator' or 'peer'.")
 
     return rpc_public, rpc_admin, ws_public, ws_admin, peer
+
+
+def sha512_half(hex_string):
+    hash_obj = hashlib.sha512()
+    hash_obj.update(bytes.fromhex(hex_string))
+    full_digest = hash_obj.hexdigest().upper()
+    hash_size = len(full_digest) // 2
+    return full_digest[:hash_size]
