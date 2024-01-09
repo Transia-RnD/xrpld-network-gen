@@ -1,87 +1,106 @@
-# xrpld-network-gen CLI
+# XRPLD Network Generator CLI Documentation
 
-This is a command-line interface (CLI) for building xrpld networks and standalone ledgers. 
+## Overview
 
-## Commands
+The XRPLD Network Generator CLI is a command-line interface tool designed to facilitate the creation, management, and interaction with XRPLD networks and standalone ledgers. This tool allows users to easily start, stop, remove, and update XRPLD nodes, as well as enable amendments on the network.
 
-### start:local
+## Prerequisites
 
-The `start:local` command is used to start a local network. This command is typically run in the build directory of the rippled or xahau build. 
+Before using the XRPLD Network Generator CLI, ensure that you have the following prerequisites installed:
 
-When you run `start:local`, it creates a standalone binary and runs the explorer. This is particularly useful for testing and development purposes, as it allows you to run a local instance of the network.
+- Python 3.10
+- Docker
+- Git (for cloning the repository)
 
-Parameters:
-- `--public_key`: The public vl key. This parameter is optional.
-- `--import_key`: The import vl key. This parameter is optional.
-- `--protocol`: The protocol of the network. This parameter is optional.
-- `--net_type`: The type of network. This parameter is optional. ("testnet", "standalone")
-- `--network_id`: The network id. This parameter is optional and should be an integer.
+## Installation
 
-```
-xrpld-netgen start:local --protocol ripple
-```
+To install the XRPLD Network Generator CLI, use pypi to install the package.
 
-### stop:local
-
-This command stops a local network. It does not require any parameters.
-
-```
-xrpld-netgen stop:local
+```bash
+pip3 install xrpld-network-gen
 ```
 
-### create:network
+## Usage
 
-This command creates a network.
+The CLI provides several commands to manage XRPLD networks and standalone ledgers:
 
-Parameters:
-- `--protocol`: The protocol of the network. This parameter is optional.
-- `--name`: The name of the network. This parameter is required.
-- `--num_validators`: The number of validators. This parameter is optional.
-- `--num_peers`: The number of peers. This parameter is optional.
-- `--network_id`: The network id. This parameter is optional and should be an integer.
-- `--image_name`: The image name. This parameter is optional.
+### Create a new Network
 
-### create:standalone
+To start a network or standalone ledger, use the `start` command followed by the name of the network or standalone ledger.
 
-This command creates a standalone binary.
-
-Parameters:
-- `--public_key`: The public vl key. This parameter is optional.
-- `--import_key`: The import vl key. This parameter is optional.
-- `--protocol`: The protocol of the network. This parameter is optional.
-- `--network_id`: The network id. This parameter is optional and should be an integer.
-- `--server`: The build server. This parameter is optional.
-- `--version`: The build version. This parameter is required.
-
-### start
-
-This command starts a network.
-
-Parameters:
-- `--name`: The name of the network. This parameter is required.
-
-```
-xrpld-netgen start --name my-network
+```bash
+xrpld-netgen create:network --protocol [PROTOCOL] --build_version [BUILD_VERSION] --validators [NUM_VALIDATORS]
 ```
 
-### stop
+### Start a Network or Standalone Ledger
 
-This command stops a network.
+To start a network or standalone ledger, use the `start` command followed by the name of the network or standalone ledger.
 
-Parameters:
-- `--name`: The name of the network. This parameter is required.
-
-```
-xrpld-netgen stop --name my-network
+```bash
+xrpld-netgen start --name [PROTOCOL] + [BUILD_VERSION]
 ```
 
-### remove
+### Stop a Network or Standalone Ledger
 
-This command removes a network.
+To stop a running network or standalone ledger, use the `stop` command followed by the name of the network or standalone ledger.
 
-Parameters:
-- `--name`: The name of the network. This parameter is required.
-
+```bash
+xrpld-netgen stop --name [PROTOCOL] + [BUILD_VERSION]
 ```
-xrpld-netgen remove --name my-network
+
+### Remove a Network or Standalone Ledger
+
+To remove an existing network or standalone ledger, use the `remove` command followed by the name of the network or standalone ledger.
+
+```bash
+xrpld-netgen remove --name [PROTOCOL] + [BUILD_VERSION]
+```
+
+### Update a Node in the Network
+
+To update a node in the network, use the `update:version` command followed by the node ID and the new version.
+
+```bash
+xrpld-netgen update:version --node_id [NODE_ID] --node_type [NODE_TYPE] --version [NEW_VERSION]
+```
+
+### Enable an Amendment on a Node
+
+To enable an amendment on a node, use the `enable:amendment` command followed by the amendment name and node ID.
+
+```bash
+xrpld-netgen enable:amendment --amendment_name [AMENDMENT_NAME] --node_id [NODE_ID] --node_type [NODE_TYPE]
+```
+
+### Create a Standalone Ledger
+
+To create a standalone ledger, use the `up:standalone` command with the necessary parameters.
+
+```bash
+xrpld-netgen up:standalone --version [BUILD_VERSION]
+```
+
+> If version is omitted then the current release is built
+
+### Remove a Standalone Ledger
+
+To remove a standalone ledger, use the `down:standalone` command.
+
+```bash
+xrpld-netgen down:standalone --name [PROTOCOL] + [BUILD_VERSION]
+```
+
+> `name` is not required when running current release
+
+## Support
+
+For any issues or questions regarding the XRPLD Network Generator CLI, please refer to the repository's issue tracker or contact the maintainers.
+
+## Contributing
+
+To install the XRPLD Network Generator CLI, clone the repository to your local machine and navigate to the directory containing the `cli.py` file.
+
+```bash
+git clone https://github.com/Transia-RnD/xrpld-network-gen
+cd xrpld-network-gen
 ```
