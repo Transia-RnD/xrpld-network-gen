@@ -109,6 +109,7 @@ def create_standalone_folder(
         vl_config["import_vl_keys"] = [ivl_key]
 
     configs: List[RippledBuild] = gen_config(
+        protocol,
         name,
         vl_config["network_id"],
         0,
@@ -263,6 +264,7 @@ def create_binary_folder(
         vl_config["import_vl_keys"] = [ivl_key]
 
     configs: List[RippledBuild] = gen_config(
+        protocol,
         name,
         vl_config["network_id"],
         0,
@@ -421,6 +423,7 @@ def create_local_folder(
         vl_config["import_vl_keys"] = [ivl_key]
 
     configs: List[RippledBuild] = gen_config(
+        protocol,
         name,
         vl_config["network_id"],
         0,

@@ -21,7 +21,8 @@ from xrpld_netgen.libs.github import (
     download_file_at_commit,
 )
 from xrpld_netgen.utils.misc import (
-    run_file,
+    download_json,
+    parse_image_name,
     run_command,
     generate_ports,
     save_local_config,
@@ -56,7 +57,6 @@ def generate_validator_config(protocol: str, network: str):
 import requests
 import os
 import json
-
 
 services: Dict[str, Dict] = {}
 
@@ -101,6 +101,7 @@ def create_node_folders(
         )
         # GENERATE CONFIG
         configs: List[RippledBuild] = gen_config(
+            protocol,
             name,
             network_id,
             i,
@@ -125,12 +126,18 @@ def create_node_folders(
         save_local_config(cfg_path, configs[0].data, configs[1].data)
 
         # default features
-        features_json: Any = read_json("default.xahaud.features.json")
+        features_json: Any = read_json(f"default.{protocol}d.features.json")
 
         # genesis (enable all features)
         if enable_all:
-            lines: List[str] = get_feature_lines_from_content(feature_content)
-            features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+            if protocol == "xahau":
+                lines: List[str] = get_feature_lines_from_content(feature_content)
+                features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+
+            if protocol == "ripple":
+                features_json: Dict[str, Any] = download_json(
+                    feature_content, f"{basedir}/{name}-cluster"
+                )
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -143,14 +150,15 @@ def create_node_folders(
             json.dumps(features_json, indent=4, sort_keys=True),
         )
 
-        shutil.copyfile(
-            f"{basedir}/{name}-cluster/rippled.{name}",
-            f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
-        )
-        os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
+        if protocol == "xahau":
+            shutil.copyfile(
+                f"{basedir}/{name}-cluster/rippled.{name}",
+                f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
+            )
+            os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
 
         dockerfile: str = create_dockerfile(
-            binary,
+            binary and protocol == "xahau",
             name,
             image,
             rpc_public,
@@ -197,6 +205,7 @@ def create_node_folders(
         cfg_path = f"{basedir}/{name}-cluster/{node_dir}/config"
         rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(i, "peer")
         configs: List[RippledBuild] = gen_config(
+            protocol,
             name,
             network_id,
             i,
@@ -225,8 +234,14 @@ def create_node_folders(
 
         # genesis (enable all features)
         if enable_all:
-            lines: List[str] = get_feature_lines_from_content(feature_content)
-            features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+            if protocol == "xahau":
+                lines: List[str] = get_feature_lines_from_content(feature_content)
+                features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+
+            if protocol == "ripple":
+                features_json: Dict[str, Any] = download_json(
+                    feature_content, f"{basedir}/{name}-cluster"
+                )
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -239,14 +254,15 @@ def create_node_folders(
             json.dumps(features_json, indent=4, sort_keys=True),
         )
 
-        shutil.copyfile(
-            f"{basedir}/{name}-cluster/rippled.{name}",
-            f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
-        )
-        os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
+        if protocol == "xahau":
+            shutil.copyfile(
+                f"{basedir}/{name}-cluster/rippled.{name}",
+                f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
+            )
+            os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
 
         dockerfile: str = create_dockerfile(
-            binary,
+            binary and protocol == "xahau",
             name,
             image,
             rpc_public,
@@ -325,7 +341,7 @@ def update_stop_sh(
     return stop_sh_content
 
 
-def create_network_binary(
+def create_network(
     public_key: str,
     import_key: str,
     private_key: str,
@@ -339,18 +355,31 @@ def create_network_binary(
     genesis: bool = False,
     quorum: int = None,
 ) -> None:
-    name: str = build_version
-    os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-    # Usage
-    owner = "Xahau"
-    repo = "xahaud"
-    commit_hash = get_commit_hash_from_server_version(build_server, build_version)
-    content: str = download_file_at_commit(
-        owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
-    )
-    url: str = f"{build_server}/{build_version}"
-    download_binary(url, f"{basedir}/{name}-cluster/rippled.{build_version}")
-    image: str = "ubuntu:jammy"
+    if protocol == "xahau":
+        name: str = build_version
+        os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+        # Usage
+        owner = "Xahau"
+        repo = "xahaud"
+        commit_hash = get_commit_hash_from_server_version(build_server, build_version)
+        content: str = download_file_at_commit(
+            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
+        )
+        url: str = f"{build_server}/{build_version}"
+        download_binary(url, f"{basedir}/{name}-cluster/rippled.{build_version}")
+        image: str = "ubuntu:jammy"
+
+    if protocol == "ripple":
+        name: str = build_version.replace(":", "-")
+        os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+        image_name, version = parse_image_name(build_version)
+        root_url = f"https://storage.googleapis.com/thelab-builds/"
+        content: str = (
+            root_url
+            + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}/features.json"
+        )
+        image: str = f"{build_server}/{build_version}"
+
     manifests: List[str] = create_node_folders(
         True,
         name,

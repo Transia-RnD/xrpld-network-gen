@@ -346,6 +346,7 @@ def generate_rippled_cfg(
 
 
 def gen_config(
+    protocol: str,
     name: str,
     network_id: int,
     index: int,
@@ -401,7 +402,7 @@ def gen_config(
         import_vl_keys=ivl_keys,
         ips_urls=ips_urls,
         ips_fixed_urls=ips_fixed_urls,
-        amendment_majority_time="5 minutes",
+        amendment_majority_time="5 minutes" if protocol == 'xahau' else '15 minutes',
         amendments_dict={},
     )
     return configs
