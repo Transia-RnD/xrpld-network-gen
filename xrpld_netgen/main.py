@@ -28,10 +28,6 @@ from xrpl_helpers.rippled.utils import (
     get_feature_lines_from_path,
 )
 
-
-from xrpld_publisher.publisher import PublisherClient
-from xrpld_publisher.validator import ValidatorClient
-
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 

@@ -42,7 +42,7 @@ from xrpld_netgen.main import (
     start_local,
 )
 from xrpld_netgen.network import (
-    create_network_binary,
+    create_network,
     update_node_binary,
     enable_node_amendment,
 )
@@ -341,16 +341,9 @@ def main():
         GENESIS = args.genesis
         QUORUM = args.quorum
 
-        public_key: str = (
-            "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
-        )
         import_vl_key: str = (
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
         )
-        private_key: str = (
-            "A232AD54A29466CDE4A3D99C651B332F89D25B5ACE3D8BD6ABD4748DA67159B2"
-        )
-        manifest: str = "JAAAAAFxIe2H4OqRqv+hMLeLddLMPlMgKqG9irPV57rFMMhEDjKFAXMh7eP2BCI6nc9g/k66bj7ksWmKuwZOKJeFx1emXip6dXxCdkB/0p6s8BzkgY7AXQxJh47pGP+vVtgcVJ44y2FK9H7xMsGOhdrbl0KUWY1Y15ZHd/R/QmvLhNC05psAX1+76YkNcBJAytrEazBhxQAEZSSLkfLwNTj3MewH1l1BjZhuIARiJNzh90dkV6AFqFW2m9VyVNLJX8EKl6yau/NET8KV2oFhAQ=="
 
         if not BUILD_SERVER:
             BUILD_SERVER: str = "https://build.xahau.tech"
@@ -361,11 +354,8 @@ def main():
         if not QUORUM:
             QUORUM = NUM_VALIDATORS - 1
 
-        create_network_binary(
-            public_key,
+        create_network(
             import_vl_key,
-            private_key,
-            manifest,
             PROTOCOL,
             NUM_VALIDATORS,
             NUM_PEERS,

@@ -35,7 +35,6 @@ from xrpl_helpers.rippled.utils import (
     update_amendments,
     parse_rippled_amendments,
     get_feature_lines_from_content,
-    get_feature_lines_from_path,
 )
 
 from xrpld_publisher.publisher import PublisherClient
@@ -92,7 +91,6 @@ def create_node_folders(
         client.set_domain(f"xahau.{node_dir}.transia.co")
         client.create_token()
         token = client.read_token()
-        client.create_manifest()
         manifest = client.read_manifest()
         manifests.append(manifest)
         # GENERATE PORTS
@@ -342,10 +340,7 @@ def update_stop_sh(
 
 
 def create_network(
-    public_key: str,
     import_key: str,
-    private_key: str,
-    manifest: str,
     protocol: str,
     num_validators: int,
     num_peers: int,
@@ -380,6 +375,9 @@ def create_network(
         )
         image: str = f"{build_server}/{build_version}"
 
+    client = PublisherClient()
+    client.create_keys()
+    keys = client.get_keys()
     manifests: List[str] = create_node_folders(
         True,
         name,
@@ -390,7 +388,7 @@ def create_network(
         network_id,
         genesis,
         quorum,
-        public_key,
+        keys["publicKey"],
         import_key,
         protocol,
     )
@@ -434,13 +432,9 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
     write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
 
     os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
-    client = PublisherClient(manifest)
     for manifest in manifests:
         client.add_validator(manifest)
-    print(private_key)
-    print(f"{basedir}/{name}-cluster/vl/vl.json")
-    print(os.getenv("BIN_PATH"))
-    client.sign_unl(private_key, f"{basedir}/{name}-cluster/vl/vl.json")
+    client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
     shutil.copyfile(
         f"{basedir}/deploykit/nginx.dockerfile",
         f"{basedir}/{name}-cluster/vl/Dockerfile",

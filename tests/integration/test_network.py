@@ -17,19 +17,16 @@ logger = logging.getLogger("app")
 
 
 class TestINetGenXahau(BaseTestConfig):
-    def _test_create_xahau_network(cls):
+    def test_create_xahau_network(cls):
         create_network(
-            "ED6ACA9949FC56CB07574C5AC9D29C8E62EB9D0752954F4D8953380EDB3EC46DC3",
             "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
-            "87BAB1FB62F8F665F58DD1C8293B11A4E20DA1E5C1C41CE65FAEB3A1E110B6D8",
-            "JAAAAAFxIe1qyplJ/FbLB1dMWsnSnI5i650HUpVPTYlTOA7bPsRtw3Mh7VyccqnOn1TaZC6UI1WMJD4sH3HqEzvJkPDoEVRWGdowdkArhkDIKzi+W4+/8ry4RyGnsSC7bMZzKw4/TM70esOQTr9TZKhF1FaePva/Aitt3l2KnORLIALBVmZ1x3yAYr4CcBJA67ISzEFSkOIoyNvLWPdetIdN/xEekPJNp2hyhodt2cu0sr46wdXPMjIFO/cFfxTndxTyTW/R/29U92Dcly8nAg==",
             "xahau",  # protocol
             6,  # num validators
             2,  # num peers
             21336,  # network id
             "https://build.xahau.tech",  # image host
-            "2023.12.29-release+689",  # image name
-            False,
+            "2024.1.19-HEAD+702",  # image name
+            True,
             3,
         )
 
@@ -52,12 +49,9 @@ class TestINetGenXahau(BaseTestConfig):
 
 
 class TestINetGenRippled(BaseTestConfig):
-    def test_create_rippled_network(cls):
+    def _test_create_rippled_network(cls):
         create_network(
-            "ED6ACA9949FC56CB07574C5AC9D29C8E62EB9D0752954F4D8953380EDB3EC46DC3",
             None,
-            "87BAB1FB62F8F665F58DD1C8293B11A4E20DA1E5C1C41CE65FAEB3A1E110B6D8",
-            "JAAAAAFxIe1qyplJ/FbLB1dMWsnSnI5i650HUpVPTYlTOA7bPsRtw3Mh7VyccqnOn1TaZC6UI1WMJD4sH3HqEzvJkPDoEVRWGdowdkArhkDIKzi+W4+/8ry4RyGnsSC7bMZzKw4/TM70esOQTr9TZKhF1FaePva/Aitt3l2KnORLIALBVmZ1x3yAYr4CcBJA67ISzEFSkOIoyNvLWPdetIdN/xEekPJNp2hyhodt2cu0sr46wdXPMjIFO/cFfxTndxTyTW/R/29U92Dcly8nAg==",
             "ripple",  # protocol
             6,  # num validators
             2,  # num peers
