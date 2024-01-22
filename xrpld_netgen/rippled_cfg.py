@@ -283,11 +283,11 @@ def generate_rippled_cfg(
             for vk in validator_list_keys:
                 validators_out += "    " + vk + "\n"
 
-            if len(import_vl_keys) > 0:
-                validators_out += "\n"
-                validators_out += "[import_vl_keys]" + "\n"
-                for vk in import_vl_keys:
-                    validators_out += "    " + vk + "\n"
+        if len(import_vl_keys) > 0:
+            validators_out += "\n"
+            validators_out += "[import_vl_keys]" + "\n"
+            for vk in import_vl_keys:
+                validators_out += "    " + vk + "\n"
 
         return [
             RippledBuild("cfg", f"{node_config_path}/rippled.cfg", cfg_out),
@@ -346,6 +346,7 @@ def generate_rippled_cfg(
 
 
 def gen_config(
+    ansible: bool,
     protocol: str,
     name: str,
     network_id: int,
@@ -359,6 +360,7 @@ def gen_config(
     db_path: str,
     debug_path: str,
     v_token: str,
+    validators: List[str],
     vl_sites: List[str],
     vl_keys: List[str],
     ivl_keys: List[str],
@@ -395,14 +397,15 @@ def gen_config(
         log_level="trace",
         # private_peer=1 if _node.private_peer and i == 1 else 0,
         private_peer=0,
-        genesis=False,
+        genesis=ansible,
         v_token=v_token,
+        validators=validators,
         validator_list_sites=vl_sites,
         validator_list_keys=vl_keys,
         import_vl_keys=ivl_keys,
         ips_urls=ips_urls,
         ips_fixed_urls=ips_fixed_urls,
-        amendment_majority_time="5 minutes" if protocol == 'xahau' else '15 minutes',
+        amendment_majority_time="5 minutes" if protocol == "xahau" else "15 minutes",
         amendments_dict={},
     )
     return configs

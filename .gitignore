@@ -11,3 +11,4 @@ bin
 keystore/
 xrpld-standalone
 playground.py
+.env

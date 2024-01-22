@@ -15,6 +15,8 @@ from xrpld_netgen.utils.deploy_kit import (
     create_dockerfile,
     download_binary,
     update_dockerfile,
+    DockerVars,
+    create_ansible_vars_file,
 )
 from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
@@ -73,32 +75,44 @@ def create_node_folders(
     vl_key: str,
     ivl_key: str,
     protocol: str,
+    ansible: bool,
+    ips: List[str],
 ):
     # Create directories for validator nodes
     ips_fixed: List[str] = []
     for i in range(1, num_validators + 1):
-        node_dir = f"vnode{i}"
+        ips_dir = ips[i - 1] if ansible else f"vnode{i}"
         _, _, _, _, peer = generate_ports(i, "validator")
-        ips_fixed.append(f"{node_dir} {peer}")
+        ips_fixed.append(f"{ips_dir} {peer}")
 
     manifests: List[str] = []
+    validators: List[str] = []
+    tokens: List[str] = []
     for i in range(1, num_validators + 1):
         node_dir = f"vnode{i}"
-        cfg_path = f"{basedir}/{name}-cluster/{node_dir}/config"
         # GENERATE VALIDATOR KEY
         client = ValidatorClient(node_dir)
         client.create_keys()
         client.set_domain(f"xahau.{node_dir}.transia.co")
         client.create_token()
+        keys = client.get_keys()
         token = client.read_token()
         manifest = client.read_manifest()
         manifests.append(manifest)
+        validators.append(keys["public_key"])
+        tokens.append(token)
+
+    for i in range(1, num_validators + 1):
+        ips_dir = ips[i - 1] if ansible else f"vnode{i}"
+        node_dir = f"vnode{i}"
+        cfg_path = f"{basedir}/{name}-cluster/{node_dir}/config"
         # GENERATE PORTS
         rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(
             i, "validator"
         )
         # GENERATE CONFIG
         configs: List[RippledBuild] = gen_config(
+            ansible,
             protocol,
             name,
             network_id,
@@ -111,12 +125,13 @@ def create_node_folders(
             "/var/lib/rippled/db/nudb",
             "/var/lib/rippled/db",
             "/var/log/rippled/debug.log",
-            token,
+            tokens[i - 1],
+            [v for v in validators if v != validators[i - 1]],
             [f"http://vl/vl.json"],
             [vl_key],
             [ivl_key] if ivl_key else [],
             [],
-            [ips for ips in ips_fixed if ips != f"{node_dir} {peer}"],
+            [ips for ips in ips_fixed if ips != f"{ips_dir} {peer}"],
         )
 
         os.makedirs(f"{basedir}/{name}-cluster/{node_dir}", exist_ok=True)
@@ -203,6 +218,7 @@ def create_node_folders(
         cfg_path = f"{basedir}/{name}-cluster/{node_dir}/config"
         rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(i, "peer")
         configs: List[RippledBuild] = gen_config(
+            ansible,
             protocol,
             name,
             network_id,
@@ -216,6 +232,7 @@ def create_node_folders(
             "/var/lib/rippled/db",
             "/var/log/rippled/debug.log",
             None,
+            validators,
             [f"http://vl/vl.json"],
             [vl_key],
             [ivl_key] if ivl_key else [],
@@ -488,3 +505,192 @@ def enable_node_amendment(
     escaped_str = json_str.replace('"', '\\"')
     command: str = f'curl -X POST -H "Content-Type: application/json" -d "{escaped_str}" http://localhost:{port}'
     run_command(f"{basedir}/{name}", command)
+
+
+def create_ansible(
+    import_key: str,
+    protocol: str,
+    num_validators: int,
+    num_peers: int,
+    network_id: int,
+    build_server: str,
+    build_version: str,
+    genesis: bool = False,
+    quorum: int = None,
+    vips: List[str] = [],
+    pips: List[str] = [],
+) -> None:
+    if protocol == "xahau":
+        name: str = build_version
+        os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+        # Usage
+        owner = "Xahau"
+        repo = "xahaud"
+        commit_hash = get_commit_hash_from_server_version(build_server, build_version)
+        content: str = download_file_at_commit(
+            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
+        )
+        url: str = f"{build_server}/{build_version}"
+        download_binary(url, f"{basedir}/{name}-cluster/rippled.{build_version}")
+        image: str = "ubuntu:jammy"
+
+    if protocol == "ripple":
+        name: str = build_version.replace(":", "-")
+        os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+        image_name, version = parse_image_name(build_version)
+        root_url = f"https://storage.googleapis.com/thelab-builds/"
+        content: str = (
+            root_url
+            + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}/features.json"
+        )
+        image: str = f"{build_server}/{build_version}"
+
+    client = PublisherClient()
+    client.create_keys()
+    keys = client.get_keys()
+    manifests: List[str] = create_node_folders(
+        True,
+        name,
+        image,
+        content,
+        num_validators,
+        num_peers,
+        network_id,
+        genesis,
+        quorum,
+        keys["publicKey"],
+        import_key,
+        protocol,
+        True,
+        vips,
+    )
+
+    services["vl"] = {
+        "build": {
+            "context": "vl",
+            "dockerfile": "Dockerfile",
+        },
+        "container_name": "vl",
+        "ports": ["80:80"],
+        "networks": [f"{name}-network"],
+    }
+
+    services[f"network-explorer"] = {
+        "image": "transia/explorer-main:latest",
+        "container_name": f"network-explorer",
+        "environment": [
+            f"PORT=4000",
+        ],
+        "ports": [f"4000:4000"],
+        "networks": [f"{name}-network"],
+    }
+
+    compose = {
+        "version": "3.9",
+        "services": services,
+        "networks": {f"{name}-network": {"driver": "bridge"}},
+    }
+    with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
+        yaml.dump(compose, f, default_flow_style=False)
+
+    write_file(
+        f"{basedir}/{name}-cluster/start.sh",
+        f"""\
+#! /bin/bash
+docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force-recreate -d
+""",
+    )
+    stop_sh_content: str = update_stop_sh(protocol, name, num_validators, num_peers)
+    write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
+
+    os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
+    for manifest in manifests:
+        client.add_validator(manifest)
+    client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
+    shutil.copyfile(
+        f"{basedir}/deploykit/nginx.dockerfile",
+        f"{basedir}/{name}-cluster/vl/Dockerfile",
+    )
+
+    os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
+    os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
+
+    os.makedirs(f"{basedir}/{name}-cluster/ansible", exist_ok=True)
+    os.makedirs(f"{basedir}/{name}-cluster/ansible/host_vars", exist_ok=True)
+    shutil.copytree(
+        f"{basedir}/deploykit/ansible",
+        f"{basedir}/{name}-cluster/ansible",
+    )
+    image_name: str = build_version.replace("-", ".")
+    image_name: str = image_name.replace("+", ".")
+    for k, v in services.items():
+        if k[:5] == "vnode":
+            index: int = int(k[5:])
+            c_name: str = v["container_name"]
+            ports: List[str] = v["ports"]
+            vars = DockerVars(
+                os.environ("SSH_PORT", 20),
+                int(ports[2].split(":")[-1]),
+                int(ports[4].split(":")[-1]),
+                f"transia/cluster-{c_name}:{image_name}",
+                c_name,
+                ports,
+                [
+                    "/var/log/rippled:/var/log/rippled",
+                    "/var/lib/rippled:/var/lib/rippled",
+                ],
+                ["/var/log/rippled", "/var/lib/rippled"],
+            )
+            create_ansible_vars_file(
+                f"{basedir}/{name}-cluster/ansible/host_vars", vips[index - 1], vars
+            )
+            run_command(
+                f"{basedir}/{name}-cluster/{c_name}",
+                f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster-{c_name}:{image_name} .",
+            )
+            run_command(
+                f"{basedir}/{name}-cluster/{c_name}",
+                f"docker push transia/cluster-{c_name}:{image_name}",
+            )
+        if k[:5] == "pnode":
+            index: int = int(k[5:])
+            c_name: str = v["container_name"]
+            ports: List[str] = v["ports"]
+            vars = DockerVars(
+                os.environ("SSH_PORT", 20),
+                int(ports[2].split(":")[-1]),
+                int(ports[4].split(":")[-1]),
+                f"transia/cluster-{c_name}:{image_name}",
+                c_name,
+                ports,
+                [
+                    "/var/log/rippled:/var/log/rippled",
+                    "/var/lib/rippled:/var/lib/rippled",
+                ],
+                ["/var/log/rippled", "/var/lib/rippled"],
+            )
+            create_ansible_vars_file(
+                f"{basedir}/{name}-cluster/ansible/host_vars", pips[index - 1], vars
+            )
+            run_command(
+                f"{basedir}/{name}-cluster/{c_name}",
+                f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster-{c_name}:{image_name} .",
+            )
+            run_command(
+                f"{basedir}/{name}-cluster/{c_name}",
+                f"docker push transia/cluster-{c_name}:{image_name}",
+            )
+    hosts_content: str = """
+# this is a basic file putting different hosts into categories
+# used by ansible to determine which actions to run on which hosts
+[all]
+    """
+    hosts_content += "\n"
+    ssh: str = os.environ("SSH_PORT", 20)
+    user: str = os.environ("SSH_USER", "ubuntu")
+    ssh_key: str = os.environ("SSH_PATH", "~/.ssh/id_rsa")
+    for vip in vips:
+        hosts_content += f"{vip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{vips}.yml \n"
+    for pip in pips:
+        hosts_content += f"{pip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{pip}.yml \n"
+    write_file(f"{basedir}/{name}-cluster/ansible/hosts.txt", hosts_content)

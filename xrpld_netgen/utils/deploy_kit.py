@@ -4,6 +4,10 @@
 import requests
 import re
 import os
+import yaml
+
+from typing import List, Dict, Any
+
 from xrpl_helpers.common.utils import write_file
 
 
@@ -46,6 +50,50 @@ fi
     write_file(f"{root_path}/entrypoint", entrypoint)
 
 
+class DockerVars:
+    def __init__(
+        self,
+        ssh_port: int,
+        ws_port: int,
+        peer_port: int,
+        image_name: str,
+        container_name: str,
+        container_ports: list,
+        docker_volumes: list,
+        volumes: list,
+    ):
+        self.ssh_port = ssh_port
+        self.ws_port = ws_port
+        self.peer_port = peer_port
+        self.image_name = image_name
+        self.container_name = container_name
+        self.container_ports = container_ports
+        self.docker_volumes = docker_volumes
+        self.volumes = volumes
+
+    def to_dict(self) -> dict:
+        return {
+            "ssh_port": self.ssh_port,
+            "ws_port": self.ws_port,
+            "peer_port": self.peer_port,
+            "docker_image_name": self.image_name,
+            "docker_container_name": self.container_name,
+            "docker_container_ports": self.container_ports,
+            "docker_volumes": self.docker_volumes,
+            "volumes": self.volumes,
+        }
+
+
+def create_ansible_vars_file(
+    path: str,
+    ip: str,
+    vars: DockerVars,
+):
+    with open(os.path.join(path, f"{ip}.yml"), "w") as f:
+        yaml.dump(vars.to_dict(), f, explicit_start=True)
+    return vars
+
+
 def create_dockerfile(
     binary,
     version,
@@ -83,7 +131,7 @@ def create_dockerfile(
         echo '#!/bin/bash' > /usr/bin/server_info && echo '/entrypoint.sh server_info' >> /usr/bin/server_info && \
         chmod +x /usr/bin/server_info
 
-    EXPOSE 80 443 {rpc_public_port} {rpc_admin_port} {ws_public_port} {ws_admin_port} {peer_port} {peer_port}/udp
+    EXPOSE {rpc_public_port} {rpc_admin_port} {ws_public_port} {ws_admin_port} {peer_port} {peer_port}/udp
     """
 
     if include_genesis:

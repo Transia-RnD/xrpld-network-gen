@@ -8,6 +8,7 @@ from typing import Dict, Any, List  # noqa: F401
 from testing_config import BaseTestConfig
 
 from xrpld_netgen.network import (
+    create_ansible,
     create_network,
     update_node_binary,
     enable_node_amendment,
@@ -17,7 +18,7 @@ logger = logging.getLogger("app")
 
 
 class TestINetGenXahau(BaseTestConfig):
-    def test_create_xahau_network(cls):
+    def _test_create_xahau_network(cls):
         create_network(
             "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
             "xahau",  # protocol
@@ -28,6 +29,25 @@ class TestINetGenXahau(BaseTestConfig):
             "2024.1.19-HEAD+702",  # image name
             True,
             3,
+        )
+
+    def test_create_ansible(cls):
+        create_ansible(
+            "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
+            "xahau",  # protocol
+            6,  # num validators
+            2,  # num peers
+            21336,  # network id
+            "https://build.xahau.tech",  # image host
+            "2023.12.29-release+689",  # image name
+            True,
+            3,
+            [
+                "192.168.0.1",  # vnode0
+            ],
+            [
+                "192.168.0.2",  # pnode0
+            ],
         )
 
     def _test_update_node(cls):
