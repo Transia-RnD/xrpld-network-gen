@@ -75,8 +75,8 @@ def create_node_folders(
     vl_key: str,
     ivl_key: str,
     protocol: str,
-    ansible: bool,
-    ips: List[str],
+    ansible: bool = False,
+    ips: List[str] = [],
 ):
     # Create directories for validator nodes
     ips_fixed: List[str] = []
@@ -213,7 +213,7 @@ def create_node_folders(
             "networks": [f"{name}-network"],
         }
 
-    for i in range(0, num_peers):
+    for i in range(1, num_peers + 1):
         node_dir = f"pnode{i}"
         cfg_path = f"{basedir}/{name}-cluster/{node_dir}/config"
         rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(i, "peer")
@@ -330,6 +330,17 @@ def update_stop_sh(
     local: bool = False,
 ) -> str:
     stop_sh_content = f"#! /bin/bash\n"
+    stop_sh_content += "REMOVE_FLAG=false \n"
+    stop_sh_content += """
+for arg in "$@"; do
+  if [ "$arg" == "--remove" ]; then
+    REMOVE_FLAG=true
+    break
+  fi
+done
+"""
+    stop_sh_content += "\n"
+    stop_sh_content += 'if [ "$REMOVE_FLAG" = true ]; then \n'
     if num_validators > 0 and num_peers > 0:
         stop_sh_content += f"docker compose -f {basedir}/{name}-cluster/docker-compose.yml down --remove-orphans\n"
 
@@ -353,6 +364,7 @@ def update_stop_sh(
         stop_sh_content += f"rm -r db\n"
         stop_sh_content += f"rm -r debug.log\n"
 
+    stop_sh_content += "fi \n"
     return stop_sh_content
 
 
@@ -620,16 +632,18 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
     shutil.copytree(
         f"{basedir}/deploykit/ansible",
         f"{basedir}/{name}-cluster/ansible",
+        dirs_exist_ok=True,
     )
     image_name: str = build_version.replace("-", ".")
     image_name: str = image_name.replace("+", ".")
+    ssh_port: int = os.environ.get("SSH_PORT", 20)
     for k, v in services.items():
         if k[:5] == "vnode":
             index: int = int(k[5:])
             c_name: str = v["container_name"]
             ports: List[str] = v["ports"]
             vars = DockerVars(
-                os.environ("SSH_PORT", 20),
+                ssh_port,
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
                 f"transia/cluster-{c_name}:{image_name}",
@@ -657,7 +671,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
             c_name: str = v["container_name"]
             ports: List[str] = v["ports"]
             vars = DockerVars(
-                os.environ("SSH_PORT", 20),
+                ssh_port,
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
                 f"transia/cluster-{c_name}:{image_name}",
@@ -686,11 +700,11 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
 [all]
     """
     hosts_content += "\n"
-    ssh: str = os.environ("SSH_PORT", 20)
-    user: str = os.environ("SSH_USER", "ubuntu")
-    ssh_key: str = os.environ("SSH_PATH", "~/.ssh/id_rsa")
+    ssh: str = os.environ.get("SSH_PORT", 20)
+    user: str = os.environ.get("SSH_USER", "ubuntu")
+    ssh_key: str = os.environ.get("SSH_PATH", "~/.ssh/id_rsa")
     for vip in vips:
-        hosts_content += f"{vip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{vips}.yml \n"
+        hosts_content += f"{vip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{vip}.yml \n"
     for pip in pips:
         hosts_content += f"{pip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{pip}.yml \n"
     write_file(f"{basedir}/{name}-cluster/ansible/hosts.txt", hosts_content)
