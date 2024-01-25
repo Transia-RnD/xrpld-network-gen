@@ -53,15 +53,20 @@ def generate_rippled_cfg(
     ips_urls: List[str] = [],
     amendment_majority_time: str = None,
     amendments_dict: Dict[str, str] = {},
-    max_transactions: int = 1000,
-    ledgers_in_queue: int = 200,
-    minimum_queue_size: int = 10000,
-    minimum_txn_in_ledger: int = 500,
-    target_txn_in_ledger: int = 10000,
-    normal_consensus_increase_percent: int = 50,
-    slow_consensus_decrease_percent: int = 10,
-    maximum_txn_in_ledger: int = 10000,
-    maximum_txn_per_account: int = 10000,
+    max_transactions: int = 10000,
+    ledgers_in_queue: int = 20,
+    minimum_queue_size: int = 2000,
+    retry_sequence_percent: int = 25,
+    minimum_escalation_multiplier: int = 500,
+    minimum_txn_in_ledger: int = 5,
+    minimum_txn_in_ledger_standalone: int = 5,
+    target_txn_in_ledger: int = 100,
+    maximum_txn_in_ledger: int = 10000,  # no default
+    normal_consensus_increase_percent: int = 20,
+    slow_consensus_decrease_percent: int = 50,
+    maximum_txn_per_account: int = 100000,
+    minimum_last_ledger_buffer: int = 2,
+    zero_basefee_transaction_feelevel: int = 256000,
 ):
     try:
         node_config_path: str = build_path + "/config"
@@ -228,6 +233,8 @@ def generate_rippled_cfg(
             cfg_out += '{ "command": "log_level", "severity": "info" }' + "\n"
         elif log_level == "warning":
             cfg_out += '{ "command": "log_level", "severity": "warning" }' + "\n"
+        elif log_level == "error":
+            cfg_out += '{ "command": "log_level", "severity": "error" }' + "\n"
         else:
             cfg_out += '{ "command": "log_level", "severity": "info" }' + "\n"
 
@@ -243,7 +250,15 @@ def generate_rippled_cfg(
         cfg_out += "[transaction_queue]" + "\n"
         cfg_out += f"ledgers_in_queue = {ledgers_in_queue}" + "\n"
         cfg_out += f"minimum_queue_size = {minimum_queue_size}" + "\n"
+        cfg_out += f"retry_sequence_percent = {retry_sequence_percent}" + "\n"
+        cfg_out += (
+            f"minimum_escalation_multiplier = {minimum_escalation_multiplier}" + "\n"
+        )
         cfg_out += f"minimum_txn_in_ledger = {minimum_txn_in_ledger}" + "\n"
+        cfg_out += (
+            f"minimum_txn_in_ledger_standalone = {minimum_txn_in_ledger_standalone}"
+            + "\n"
+        )
         cfg_out += f"target_txn_in_ledger = {target_txn_in_ledger}" + "\n"
         cfg_out += (
             f"normal_consensus_increase_percent = {normal_consensus_increase_percent}"
@@ -255,6 +270,11 @@ def generate_rippled_cfg(
         )
         cfg_out += f"maximum_txn_in_ledger = {maximum_txn_in_ledger}" + "\n"
         cfg_out += f"maximum_txn_per_account = {maximum_txn_per_account}" + "\n"
+        cfg_out += f"minimum_last_ledger_buffer = {minimum_last_ledger_buffer}" + "\n"
+        cfg_out += (
+            f"zero_basefee_transaction_feelevel = {zero_basefee_transaction_feelevel}"
+            + "\n"
+        )
 
         if amendment_majority_time:
             cfg_out += "\n"
@@ -392,7 +412,7 @@ def gen_config(
         size_node="huge",
         nudb_path=nudb_path,
         db_path=db_path,
-        num_ledgers=256,
+        num_ledgers=10000,
         debug_path=debug_path,
         log_level="trace",
         # private_peer=1 if _node.private_peer and i == 1 else 0,
