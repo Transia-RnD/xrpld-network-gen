@@ -6,8 +6,8 @@ The XRPLD Network Generator CLI is a command-line interface tool designed to fac
 
 ### Current Versions
 
-Ripple: `1.12.0`
-Xahau: `2024.1.25-release+738`
+- Ripple: `1.12.0`
+- Xahau: `2024.1.25-release+738`
 
 ## Prerequisites
 
