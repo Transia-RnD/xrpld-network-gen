@@ -16,6 +16,8 @@ from xrpld_netgen.network import (
 
 logger = logging.getLogger("app")
 
+# 2024.1.22-candidate+729
+
 
 class TestINetGenXahau(BaseTestConfig):
     def _test_create_xahau_network(cls):
@@ -26,8 +28,8 @@ class TestINetGenXahau(BaseTestConfig):
             2,  # num peers
             21336,  # network id
             "https://build.xahau.tech",  # image host
-            "2024.1.19-HEAD+702",  # image name
-            True,
+            "2024.1.22-candidate+729",  # image name
+            False,
             3,
         )
 
@@ -39,30 +41,36 @@ class TestINetGenXahau(BaseTestConfig):
             2,  # num peers
             21336,  # network id
             "https://build.xahau.tech",  # image host
-            "2023.12.29-release+689",  # image name
+            "2024.1.25-release+738",  # image name
             True,
             3,
             [
-                "192.168.0.1",  # vnode0
+                "79.110.60.99",
+                "79.110.60.100",
+                "79.110.60.101",
+                "79.110.60.102",
+                "79.110.60.103",
+                "79.110.60.104",
             ],
             [
-                "192.168.0.2",  # pnode0
+                "79.110.60.105",
+                "79.110.60.106",
             ],
         )
 
     def _test_update_node(cls):
         update_node_binary(
-            "2023.11.10-dev+549-cluster",  # network name
+            "2023.12.29-release+689-cluster",  # network name
             "1",  # node id
             "validator",  # node type
             "https://build.xahau.tech",  # build server
-            "2023.12.29-release+689",  # build version
+            "2024.1.25-release+738",  # build version
         )
 
     def _test_enable_amendment(cls):
         enable_node_amendment(
             "2023.11.10-dev+549-cluster",  # network name
-            "fixXahauV1",  # amendment name
+            "fixXahauV2",  # amendment name
             "5",  # node id
             "validator",  # node type
         )
