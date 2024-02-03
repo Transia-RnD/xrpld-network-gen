@@ -4,6 +4,11 @@
 
 The XRPLD Network Generator CLI is a command-line interface tool designed to facilitate the creation, management, and interaction with XRPLD networks and standalone ledgers. This tool allows users to easily start, stop, remove, and update XRPLD nodes, as well as enable amendments on the network.
 
+### Current Versions
+
+Ripple: `1.12.0`
+Xahau: `2024.1.25-release+738`
+
 ## Prerequisites
 
 Before using the XRPLD Network Generator CLI, ensure that you have the following prerequisites installed:
