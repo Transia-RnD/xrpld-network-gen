@@ -93,6 +93,7 @@ def create_standalone_folder(
     ivl_key: str,
     protocol: str,
     net_type: str,
+    log_level: str,
 ):
     cfg_path = f"{basedir}/xrpld-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
@@ -121,6 +122,7 @@ def create_standalone_folder(
         "/var/lib/rippled/db/nudb",
         "/var/lib/rippled/db",
         "/var/log/rippled/debug.log",
+        log_level,
         None,
         vl_config["validator_list_sites"],
         vl_config["validator_list_keys"],
@@ -182,6 +184,7 @@ def create_standalone_folder(
 
 
 def create_standalone_image(
+    log_level: str,
     public_key: str,
     import_key: str,
     protocol: str,
@@ -208,6 +211,7 @@ def create_standalone_image(
         import_key,
         protocol,
         net_type,
+        log_level,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",
@@ -266,6 +270,7 @@ def create_binary_folder(
     ivl_key: str,
     protocol: str,
     net_type: str,
+    log_level: str,
 ):
     cfg_path = f"{basedir}/{protocol}-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
@@ -294,6 +299,7 @@ def create_binary_folder(
         "/var/lib/rippled/db/nudb",
         "/var/lib/rippled/db",
         "/var/log/rippled/debug.log",
+        log_level,
         None,
         vl_config["validator_list_sites"],
         vl_config["validator_list_keys"],
@@ -355,6 +361,7 @@ def create_binary_folder(
 
 
 def create_standalone_binary(
+    log_level: str,
     public_key: str,
     import_key: str,
     protocol: str,
@@ -386,6 +393,7 @@ def create_standalone_binary(
         import_key,
         protocol,
         net_type,
+        log_level,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",
@@ -443,6 +451,7 @@ def create_local_folder(
     ivl_key: str,
     protocol: str,
     net_type: str,
+    log_level: str,
 ):
     cfg_path = "config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
@@ -471,6 +480,7 @@ def create_local_folder(
         "db/nudb",
         "db",
         "debug.log",
+        log_level,
         None,
         vl_config["validator_list_sites"],
         vl_config["validator_list_keys"],
@@ -492,6 +502,7 @@ def create_local_folder(
 
 
 def start_local(
+    log_level: str,
     public_key: str,
     import_key: str,
     protocol: str,
@@ -507,6 +518,7 @@ def start_local(
         import_key,
         protocol,
         net_type,
+        log_level,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",

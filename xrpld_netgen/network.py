@@ -74,6 +74,7 @@ def create_node_folders(
     protocol: str,
     ansible: bool = False,
     ips: List[str] = [],
+    log_level: str = "warning",
 ):
     # Create directories for validator nodes
     ips_fixed: List[str] = []
@@ -122,6 +123,7 @@ def create_node_folders(
             "/var/lib/rippled/db/nudb",
             "/var/lib/rippled/db",
             "/var/log/rippled/debug.log",
+            log_level,
             tokens[i - 1],
             [v for v in validators if v != validators[i - 1]],
             ["http://vl/vl.json"],
@@ -228,6 +230,7 @@ def create_node_folders(
             "/var/lib/rippled/db/nudb",
             "/var/lib/rippled/db",
             "/var/log/rippled/debug.log",
+            log_level,
             None,
             validators,
             ["http://vl/vl.json"],
@@ -368,6 +371,7 @@ done
 
 
 def create_network(
+    log_level: str,
     import_key: str,
     protocol: str,
     num_validators: int,
@@ -419,6 +423,7 @@ def create_network(
         keys["publicKey"],
         import_key,
         protocol,
+        log_level,
     )
 
     services["vl"] = {
@@ -521,6 +526,7 @@ def enable_node_amendment(
 
 
 def create_ansible(
+    log_level: str,
     import_key: str,
     protocol: str,
     num_validators: int,
@@ -576,6 +582,7 @@ def create_ansible(
         protocol,
         True,
         vips,
+        log_level,
     )
 
     services["vl"] = {

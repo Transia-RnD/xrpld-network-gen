@@ -67,6 +67,13 @@ def main():
     # start:local
     parser_sl = subparsers.add_parser("start:local", help="Start Local Network")
     parser_sl.add_argument(
+        "--log_level",
+        required=False,
+        help="The log level",
+        choices=["warning", "debug", "trace"],
+        default="trace",
+    )
+    parser_sl.add_argument(
         "--public_key",
         required=False,
         help="The public vl key",
@@ -95,6 +102,13 @@ def main():
 
     # create:network
     parser_cn = subparsers.add_parser("create:network", help="Create Network")
+    parser_cn.add_argument(
+        "--log_level",
+        required=False,
+        help="The log level",
+        choices=["warning", "debug", "trace"],
+        default="trace",
+    )
     parser_cn.add_argument(
         "--protocol",
         type=str,
@@ -208,46 +222,15 @@ def main():
 
     # STANDALONE
 
-    # create:standalone
-    parser_cs = subparsers.add_parser("create:standalone", help="Create Standalone")
-    parser_cs.add_argument(
-        "--build_type",
-        required=True,
-        help="The build type",
-        choices=["image", "binary"],
-        default="binary",
-    )
-    parser_cs.add_argument(
-        "--public_key",
-        required=False,
-        help="The public vl key",
-        default="ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
-    )
-    parser_cs.add_argument("--import_key", required=False, help="The import vl key")
-    parser_cs.add_argument(
-        "--protocol",
-        required=False,
-        help="The protocol of the network",
-        default="xahau",
-    )
-    parser_cs.add_argument(
-        "--network_id", type=int, required=False, help="The network id", default=21339
-    )
-    parser_cs.add_argument(
-        "--network_type",
-        type=int,
-        required=False,
-        help="The network type",
-        default="standalone",
-    )
-    parser_cs.add_argument(
-        "--server", required=False, help="The build server for the network"
-    )
-    parser_cs.add_argument(
-        "--version", required=True, help="The build version for the network"
-    )
     # up:standalone
     parser_us = subparsers.add_parser("up:standalone", help="Up Standalone")
+    parser_us.add_argument(
+        "--log_level",
+        required=False,
+        help="The log level",
+        choices=["warning", "debug", "trace"],
+        default="trace",
+    )
     parser_us.add_argument(
         "--build_type",
         type=str,
@@ -322,19 +305,23 @@ def main():
 
     # LOCAL
     if args.command == "start:local":
+        LOG_LEVEL = args.log_level
         PUBLIC_KEY = args.public_key
         IMPORT_KEY = args.import_key
         PROTOCOL = args.protocol
         NETWORK_TYPE = args.network_type
         NETWORK_ID = args.network_id
 
-        start_local(PUBLIC_KEY, IMPORT_KEY, PROTOCOL, NETWORK_TYPE, NETWORK_ID)
+        start_local(
+            LOG_LEVEL, PUBLIC_KEY, IMPORT_KEY, PROTOCOL, NETWORK_TYPE, NETWORK_ID
+        )
 
     if args.command == "stop:local":
         run_file("./stop.sh")
 
     # CREATE NETWORK
     if args.command == "create:network":
+        LOG_LEVEL = args.log_level
         PROTOCOL = args.protocol
         NUM_VALIDATORS = args.num_validators
         NUM_PEERS = args.num_peers
@@ -358,6 +345,7 @@ def main():
             QUORUM = NUM_VALIDATORS - 1
 
         create_network(
+            LOG_LEVEL,
             import_vl_key,
             PROTOCOL,
             NUM_VALIDATORS,
@@ -399,6 +387,7 @@ def main():
 
     # UP STANDALONE
     if args.command == "up:standalone":
+        LOG_LEVEL = args.log_level
         BUILD_TYPE = args.build_type
         PUBLIC_KEY = args.public_key
         IMPORT_KEY = args.import_key
@@ -431,6 +420,7 @@ def main():
 
         if BUILD_TYPE == "image":
             create_standalone_image(
+                LOG_LEVEL,
                 PUBLIC_KEY,
                 IMPORT_KEY,
                 PROTOCOL,
@@ -442,6 +432,7 @@ def main():
             )
         else:
             create_standalone_binary(
+                LOG_LEVEL,
                 PUBLIC_KEY,
                 IMPORT_KEY,
                 PROTOCOL,
