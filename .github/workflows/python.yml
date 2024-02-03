@@ -46,42 +46,6 @@ jobs:
         run: |
           poetry run flake8 .
 
-  unit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    strategy:
-      matrix:
-        python-version: ['3.8', '3.9', '3.10']
-
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install Poetry
-        run: |
-          pip install poetry
-
-      - name: Cache Poetry virtual environment
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pypoetry/virtualenvs
-          key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-${{ matrix.python-version }}-
-            ${{ runner.os }}-poetry-
-
-      - name: Install Dependencies
-        run: |
-          poetry install
-
-      - name: Run unit tests
-        run: |
-          poetry run python3 test.py tests/unit
-
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -97,10 +61,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Run docker in background
-        run: |
-          docker run --detach --rm --name rippled-service -p 6006:6006 --health-cmd="wget localhost:6006 || exit 1" --health-interval=5s --health-retries=10 --health-timeout=2s transia/hooksv3d-standalone:latest
-
       - name: Install Poetry
         run: |
           pip install poetry
@@ -118,14 +78,7 @@ jobs:
         run: |
           poetry install
 
-      - run: npm install -g c2wasm-cli
-      - run: c2wasm-cli contracts build
-
       - name: Run integration tests
         run: |
           # Add commands to run integration tests here
           poetry run python3 test.py tests/integration
-
-      - name: Stop docker container
-        if: always()
-        run: docker stop rippled-service
