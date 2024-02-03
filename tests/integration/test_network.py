@@ -16,8 +16,6 @@ from xrpld_netgen.network import (
 
 logger = logging.getLogger("app")
 
-# 2024.1.22-candidate+729
-
 
 class TestINetGenXahau(BaseTestConfig):
     def _test_create_xahau_network(cls):

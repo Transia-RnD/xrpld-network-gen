@@ -12,7 +12,7 @@ from tests.utils import is_folder_and_files
 logger = logging.getLogger("app")
 
 
-class TestINetGen(BaseTestConfig):
+class TestINetGenStandalone(BaseTestConfig):
     def test_standalone_image(cls):
         create_standalone_image(
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
