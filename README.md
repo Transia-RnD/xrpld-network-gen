@@ -13,7 +13,7 @@ The XRPLD Network Generator CLI is a command-line interface tool designed to fac
 
 Before using the XRPLD Network Generator CLI, ensure that you have the following prerequisites installed:
 
-- Python 3.10
+- Python ^3.9.6
 - Docker
 - Git (for cloning the repository)
 
