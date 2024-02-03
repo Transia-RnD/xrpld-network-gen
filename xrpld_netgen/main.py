@@ -105,6 +105,7 @@ def create_standalone_folder(
         vl_config["import_vl_keys"] = [ivl_key]
 
     configs: List[RippledBuild] = gen_config(
+        False,
         protocol,
         name,
         vl_config["network_id"],
@@ -185,6 +186,7 @@ def create_standalone_image(
     network_id: int,
     build_system: str,
     build_name: str,
+    add_ipfs: bool = False,
 ) -> None:
     name: str = "standalone"
     image_name, version = parse_image_name(build_name)
@@ -215,6 +217,19 @@ def create_standalone_image(
         "networks": ["standalone-network"],
     }
 
+    if add_ipfs:
+        pwd_str: str = "${PWD}"
+        services["ipfs"] = {
+            "image": "ipfs/go-ipfs:latest",
+            "container_name": "ipfs",
+            "environment": [
+                "IPFS_PROFILE=server",
+            ],
+            "ports": ["4001:4001", "5001:5001", "8080:8080"],
+            "volumes": [f"{pwd_str}/{protocol}/ipfs_staging:/export", f"{pwd_str}/{protocol}/ipfs_data:/data/ipfs"],
+            "networks": ["standalone-network"],
+        }
+    
     compose = {
         "version": "3.9",
         "services": services,
@@ -260,6 +275,7 @@ def create_binary_folder(
         vl_config["import_vl_keys"] = [ivl_key]
 
     configs: List[RippledBuild] = gen_config(
+        False,
         protocol,
         name,
         vl_config["network_id"],
@@ -340,6 +356,7 @@ def create_standalone_binary(
     network_id: int,
     build_server: str,
     build_version: str,
+    add_ipfs: bool = False,
 ) -> None:
     name: str = build_version
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
@@ -374,6 +391,19 @@ def create_standalone_binary(
         "ports": ["4000:4000"],
         "networks": ["standalone-network"],
     }
+
+    if add_ipfs:
+        pwd_str: str = "${PWD}"
+        services["ipfs"] = {
+            "image": "ipfs/go-ipfs:latest",
+            "container_name": "ipfs",
+            "environment": [
+                "IPFS_PROFILE=server",
+            ],
+            "ports": ["4001:4001", "5001:5001", "8080:8080"],
+            "volumes": [f"{pwd_str}/{protocol}/ipfs_staging:/export", f"{pwd_str}/{protocol}/ipfs_data:/data/ipfs"],
+            "networks": ["standalone-network"],
+        }
 
     compose = {
         "version": "3.9",
@@ -419,6 +449,7 @@ def create_local_folder(
         vl_config["import_vl_keys"] = [ivl_key]
 
     configs: List[RippledBuild] = gen_config(
+        False,
         protocol,
         name,
         vl_config["network_id"],
