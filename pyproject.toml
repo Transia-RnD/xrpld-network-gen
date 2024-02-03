@@ -5,7 +5,7 @@ description = "Xrpld network generator"
 authors = ["Denis Angell <dangell@transia.co>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9.6"
 pyyaml = "^6.0.1"
 requests = "^2.31.0"
 xrpld-publisher = "^2.0.0"
