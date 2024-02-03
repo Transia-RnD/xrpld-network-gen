@@ -2,8 +2,6 @@
 # coding: utf-8
 
 import sys
-import logging
-import os
 from typing import List, Dict
 from dataclasses import dataclass
 
@@ -67,6 +65,9 @@ def generate_rippled_cfg(
     maximum_txn_per_account: int = 100000,
     minimum_last_ledger_buffer: int = 2,
     zero_basefee_transaction_feelevel: int = 256000,
+    workers: int = 6,
+    io_workers: int = 2,
+    prefetch_workers: int = 4,
 ):
     try:
         node_config_path: str = build_path + "/config"
@@ -140,7 +141,7 @@ def generate_rippled_cfg(
             cfg_out += "[port_peer]" + "\n"
             cfg_out += f"port = {peer_port}" + "\n"
             cfg_out += f"ip = {_peer_port_ip}" + "\n"
-            cfg_out += f"protocol = peer" + "\n"
+            cfg_out += "protocol = peer" + "\n"
 
         cfg_out += "\n"
         cfg_out += "[node_size]" + "\n"
@@ -275,6 +276,18 @@ def generate_rippled_cfg(
             f"zero_basefee_transaction_feelevel = {zero_basefee_transaction_feelevel}"
             + "\n"
         )
+
+        if workers:
+            cfg_out += "[workers] \n"
+            cfg_out += f"{workers} \n"
+
+        if io_workers:
+            cfg_out += "[io_workers] \n"
+            cfg_out += f"{io_workers} \n"
+
+        if prefetch_workers:
+            cfg_out += "[prefetch_workers] \n"
+            cfg_out += f"{prefetch_workers} \n"
 
         if amendment_majority_time:
             cfg_out += "\n"
@@ -414,7 +427,7 @@ def gen_config(
         db_path=db_path,
         num_ledgers=10000,
         debug_path=debug_path,
-        log_level="trace",
+        log_level="warning",
         # private_peer=1 if _node.private_peer and i == 1 else 0,
         private_peer=0,
         genesis=ansible,

@@ -9,10 +9,10 @@ import subprocess
 import shlex
 import hashlib
 
-from xrpl_helpers.common.utils import read_json
+from typing import Dict, Any, Tuple
 
 
-def remove_directory(directory_path: str):
+def remove_directory(directory_path: str) -> None:
     try:
         shutil.rmtree(directory_path)
         print(f"Directory '{directory_path}' has been removed successfully.")
@@ -24,7 +24,7 @@ def remove_directory(directory_path: str):
         print(f"An error occurred: {e}")
 
 
-def run_file(file_path: str):
+def run_file(file_path: str) -> None:
     try:
         # Run the file as a subprocess
         result = subprocess.run(file_path, check=True)
@@ -38,7 +38,7 @@ def run_file(file_path: str):
         print(f"An error occurred while trying to run the file: {e}")
 
 
-def run_command(dir: str, command: str):
+def run_command(dir: str, command: str) -> None:
     try:
         # Split the command into a list of arguments
         # args = command.split()
@@ -64,7 +64,7 @@ def run_command(dir: str, command: str):
         print(f"An error occurred while trying to run the command: {e}")
 
 
-def download_json(url, destination_dir):
+def download_json(url: str, destination_dir: str) -> Dict[str, Any]:
     # Make sure destination directory exists
     os.makedirs(destination_dir, exist_ok=True)
 
@@ -88,7 +88,7 @@ def download_json(url, destination_dir):
         raise ValueError(f"Failed to download file from {url}")
 
 
-def save_local_config(cfg_path: str, cfg_out: str, validators_out: str):
+def save_local_config(cfg_path: str, cfg_out: str, validators_out: str) -> None:
     with open(f"{cfg_path}/rippled.cfg", "w") as text_file:
         text_file.write(cfg_out)
 
@@ -111,14 +111,14 @@ WS_ADMIN: int = 6006
 PEER: int = 51235
 
 
-def get_node_port(index, node_type):
+def get_node_port(index: int, node_type: str) -> int:
     if node_type == "validator":
         return RPC_ADMIN + (index * 100)
     elif node_type == "peer":
         return RPC_ADMIN + (index * 10)
 
 
-def generate_ports(index, node_type):
+def generate_ports(index: int, node_type: str) -> Tuple:
     if node_type == "validator":
         rpc_public = RPC_PUBLIC + (index * 100)
         rpc_admin = RPC_ADMIN + (index * 100)
@@ -143,7 +143,7 @@ def generate_ports(index, node_type):
     return rpc_public, rpc_admin, ws_public, ws_admin, peer
 
 
-def sha512_half(hex_string):
+def sha512_half(hex_string: str) -> str:
     hash_obj = hashlib.sha512()
     hash_obj.update(bytes.fromhex(hex_string))
     full_digest = hash_obj.hexdigest().upper()

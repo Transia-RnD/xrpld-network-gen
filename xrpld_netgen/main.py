@@ -5,7 +5,7 @@ import os
 import yaml
 import shutil
 import json
-from typing import List, Any, Dict, Tuple
+from typing import List, Any, Dict
 
 from xrpld_netgen.rippled_cfg import gen_config, RippledBuild
 from xrpld_netgen.utils.deploy_kit import create_dockerfile, download_binary
@@ -31,11 +31,12 @@ from xrpl_helpers.rippled.utils import (
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
-def generate_validator_config(protocol: str, network: str):
+def generate_validator_config(protocol: str, network: str) -> str:
     try:
         config = read_json(f"{basedir}/deploykit/config.json")
         return config[protocol][network]
     except Exception as e:
+        print(e)
         return None
 
 
@@ -53,9 +54,9 @@ def update_stop_sh(
     standalone: bool = False,
     local: bool = False,
 ) -> str:
-    stop_sh_content = f"#! /bin/bash\n"
+    stop_sh_content = "#! /bin/bash\n"
     if num_validators > 0 and num_peers > 0:
-        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"
+        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
 
     for i in range(1, num_validators + 1):
         stop_sh_content += f"rm -r vnode{i}/lib\n"
@@ -66,16 +67,18 @@ def update_stop_sh(
         stop_sh_content += f"rm -r pnode{i}/log\n"
 
     if standalone:
-        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"
+        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
         stop_sh_content += f"rm -r {protocol}/config\n"
         stop_sh_content += f"rm -r {protocol}/lib\n"
         stop_sh_content += f"rm -r {protocol}/log\n"
         stop_sh_content += f"rm -r {protocol}\n"
 
     if local:
-        stop_sh_content = f"#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
-        stop_sh_content += f"rm -r db\n"
-        stop_sh_content += f"rm -r debug.log\n"
+        stop_sh_content = (
+            "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
+        )
+        stop_sh_content += "rm -r db\n"
+        stop_sh_content += "rm -r debug.log\n"
 
     return stop_sh_content
 
@@ -190,7 +193,7 @@ def create_standalone_image(
 ) -> None:
     name: str = "standalone"
     image_name, version = parse_image_name(build_name)
-    root_url = f"https://storage.googleapis.com/thelab-builds/"
+    root_url = "https://storage.googleapis.com/thelab-builds/"
     storage_url: str = (
         root_url + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}"
     )
@@ -226,10 +229,13 @@ def create_standalone_image(
                 "IPFS_PROFILE=server",
             ],
             "ports": ["4001:4001", "5001:5001", "8080:8080"],
-            "volumes": [f"{pwd_str}/{protocol}/ipfs_staging:/export", f"{pwd_str}/{protocol}/ipfs_data:/data/ipfs"],
+            "volumes": [
+                f"{pwd_str}/{protocol}/ipfs_staging:/export",
+                f"{pwd_str}/{protocol}/ipfs_data:/data/ipfs",
+            ],
             "networks": ["standalone-network"],
         }
-    
+
     compose = {
         "version": "3.9",
         "services": services,
@@ -244,7 +250,7 @@ def create_standalone_image(
         f"""\
 #! /bin/bash
 docker compose -f {basedir}/xrpld-{name}/docker-compose.yml up --build --force-recreate -d
-""",
+""",  # noqa: E501
     )
     stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, True)
     write_file(f"{basedir}/xrpld-{name}/stop.sh", stop_sh_content)
@@ -401,7 +407,10 @@ def create_standalone_binary(
                 "IPFS_PROFILE=server",
             ],
             "ports": ["4001:4001", "5001:5001", "8080:8080"],
-            "volumes": [f"{pwd_str}/{protocol}/ipfs_staging:/export", f"{pwd_str}/{protocol}/ipfs_data:/data/ipfs"],
+            "volumes": [
+                f"{pwd_str}/{protocol}/ipfs_staging:/export",
+                f"{pwd_str}/{protocol}/ipfs_data:/data/ipfs",
+            ],
             "networks": ["standalone-network"],
         }
 
@@ -419,7 +428,7 @@ def create_standalone_binary(
         f"""\
 #! /bin/bash
 docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml up --build --force-recreate -d
-""",
+""",  # noqa: E501
     )
     os.chmod(f"{basedir}/{protocol}-{name}/start.sh", 0o755)
     stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, True)
@@ -435,7 +444,7 @@ def create_local_folder(
     protocol: str,
     net_type: str,
 ):
-    cfg_path = f"config"
+    cfg_path = "config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
     vl_config: Dict[str, Any] = generate_validator_config(protocol, net_type)
 
@@ -469,7 +478,7 @@ def create_local_folder(
         vl_config["ips"],
         vl_config["ips_fixed"],
     )
-    os.makedirs(f"config", exist_ok=True)
+    os.makedirs("config", exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     content: str = get_feature_lines_from_path(
         "../src/ripple/protocol/impl/Feature.cpp"
@@ -477,7 +486,7 @@ def create_local_folder(
     features_json: Dict[str, Any] = parse_rippled_amendments(content)
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
-        f"config/genesis.json",
+        "config/genesis.json",
         json.dumps(genesis_json, indent=4, sort_keys=True),
     )
 
@@ -516,7 +525,7 @@ def start_local(
         "networks": {"standalone-network": {"driver": "bridge"}},
     }
 
-    with open(f"docker-compose.yml", "w") as f:
+    with open("docker-compose.yml", "w") as f:
         yaml.dump(compose, f, default_flow_style=False)
 
     write_file(
@@ -525,7 +534,7 @@ def start_local(
 #! /bin/bash
 docker compose -f docker-compose.yml up --build --force-recreate -d
 ./rippled {'-a' if net_type == 'standalone' else ''} --conf config/rippled.cfg --ledgerfile config/genesis.json
-""",
+""",  # noqa: E501
     )
     os.chmod("start.sh", 0o755)
     stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, False, True)

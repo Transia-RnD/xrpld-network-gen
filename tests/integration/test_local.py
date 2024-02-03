@@ -7,10 +7,12 @@ from typing import Dict, Any, List  # noqa: F401
 
 from testing_config import BaseTestConfig
 from xrpld_netgen.main import (
-    create_network,
     create_standalone_image,
     create_standalone_binary,
     start_local,
+)
+from xrpld_netgen.network import (
+    create_network,
 )
 
 logger = logging.getLogger("app")

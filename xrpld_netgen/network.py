@@ -4,11 +4,9 @@
 import os
 import yaml
 import shutil
-import subprocess
-from typing import List, Any, Dict, Tuple
+import json
+from typing import List, Any, Dict
 from dotenv import load_dotenv
-
-load_dotenv()
 
 from xrpld_netgen.rippled_cfg import gen_config, RippledBuild
 from xrpld_netgen.utils.deploy_kit import (
@@ -42,6 +40,8 @@ from xrpl_helpers.rippled.utils import (
 from xrpld_publisher.publisher import PublisherClient
 from xrpld_publisher.validator import ValidatorClient
 
+load_dotenv()
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 deploykit_path: str = ""
@@ -52,12 +52,9 @@ def generate_validator_config(protocol: str, network: str):
         config = read_json(f"{basedir}/deploykit/config.json")
         return config[protocol][network]
     except Exception as e:
+        print(e)
         return None
 
-
-import requests
-import os
-import json
 
 services: Dict[str, Dict] = {}
 
@@ -127,7 +124,7 @@ def create_node_folders(
             "/var/log/rippled/debug.log",
             tokens[i - 1],
             [v for v in validators if v != validators[i - 1]],
-            [f"http://vl/vl.json"],
+            ["http://vl/vl.json"],
             [vl_key],
             [ivl_key] if ivl_key else [],
             [],
@@ -233,7 +230,7 @@ def create_node_folders(
             "/var/log/rippled/debug.log",
             None,
             validators,
-            [f"http://vl/vl.json"],
+            ["http://vl/vl.json"],
             [vl_key],
             [ivl_key] if ivl_key else [],
             [],
@@ -329,7 +326,7 @@ def update_stop_sh(
     standalone: bool = False,
     local: bool = False,
 ) -> str:
-    stop_sh_content = f"#! /bin/bash\n"
+    stop_sh_content = "#! /bin/bash\n"
     stop_sh_content += "REMOVE_FLAG=false \n"
     stop_sh_content += """
 for arg in "$@"; do
@@ -342,7 +339,7 @@ done
     stop_sh_content += "\n"
     stop_sh_content += 'if [ "$REMOVE_FLAG" = true ]; then \n'
     if num_validators > 0 and num_peers > 0:
-        stop_sh_content += f"docker compose -f {basedir}/{name}-cluster/docker-compose.yml down --remove-orphans\n"
+        stop_sh_content += f"docker compose -f {basedir}/{name}-cluster/docker-compose.yml down --remove-orphans\n"  # noqa: E501
 
     for i in range(1, num_validators + 1):
         stop_sh_content += f"rm -r {basedir}/{name}-cluster/vnode{i}/lib\n"
@@ -353,16 +350,18 @@ done
         stop_sh_content += f"rm -r {basedir}/{name}-cluster/pnode{i}/log\n"
 
     if standalone:
-        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"
+        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
         stop_sh_content += f"rm -r {protocol}/config\n"
         stop_sh_content += f"rm -r {protocol}/lib\n"
         stop_sh_content += f"rm -r {protocol}/log\n"
         stop_sh_content += f"rm -r {protocol}\n"
 
     if local:
-        stop_sh_content = f"#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
-        stop_sh_content += f"rm -r db\n"
-        stop_sh_content += f"rm -r debug.log\n"
+        stop_sh_content = (
+            "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
+        )
+        stop_sh_content += "rm -r db\n"
+        stop_sh_content += "rm -r debug.log\n"
 
     stop_sh_content += "fi \n"
     return stop_sh_content
@@ -397,10 +396,10 @@ def create_network(
         name: str = build_version.replace(":", "-")
         os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
         image_name, version = parse_image_name(build_version)
-        root_url = f"https://storage.googleapis.com/thelab-builds/"
+        root_url = "https://storage.googleapis.com/thelab-builds/"
         content: str = (
             root_url
-            + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}/features.json"
+            + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}/features.json"  # noqa: E501
         )
         image: str = f"{build_server}/{build_version}"
 
@@ -432,13 +431,13 @@ def create_network(
         "networks": [f"{name}-network"],
     }
 
-    services[f"network-explorer"] = {
+    services["network-explorer"] = {
         "image": "transia/explorer-main:latest",
-        "container_name": f"network-explorer",
+        "container_name": "network-explorer",
         "environment": [
-            f"PORT=4000",
+            "PORT=4000",
         ],
-        "ports": [f"4000:4000"],
+        "ports": ["4000:4000"],
         "networks": [f"{name}-network"],
     }
 
@@ -455,7 +454,7 @@ def create_network(
         f"""\
 #! /bin/bash
 docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force-recreate -d
-""",
+""",  # noqa: E501
     )
     stop_sh_content: str = update_stop_sh(protocol, name, num_validators, num_peers)
     write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
@@ -515,7 +514,9 @@ def enable_node_amendment(
     port: int = get_node_port(int(node_id), node_type)
     json_str: str = json.dumps(command)
     escaped_str = json_str.replace('"', '\\"')
-    command: str = f'curl -X POST -H "Content-Type: application/json" -d "{escaped_str}" http://localhost:{port}'
+    command: str = (
+        f'curl -X POST -H "Content-Type: application/json" -d "{escaped_str}" http://localhost:{port}'  # noqa: E501
+    )
     run_command(f"{basedir}/{name}", command)
 
 
@@ -550,10 +551,10 @@ def create_ansible(
         name: str = build_version.replace(":", "-")
         os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
         image_name, version = parse_image_name(build_version)
-        root_url = f"https://storage.googleapis.com/thelab-builds/"
+        root_url = "https://storage.googleapis.com/thelab-builds/"
         content: str = (
             root_url
-            + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}/features.json"
+            + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}/features.json"  # noqa: E501
         )
         image: str = f"{build_server}/{build_version}"
 
@@ -587,13 +588,13 @@ def create_ansible(
         "networks": [f"{name}-network"],
     }
 
-    services[f"network-explorer"] = {
+    services["network-explorer"] = {
         "image": "transia/explorer-main:latest",
-        "container_name": f"network-explorer",
+        "container_name": "network-explorer",
         "environment": [
-            f"PORT=4000",
+            "PORT=4000",
         ],
-        "ports": [f"4000:4000"],
+        "ports": ["4000:4000"],
         "networks": [f"{name}-network"],
     }
 
@@ -610,7 +611,7 @@ def create_ansible(
         f"""\
 #! /bin/bash
 docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force-recreate -d
-""",
+""",  # noqa: E501
     )
     stop_sh_content: str = update_stop_sh(protocol, name, num_validators, num_peers)
     write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
@@ -660,7 +661,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
             )
             run_command(
                 f"{basedir}/{name}-cluster/{c_name}",
-                f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster-{c_name}:{image_name} .",
+                f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster-{c_name}:{image_name} .",  # noqa: E501
             )
             run_command(
                 f"{basedir}/{name}-cluster/{c_name}",
@@ -688,7 +689,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
             )
             run_command(
                 f"{basedir}/{name}-cluster/{c_name}",
-                f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster-{c_name}:{image_name} .",
+                f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster-{c_name}:{image_name} .",  # noqa: E501
             )
             run_command(
                 f"{basedir}/{name}-cluster/{c_name}",
@@ -704,7 +705,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
     user: str = os.environ.get("SSH_USER", "ubuntu")
     ssh_key: str = os.environ.get("SSH_PATH", "~/.ssh/id_rsa")
     for vip in vips:
-        hosts_content += f"{vip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{vip}.yml \n"
+        hosts_content += f"{vip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{vip}.yml \n"  # noqa: E501
     for pip in pips:
-        hosts_content += f"{pip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{pip}.yml \n"
+        hosts_content += f"{pip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{pip}.yml \n"  # noqa: E501
     write_file(f"{basedir}/{name}-cluster/ansible/hosts.txt", hosts_content)

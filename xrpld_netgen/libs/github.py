@@ -5,7 +5,15 @@ import requests
 import re
 
 
-def get_commit_hash_from_server_version(server: str, version: str):
+def get_commit_hash_from_server_version(server: str, version: str) -> str:
+    """
+    Download a specific commit hash from a GitHub repository.
+
+    :param server: The owner of the repository (username or organization)
+    :param version: The name of the repository
+    :return: The commit hash
+    """
+
     # Send a GET request to the URL to download the file
     response = requests.get(f"{server}/{version}.releaseinfo")
 
@@ -27,7 +35,9 @@ def get_commit_hash_from_server_version(server: str, version: str):
         response.raise_for_status()
 
 
-def download_file_at_commit(owner: str, repo: str, commit_hash: str, file_path: str):
+def download_file_at_commit(
+    owner: str, repo: str, commit_hash: str, file_path: str
+) -> str:
     """
     Download a specific file from a GitHub repository at a given commit hash.
 

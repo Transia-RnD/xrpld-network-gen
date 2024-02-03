@@ -1,7 +1,7 @@
 [flake8]
-max-line-length = 79
 # As defined at https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
 docstring-convention=google
+exclude = .venv, tests, dist, keystore
 
 # D212 and D213 are mutually exclusive, so we're only allowing D213.
 # D205 and D415 don't like multi-line summary statements, which is annoying.

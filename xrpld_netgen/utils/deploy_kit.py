@@ -6,12 +6,10 @@ import re
 import os
 import yaml
 
-from typing import List, Dict, Any
-
 from xrpl_helpers.common.utils import write_file
 
 
-def build_entrypoint(root_path: str, genesis: False, quorum: int):
+def build_entrypoint(root_path: str, genesis: False, quorum: int) -> None:
     entrypoint: str = """
 #!/bin/bash
 
@@ -32,11 +30,13 @@ fi
 
 # Start rippled, Passthrough other arguments
 """
-    exec: str = f'exec /app/rippled --conf /etc/opt/ripple/rippled.cfg "$@"'
+    exec: str = 'exec /app/rippled --conf /etc/opt/ripple/rippled.cfg "$@"'
     exec_quorum: str = (
         f'exec /app/rippled --conf /etc/opt/ripple/rippled.cfg --quorum={quorum} "$@"'
     )
-    exec_genesis: str = f'exec /app/rippled --ledgerfile /genesis.json --conf /etc/opt/ripple/rippled.cfg --quorum={quorum} "$@"'
+    exec_genesis: str = (
+        f'exec /app/rippled --ledgerfile /genesis.json --conf /etc/opt/ripple/rippled.cfg --quorum={quorum} "$@"'  # noqa: E501
+    )
 
     entrypoint += "\n"
     if genesis:
@@ -88,25 +88,25 @@ def create_ansible_vars_file(
     path: str,
     ip: str,
     vars: DockerVars,
-):
+) -> DockerVars:
     with open(os.path.join(path, f"{ip}.yml"), "w") as f:
         yaml.dump(vars.to_dict(), f, explicit_start=True)
     return vars
 
 
 def create_dockerfile(
-    binary,
-    version,
-    image_name,
-    rpc_public_port,
-    rpc_admin_port,
-    ws_public_port,
-    ws_admin_port,
-    peer_port,
-    include_genesis=False,
-    quorum=None,
-    standalone=None,
-):
+    binary: bool,
+    version: str,
+    image_name: str,
+    rpc_public_port: int,
+    rpc_admin_port: int,
+    ws_public_port: int,
+    ws_admin_port: int,
+    peer_port: int,
+    include_genesis: bool = False,
+    quorum: int = None,
+    standalone: str = None,
+) -> str:
     dockerfile = f"""
     FROM {image_name} as base
 
@@ -118,7 +118,7 @@ def create_dockerfile(
 
     COPY config /config
     COPY entrypoint /entrypoint.sh
-    """
+    """  # noqa: E501
 
     if include_genesis:
         dockerfile += "COPY genesis.json /genesis.json\n"
@@ -128,21 +128,22 @@ def create_dockerfile(
 
     dockerfile += f"""
     RUN chmod +x /entrypoint.sh && \
-        echo '#!/bin/bash' > /usr/bin/server_info && echo '/entrypoint.sh server_info' >> /usr/bin/server_info && \
+        echo '#!/bin/bash' > /usr/bin/server_info && \
+        echo '/entrypoint.sh server_info' >> /usr/bin/server_info && \
         chmod +x /usr/bin/server_info
 
     EXPOSE {rpc_public_port} {rpc_admin_port} {ws_public_port} {ws_admin_port} {peer_port} {peer_port}/udp
-    """
+    """  # noqa: E501
 
     if include_genesis:
-        dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", "{quorum}", "{standalone}" ]'
+        dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", "{quorum}", "{standalone}" ]'  # noqa: E501
     else:
         dockerfile += 'ENTRYPOINT [ "/entrypoint.sh" ]'
 
     return dockerfile
 
 
-def download_binary(url: str, save_path: str):
+def download_binary(url: str, save_path: str) -> None:
     # Check if the file already exists
     if os.path.exists(save_path):
         print(f"The file {save_path} already exists.")
@@ -167,7 +168,7 @@ def download_binary(url: str, save_path: str):
         print(f"An error occurred: {e}")
 
 
-def update_dockerfile(build_version: str, save_path: str):
+def update_dockerfile(build_version: str, save_path: str) -> None:
     # Read the Dockerfile
     with open(save_path, "r") as file:
         lines = file.readlines()

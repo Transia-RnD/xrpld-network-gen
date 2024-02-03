@@ -5,9 +5,9 @@
 # create:network
 # xrpld-netgen create:network --protocol "xahau" --build_version "2023.11.10-dev+549"
 # add:peer
-# xrpld-netgen add:peer --network_name xrpld-2023.11.10-dev+549 --protocol "xahau" --version "2023.11.10-dev+549"
+# xrpld-netgen add:peer --network_name xrpld-2023.11.10-dev+549 --protocol "xahau" --version "2023.11.10-dev+549"  # noqa: E501
 # remove:peer
-# xrpld-netgen remove:peer --network_name xrpld-2023.11.10-dev+549 --protocol "xahau" --version "2023.11.10-dev+549"
+# xrpld-netgen remove:peer --network_name xrpld-2023.11.10-dev+549 --protocol "xahau" --version "2023.11.10-dev+549"  # noqa: E501
 # update:version
 # xrpld-netgen update:version --node --version xrpld-2023.11.10-dev+549
 # enable:amendment
@@ -89,7 +89,7 @@ def main():
         "--network_id", type=int, required=False, help="The network id", default=21339
     )
     # stop:local
-    parser_spl = subparsers.add_parser("stop:local", help="Stop Local Network")
+    # parser_spl = subparsers.add_parser("stop:local", help="Stop Local Network")
 
     # NETWORK
 
@@ -322,6 +322,7 @@ def main():
 
     # LOCAL
     if args.command == "start:local":
+        PUBLIC_KEY = args.public_key
         IMPORT_KEY = args.import_key
         PROTOCOL = args.protocol
         NETWORK_TYPE = args.network_type

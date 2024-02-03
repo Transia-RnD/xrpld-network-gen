@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from typing import Dict, Any # noqa: F401
-
 from unittest import TestCase
 
 
@@ -12,34 +10,33 @@ class BaseTestConfig(TestCase):
     @classmethod
     def setUpUnit(cls):
         """setUpUnit."""
-        print('SETUP UNIT')
+        print("SETUP UNIT")
 
     @classmethod
     def setUpIntegration(cls):
         """setUpIntegration."""
-        print('SETUP INTEGRATION')
+        print("SETUP INTEGRATION")
 
     @classmethod
     def tearDownIntegration(cls):
         """tearDownIntegration."""
-        print('TEAR DOWN INTEGRATION')
+        print("TEAR DOWN INTEGRATION")
 
     @classmethod
     def setUpClass(cls):
         """setUpClass."""
-        print('SETUP CLASS')
+        print("SETUP CLASS")
 
     @classmethod
     def tearDownClass(cls):
         """tearDownClass."""
-        print('TEAR DOWN CLASS')
+        print("TEAR DOWN CLASS")
 
     def setUp(cls):
         """setUp."""
-        print('SETUP APP')
+        print("SETUP APP")
         cls.setUpUnit()
 
     def tearDown(cls):
         """tearDown."""
-        print('TEAR DOWN')
-        # print(ee)
+        print("TEAR DOWN")
