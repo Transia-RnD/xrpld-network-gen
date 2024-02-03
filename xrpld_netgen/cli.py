@@ -53,7 +53,7 @@ from xrpld_netgen.utils.misc import (
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-XAHAU_RELEASE: str = "2023.12.29-release+689"
+XAHAU_RELEASE: str = "2024.1.25-release+738"
 XRPL_RELEASE: str = "1.12.0"
 
 
@@ -298,6 +298,9 @@ def main():
         required=False,
         help="The build version for the network",
     )
+    parser_us.add_argument(
+        "--ipfs", type=bool, required=False, help="Add an IPFS server", default=False
+    )
     # down:standalone
     parser_ds = subparsers.add_parser("down:standalone", help="Down Standalone")
     parser_ds.add_argument("--name", required=False, help="The name of the network")
@@ -319,7 +322,6 @@ def main():
 
     # LOCAL
     if args.command == "start:local":
-        PUBLIC_KEY = args.public_key
         IMPORT_KEY = args.import_key
         PROTOCOL = args.protocol
         NETWORK_TYPE = args.network_type
@@ -404,6 +406,7 @@ def main():
         NETWORK_ID = args.network_id
         BUILD_SERVER = args.server
         BUILD_VERSION = args.version
+        IPFS_SERVER = args.ipfs
 
         if PROTOCOL == "xahau" and not IMPORT_KEY:
             IMPORT_KEY: str = (
@@ -434,6 +437,7 @@ def main():
                 NETWORK_ID,
                 BUILD_SERVER,
                 BUILD_VERSION,
+                IPFS_SERVER,
             )
         else:
             create_standalone_binary(
@@ -444,6 +448,7 @@ def main():
                 NETWORK_ID,
                 BUILD_SERVER,
                 BUILD_VERSION,
+                IPFS_SERVER,
             )
 
         run_file(f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/start.sh")
