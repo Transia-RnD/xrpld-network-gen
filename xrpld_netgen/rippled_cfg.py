@@ -68,6 +68,7 @@ def generate_rippled_cfg(
     workers: int = 6,
     io_workers: int = 2,
     prefetch_workers: int = 4,
+    send_queue_limit: int = 65535,
 ):
     try:
         node_config_path: str = build_path + "/config"
@@ -112,6 +113,7 @@ def generate_rippled_cfg(
             cfg_out += f"ip = {_rpc_public_ip}" + "\n"
             cfg_out += f"admin = {_rpc_public_ip}" + "\n"
             cfg_out += f"protocol = {http_protocol}" + "\n"
+            cfg_out += f"send_queue_limit = {send_queue_limit}" + "\n"
 
         if is_rpc_admin:
             cfg_out += "\n"
@@ -120,6 +122,7 @@ def generate_rippled_cfg(
             cfg_out += f"ip = {_rpc_admin_ip}" + "\n"
             cfg_out += f"admin = {_rpc_admin_ip}" + "\n"
             cfg_out += f"protocol = {http_protocol}" + "\n"
+            cfg_out += f"send_queue_limit = {send_queue_limit}" + "\n"
 
         if is_ws_public:
             cfg_out += "\n"
@@ -127,6 +130,7 @@ def generate_rippled_cfg(
             cfg_out += f"port = {ws_public_port}" + "\n"
             cfg_out += f"ip = {_ws_public_ip}" + "\n"
             cfg_out += f"protocol = {ws_protocol}" + "\n"
+            cfg_out += f"send_queue_limit = {send_queue_limit}" + "\n"
 
         if is_ws_admin:
             cfg_out += "\n"
@@ -135,6 +139,7 @@ def generate_rippled_cfg(
             cfg_out += f"ip = {_ws_admin_ip}" + "\n"
             cfg_out += f"admin = {_ws_admin_ip}" + "\n"
             cfg_out += f"protocol = {ws_protocol}" + "\n"
+            cfg_out += f"send_queue_limit = {send_queue_limit}" + "\n"
 
         if is_peer:
             cfg_out += "\n"
@@ -142,6 +147,7 @@ def generate_rippled_cfg(
             cfg_out += f"port = {peer_port}" + "\n"
             cfg_out += f"ip = {_peer_port_ip}" + "\n"
             cfg_out += "protocol = peer" + "\n"
+            cfg_out += f"send_queue_limit = {send_queue_limit}" + "\n"
 
         cfg_out += "\n"
         cfg_out += "[node_size]" + "\n"

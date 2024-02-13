@@ -423,6 +423,8 @@ def create_network(
         keys["publicKey"],
         import_key,
         protocol,
+        False,
+        [],
         log_level,
     )
 
