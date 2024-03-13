@@ -28,6 +28,8 @@ from xrpld_netgen.utils.misc import (
     save_local_config,
     get_node_port,
     sha512_half,
+    run_file,
+    remove_directory,
 )
 
 from xrpl_helpers.common.utils import write_file, read_json
@@ -138,7 +140,7 @@ def create_node_folders(
         save_local_config(cfg_path, configs[0].data, configs[1].data)
 
         # default features
-        features_json: Any = read_json(f"default.{protocol}d.features.json")
+        features_json: Any = read_json(f"{basedir}/default.{protocol}d.features.json")
 
         # genesis (enable all features)
         if enable_all:
@@ -190,7 +192,7 @@ def create_node_folders(
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
 
-        pwd_str: str = "${PWD}"
+        pwd_str: str = basedir
         services[f"vnode{i}"] = {
             "build": {
                 "context": f"vnode{i}",
@@ -245,7 +247,7 @@ def create_node_folders(
         save_local_config(cfg_path, configs[0].data, configs[1].data)
 
         # default features
-        features_json: Any = read_json("default.xahaud.features.json")
+        features_json: Any = read_json(f"{basedir}/default.xahaud.features.json")
 
         # genesis (enable all features)
         if enable_all:
@@ -296,7 +298,7 @@ def create_node_folders(
             f"{basedir}/deploykit/entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
-        pwd_str: str = "${PWD}"
+        pwd_str: str = basedir
         services[f"pnode{i}"] = {
             "build": {
                 "context": f"pnode{i}",
@@ -718,3 +720,19 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
     for pip in pips:
         hosts_content += f"{pip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{pip}.yml \n"  # noqa: E501
     write_file(f"{basedir}/{name}-cluster/ansible/hosts.txt", hosts_content)
+
+
+def start_network(name: str):
+    run_file(f"{basedir}/{name}/start.sh")
+
+
+def stop_network(name: str, remove: bool = False):
+    cmd: List[str] = [f"{basedir}/{name}/stop.sh"]
+    if remove:
+        cmd.append("--remove")
+    run_file(cmd)
+
+
+def remove_network(name: str):
+    stop_network(name, True)
+    remove_directory(f"{basedir}/{name}")
