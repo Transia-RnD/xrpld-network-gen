@@ -13,7 +13,7 @@ xrpl-helpers = "^1.0.4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.2.1"
-flake8 = "^3.8.4"
+flake8 = "^7.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
