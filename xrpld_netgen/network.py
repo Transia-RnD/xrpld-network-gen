@@ -140,7 +140,7 @@ def create_node_folders(
         save_local_config(cfg_path, configs[0].data, configs[1].data)
 
         # default features
-        features_json: Any = read_json(f"{basedir}/default.{protocol}d.features.json")
+        features_json: Any = read_json(f"{basedir}/default.xrpl.features.json")
 
         # genesis (enable all features)
         if enable_all:
@@ -247,7 +247,7 @@ def create_node_folders(
         save_local_config(cfg_path, configs[0].data, configs[1].data)
 
         # default features
-        features_json: Any = read_json(f"{basedir}/default.xahaud.features.json")
+        features_json: Any = read_json(f"{basedir}/default.xahau.features.json")
 
         # genesis (enable all features)
         if enable_all:

@@ -54,7 +54,7 @@ from xrpld_netgen.utils.misc import (
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 XAHAU_RELEASE: str = "2024.3.12-release+790"
-XRPL_RELEASE: str = "1.12.0"
+XRPL_RELEASE: str = "rippleci/rippled:2.0.0-b4"
 
 
 def main():

@@ -87,7 +87,7 @@ def create_standalone_folder(
     binary: bool,
     name: str,
     image: str,
-    features_url: str,
+    feature_content: str,
     network_id: int,
     vl_key: str,
     ivl_key: str,
@@ -95,7 +95,7 @@ def create_standalone_folder(
     net_type: str,
     log_level: str,
 ):
-    cfg_path = f"{basedir}/xrpld-{name}/config"
+    cfg_path = f"{basedir}/{protocol}-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
     vl_config: Dict[str, Any] = generate_validator_config(protocol, net_type)
 
@@ -130,14 +130,14 @@ def create_standalone_folder(
         vl_config["ips"],
         vl_config["ips_fixed"],
     )
-    os.makedirs(f"{basedir}/xrpld-{name}/config", exist_ok=True)
+    os.makedirs(f"{basedir}/{protocol}-{name}/config", exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
-    features_json: Dict[str, Any] = download_json(
-        features_url, f"{basedir}/xrpld-{name}"
-    )
+
+    lines: List[str] = get_feature_lines_from_content(feature_content)
+    features_json: Dict[str, Any] = parse_rippled_amendments(lines)
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
-        f"{basedir}/xrpld-{name}/genesis.json",
+        f"{basedir}/{protocol}-{name}/genesis.json",
         json.dumps(genesis_json, indent=4, sort_keys=True),
     )
     dockerfile: str = create_dockerfile(
@@ -153,20 +153,21 @@ def create_standalone_folder(
         "",
         "-a",
     )
-    with open(f"{basedir}/xrpld-{name}/Dockerfile", "w") as file:
+    with open(f"{basedir}/{protocol}-{name}/Dockerfile", "w") as file:
         file.write(dockerfile)
 
     shutil.copyfile(
-        f"{basedir}/deploykit/entrypoint", f"{basedir}/xrpld-{name}/entrypoint"
+        f"{basedir}/deploykit/{protocol}.entrypoint",
+        f"{basedir}/{protocol}-{name}/entrypoint",
     )
     pwd_str: str = "${PWD}"
-    services["xrpld"] = {
+    services[f"{protocol}"] = {
         "build": {
             "context": ".",
             "dockerfile": "Dockerfile",
         },
         "platform": "linux/x86_64",
-        "container_name": "xrpld",
+        "container_name": f"{protocol}",
         "ports": [
             f"{rpc_public}:{rpc_public}",
             f"{rpc_admin}:{rpc_admin}",
@@ -194,18 +195,19 @@ def create_standalone_image(
     build_name: str,
     add_ipfs: bool = False,
 ) -> None:
-    name: str = "standalone"
-    image_name, version = parse_image_name(build_name)
-    root_url = "https://storage.googleapis.com/thelab-builds/"
-    storage_url: str = (
-        root_url + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}"
+    name: str = build_name
+    os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
+    owner = "XRPLF"
+    repo = "rippled"
+    content: str = download_file_at_commit(
+        owner, repo, "develop", "src/ripple/protocol/impl/Feature.cpp"
     )
-    image: str = f"{build_system}/{build_name}"
+    image: str = f"{build_system}/rippled:{build_name}"
     create_standalone_folder(
         False,
         name,
         image,
-        f"{storage_url}/features.json",
+        content,
         network_id,
         public_key,
         import_key,
@@ -246,18 +248,20 @@ def create_standalone_image(
         "networks": {"standalone-network": {"driver": "bridge"}},
     }
 
-    with open(f"{basedir}/xrpld-{name}/docker-compose.yml", "w") as f:
+    with open(f"{basedir}/{protocol}-{name}/docker-compose.yml", "w") as f:
         yaml.dump(compose, f, default_flow_style=False)
 
     write_file(
-        f"{basedir}/xrpld-{name}/start.sh",
+        f"{basedir}/{protocol}-{name}/start.sh",
         f"""\
 #! /bin/bash
-docker compose -f {basedir}/xrpld-{name}/docker-compose.yml up --build --force-recreate -d
+docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml up --build --force-recreate -d
 """,  # noqa: E501
     )
+    os.chmod(f"{basedir}/{protocol}-{name}/start.sh", 0o755)
     stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, True)
-    write_file(f"{basedir}/xrpld-{name}/stop.sh", stop_sh_content)
+    write_file(f"{basedir}/{protocol}-{name}/stop.sh", stop_sh_content)
+    os.chmod(f"{basedir}/{protocol}-{name}/stop.sh", 0o755)
 
 
 def create_binary_folder(
@@ -334,7 +338,8 @@ def create_binary_folder(
         file.write(dockerfile)
 
     shutil.copyfile(
-        f"{basedir}/deploykit/entrypoint", f"{basedir}/{protocol}-{name}/entrypoint"
+        f"{basedir}/deploykit/{protocol}.entrypoint",
+        f"{basedir}/{protocol}-{name}/entrypoint",
     )
     pwd_str: str = "${PWD}"
     services[f"{protocol}"] = {
@@ -453,7 +458,7 @@ def create_local_folder(
     net_type: str,
     log_level: str,
 ):
-    cfg_path = "config"
+    cfg_path = f"{basedir}/{protocol}-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
     vl_config: Dict[str, Any] = generate_validator_config(protocol, net_type)
 

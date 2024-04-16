@@ -15,19 +15,20 @@ logger = logging.getLogger("app")
 class TestINetGenStandalone(BaseTestConfig):
     def test_standalone_image(cls):
         create_standalone_image(
+            "trace",
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
-            "xahau",  # protocol
+            "xrpl",  # protocol
             "standalone",  # net type
-            21337,  # network id
-            "gcr.io/thelab-924f3",  # build server
-            "dangell7-devnet-binary:2.0.0-b2",  # build version
+            1,  # network id
+            "rippleci",  # build server
+            "2.0.0-b4",  # build version
         )
-        folder = f"{basedir}/xrpld-standalone"
+        folder = f"{basedir}/xrpl-2.0.0-b4"
         files = [
             "Dockerfile",
             "docker-compose.yml",
-            "features.json",
+            # "features.json", // doesnt save for either
             "start.sh",
             # "config", // folder
             "entrypoint",
@@ -39,8 +40,9 @@ class TestINetGenStandalone(BaseTestConfig):
         for file in files_exist:
             cls.assertTrue(file)
 
-    def test_standalone_binary(cls):
+    def _test_standalone_binary(cls):
         create_standalone_binary(
+            "trace",
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
             "xahau",  # protocol

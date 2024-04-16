@@ -9,47 +9,6 @@ import yaml
 from xrpl_helpers.common.utils import write_file
 
 
-def build_entrypoint(root_path: str, genesis: False, quorum: int) -> None:
-    entrypoint: str = """
-#!/bin/bash
-
-rippledconfig=`/bin/cat /config/rippled.cfg 2>/dev/null | wc -l`
-validatorstxt=`/bin/cat /config/validators.txt 2>/dev/null | wc -l`
-
-mkdir -p /config
-
-if [[ "$rippledconfig" -gt "0" && "$validatorstxt" -gt "0" ]]; then
-
-    echo "Existing rippled config at host /config/, using them."
-    mkdir -p /etc/opt/ripple
-
-    /bin/cat /config/rippled.cfg > /etc/opt/ripple/rippled.cfg
-    /bin/cat /config/validators.txt > /etc/opt/ripple/validators.txt
-
-fi
-
-# Start rippled, Passthrough other arguments
-"""
-    exec: str = 'exec /app/rippled --conf /etc/opt/ripple/rippled.cfg "$@"'
-    exec_quorum: str = (
-        f'exec /app/rippled --conf /etc/opt/ripple/rippled.cfg --quorum={quorum} "$@"'
-    )
-    exec_genesis: str = (
-        f'exec /app/rippled --ledgerfile /genesis.json --conf /etc/opt/ripple/rippled.cfg --quorum={quorum} "$@"'  # noqa: E501
-    )
-
-    entrypoint += "\n"
-    if genesis:
-        entrypoint += exec_genesis
-    else:
-        if quorum:
-            entrypoint += exec_quorum
-        else:
-            entrypoint += exec
-
-    write_file(f"{root_path}/entrypoint", entrypoint)
-
-
 class DockerVars:
     def __init__(
         self,
