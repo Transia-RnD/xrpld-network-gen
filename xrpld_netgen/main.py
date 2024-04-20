@@ -184,6 +184,8 @@ def create_standalone_folder(
     }
 
 
+ripple_commits = {"2.0.0-b4": "2a66bb3fc725435db5d3551e390001e9352b63a9"}
+
 def create_standalone_image(
     log_level: str,
     public_key: str,
@@ -200,7 +202,7 @@ def create_standalone_image(
     owner = "XRPLF"
     repo = "rippled"
     content: str = download_file_at_commit(
-        owner, repo, "develop", "src/ripple/protocol/impl/Feature.cpp"
+        owner, repo, ripple_commits[build_name], "src/ripple/protocol/impl/Feature.cpp"
     )
     image: str = f"{build_system}/rippled:{build_name}"
     create_standalone_folder(
