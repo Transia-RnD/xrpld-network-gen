@@ -54,7 +54,7 @@ from xrpld_netgen.utils.misc import (
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 XAHAU_RELEASE: str = "2024.3.12-release+790"
-XRPL_RELEASE: str = "rippleci/rippled:2.0.0-b4"
+XRPL_RELEASE: str = "2.0.0-b4"
 
 
 def main():
@@ -403,20 +403,15 @@ def main():
                 "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1"
             )
 
-        if BUILD_TYPE == "binary" and not BUILD_SERVER:
-            BUILD_SERVER: str = "https://build.xahau.tech"
-
-        if BUILD_TYPE == "image" and not BUILD_SERVER:
-            BUILD_SERVER: str = "gcr.io/thelab-924f3"
-
-        if PROTOCOL == "xahau" and BUILD_TYPE == "binary" and not BUILD_VERSION:
+        if PROTOCOL == "xahau" and not BUILD_VERSION:
             BUILD_VERSION: str = XAHAU_RELEASE
+            BUILD_SERVER: str = "https://build.xahau.tech"
+            BUILD_TYPE: str = "binary"
 
-        if PROTOCOL == "xrpl" and BUILD_TYPE == "image" and not BUILD_VERSION:
+        if PROTOCOL == "xrpl" and not BUILD_VERSION:
             BUILD_VERSION: str = XRPL_RELEASE
-
-        if BUILD_TYPE == "binary" and PROTOCOL == "xrpl":
-            raise ValueError("Invalid `PROTOCOL`  and `BUILD_TYPE` mismatch")
+            BUILD_SERVER: str = "rippleci"
+            BUILD_TYPE: str = "image"
 
         if BUILD_TYPE == "image":
             create_standalone_image(
