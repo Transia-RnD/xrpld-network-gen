@@ -53,7 +53,7 @@ from xrpld_netgen.utils.misc import (
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-XAHAU_RELEASE: str = "2024.3.12-release+790"
+XAHAU_RELEASE: str = "2024.4.21-release+858"
 XRPL_RELEASE: str = "2.0.0-b4"
 
 
