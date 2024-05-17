@@ -122,6 +122,8 @@ def create_node_folders(
             ws_public,
             ws_admin,
             peer,
+            "huge",
+            10000,
             "/var/lib/rippled/db/nudb",
             "/var/lib/rippled/db",
             "/var/log/rippled/debug.log",
@@ -140,7 +142,7 @@ def create_node_folders(
         save_local_config(cfg_path, configs[0].data, configs[1].data)
 
         # default features
-        features_json: Any = read_json(f"{basedir}/default.xrpl.features.json")
+        features_json: Any = read_json(f"{basedir}/default.{protocol}.features.json")
 
         # genesis (enable all features)
         if enable_all:
@@ -148,7 +150,7 @@ def create_node_folders(
                 lines: List[str] = get_feature_lines_from_content(feature_content)
                 features_json: Dict[str, Any] = parse_rippled_amendments(lines)
 
-            if protocol == "ripple":
+            if protocol == "xrpl":
                 features_json: Dict[str, Any] = download_json(
                     feature_content, f"{basedir}/{name}-cluster"
                 )
@@ -188,7 +190,7 @@ def create_node_folders(
             file.write(dockerfile)
 
         shutil.copyfile(
-            f"{basedir}/deploykit/entrypoint",
+            f"{basedir}/deploykit/{protocol}.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
 
@@ -229,6 +231,8 @@ def create_node_folders(
             ws_public,
             ws_admin,
             peer,
+            "huge",
+            None,
             "/var/lib/rippled/db/nudb",
             "/var/lib/rippled/db",
             "/var/log/rippled/debug.log",
@@ -255,7 +259,7 @@ def create_node_folders(
                 lines: List[str] = get_feature_lines_from_content(feature_content)
                 features_json: Dict[str, Any] = parse_rippled_amendments(lines)
 
-            if protocol == "ripple":
+            if protocol == "xrpl":
                 features_json: Dict[str, Any] = download_json(
                     feature_content, f"{basedir}/{name}-cluster"
                 )
@@ -295,7 +299,7 @@ def create_node_folders(
             file.write(dockerfile)
 
         shutil.copyfile(
-            f"{basedir}/deploykit/entrypoint",
+            f"{basedir}/deploykit/{protocol}.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
         pwd_str: str = basedir
@@ -398,7 +402,7 @@ def create_network(
         download_binary(url, f"{basedir}/{name}-cluster/rippled.{build_version}")
         image: str = "ubuntu:jammy"
 
-    if protocol == "ripple":
+    if protocol == "xrpl":
         name: str = build_version.replace(":", "-")
         os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
         image_name, version = parse_image_name(build_version)
@@ -445,6 +449,7 @@ def create_network(
         "container_name": "network-explorer",
         "environment": [
             "PORT=4000",
+            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6006}",
         ],
         "ports": ["4000:4000"],
         "networks": [f"{name}-network"],
@@ -556,17 +561,6 @@ def create_ansible(
         url: str = f"{build_server}/{build_version}"
         download_binary(url, f"{basedir}/{name}-cluster/rippled.{build_version}")
         image: str = "ubuntu:jammy"
-
-    if protocol == "ripple":
-        name: str = build_version.replace(":", "-")
-        os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-        image_name, version = parse_image_name(build_version)
-        root_url = "https://storage.googleapis.com/thelab-builds/"
-        content: str = (
-            root_url
-            + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}/features.json"  # noqa: E501
-        )
-        image: str = f"{build_server}/{build_version}"
 
     client = PublisherClient()
     client.create_keys()

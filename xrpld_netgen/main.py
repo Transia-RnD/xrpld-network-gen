@@ -119,6 +119,8 @@ def create_standalone_folder(
         ws_public,
         ws_admin,
         peer,
+        "huge",
+        10000,
         "/var/lib/rippled/db/nudb",
         "/var/lib/rippled/db",
         "/var/log/rippled/debug.log",
@@ -185,6 +187,7 @@ def create_standalone_folder(
 
 
 ripple_commits = {"2.0.0-b4": "2a66bb3fc725435db5d3551e390001e9352b63a9"}
+
 
 def create_standalone_image(
     log_level: str,
@@ -302,6 +305,8 @@ def create_binary_folder(
         ws_public,
         ws_admin,
         peer,
+        "huge",
+        10000,
         "/var/lib/rippled/db/nudb",
         "/var/lib/rippled/db",
         "/var/log/rippled/debug.log",
@@ -484,6 +489,8 @@ def create_local_folder(
         ws_public,
         ws_admin,
         peer,
+        "huge",
+        10000,
         "db/nudb",
         "db",
         "debug.log",

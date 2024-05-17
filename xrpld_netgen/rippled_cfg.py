@@ -33,9 +33,9 @@ def generate_rippled_cfg(
     key_path: str,
     crt_path: str,
     size_node: str,
+    num_ledgers: str,
     nudb_path: str,
     db_path: str,
-    num_ledgers: str,
     debug_path: str,
     log_level: str,
     private_peer: int,
@@ -157,8 +157,9 @@ def generate_rippled_cfg(
         cfg_out += "[node_db]" + "\n"
         cfg_out += "type=NuDB" + "\n"
         cfg_out += f"path={nudb_path}" + "\n"
-        cfg_out += "advisory_delete=0" + "\n"
-        cfg_out += f"online_delete={num_ledgers}" + "\n"
+        if num_ledgers:
+            cfg_out += "advisory_delete=0" + "\n"
+            cfg_out += f"online_delete={num_ledgers}" + "\n"
         cfg_out += "\n"
 
         fee_account_reserve: int = 5000000
@@ -172,7 +173,10 @@ def generate_rippled_cfg(
         cfg_out += "\n"
 
         cfg_out += "[ledger_history]" + "\n"
-        cfg_out += f"{num_ledgers}" + "\n"
+        if num_ledgers:
+            cfg_out += f"{num_ledgers}" + "\n"
+        else:
+            cfg_out += "full" + "\n"
         cfg_out += "\n"
 
         cfg_out += "[database_path]" + "\n"
@@ -395,6 +399,8 @@ def gen_config(
     ws_public: int,
     ws_admin: int,
     peer: int,
+    size_node: str,
+    num_ledgers: int,
     nudb_path: str,
     db_path: str,
     debug_path: str,
@@ -429,10 +435,10 @@ def gen_config(
         is_ssl=True,
         key_path=None,
         crt_path=None,
-        size_node="huge",
+        size_node=size_node,
+        num_ledgers=num_ledgers,
         nudb_path=nudb_path,
         db_path=db_path,
-        num_ledgers=10000,
         debug_path=debug_path,
         log_level=log_level,
         # private_peer=1 if _node.private_peer and i == 1 else 0,
