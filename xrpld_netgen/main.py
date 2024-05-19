@@ -465,7 +465,7 @@ def create_local_folder(
     net_type: str,
     log_level: str,
 ):
-    cfg_path = f"{basedir}/{protocol}-{name}/config"
+    cfg_path = f"config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
     vl_config: Dict[str, Any] = generate_validator_config(protocol, net_type)
 
@@ -502,7 +502,7 @@ def create_local_folder(
         vl_config["ips"],
         vl_config["ips_fixed"],
     )
-    os.makedirs("config", exist_ok=True)
+    os.makedirs(cfg_path, exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     content: str = get_feature_lines_from_path(
         "../src/ripple/protocol/impl/Feature.cpp"
@@ -510,7 +510,7 @@ def create_local_folder(
     features_json: Dict[str, Any] = parse_rippled_amendments(content)
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
-        "config/genesis.json",
+        f"{cfg_path}/genesis.json",
         json.dumps(genesis_json, indent=4, sort_keys=True),
     )
 
@@ -524,7 +524,7 @@ def start_local(
     network_id: int,
 ) -> None:
     name: str = "local"
-    os.makedirs(f"{basedir}/xrpld-{name}", exist_ok=True)
+    os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
     create_local_folder(
         name,
         network_id,

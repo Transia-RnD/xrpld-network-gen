@@ -27,7 +27,7 @@ class TestINetGenXahau(BaseTestConfig):
             2,  # num peers
             21336,  # network id
             "https://build.xahau.tech",  # image host
-            "2024.1.22-candidate+729",  # image name
+            "2024.4.21-release+858",  # image name
             False,
             3,
         )
@@ -41,7 +41,7 @@ class TestINetGenXahau(BaseTestConfig):
             2,  # num peers
             21336,  # network id
             "https://build.xahau.tech",  # image host
-            "2024.1.25-release+738",  # image name
+            "2024.5.13-HEAD+864",  # image name
             True,
             3,
             [
