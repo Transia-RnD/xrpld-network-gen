@@ -14,8 +14,6 @@ from xrpld_netgen.libs.github import (
     download_file_at_commit,
 )
 from xrpld_netgen.utils.misc import (
-    parse_image_name,
-    download_json,
     generate_ports,
     save_local_config,
     run_file,
@@ -465,7 +463,7 @@ def create_local_folder(
     net_type: str,
     log_level: str,
 ):
-    cfg_path = f"config"
+    cfg_path = "config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
     vl_config: Dict[str, Any] = generate_validator_config(protocol, net_type)
 

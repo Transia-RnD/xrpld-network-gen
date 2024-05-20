@@ -6,8 +6,6 @@ import re
 import os
 import yaml
 
-from xrpl_helpers.common.utils import write_file
-
 
 class DockerVars:
     def __init__(
