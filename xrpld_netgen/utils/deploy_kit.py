@@ -109,6 +109,7 @@ def download_binary(url: str, save_path: str) -> None:
         print(
             f"{bcolors.GREEN}version: {bcolors.BLUE}{version} {bcolors.END}already exists..."
         )
+        os.chmod(save_path, 0o755)
         return
 
     try:

@@ -97,6 +97,35 @@ def run_stop(cmd: List[str]):
         sys.exit(1)
 
 
+def is_container_running(container_name):
+    result = subprocess.run(
+        ["docker", "inspect", container_name], capture_output=True, text=True
+    )
+    return "Hostname" in result.stdout
+
+
+def run_logs():
+    try:
+        container_name = "xahau"
+        if is_container_running(container_name):
+            os.system("clear")
+            print()
+            print(
+                f"{bcolors.GREEN}Starting live log monitor, edit with {bcolors.PURPLE}CTRL + C{bcolors.END}"
+            )
+            print()
+            log_command = f"docker logs --tail 20 -f {container_name} 2>&1 | grep -E --color=always 'HookTrace|HookError|Publishing ledger [0-9]+'"
+            os.system(log_command)
+        else:
+            print()
+            print(
+                f"{bcolors.RED}Cannot watch live logs, container not running. Run {bcolors.PURPLE}./install{bcolors.RED} script{bcolors.END}"
+            )
+            print()
+    except subprocess.CalledProcessError:
+        return
+
+
 def check_deps(cmd: List[str]) -> None:
     try:
         print(bcolors.BLUE + "Checking dependencies: \n")

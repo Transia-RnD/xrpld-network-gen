@@ -53,6 +53,7 @@ from xrpld_netgen.utils.misc import (
     remove_containers,
     run_start,
     run_stop,
+    run_logs,
 )
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -62,28 +63,14 @@ XRPL_RELEASE: str = "2.0.0-b4"
 
 
 def main():
-    print("")
-    print("   _  __ ____  ____  __    ____     _   __     __  ______          ")
-    print("  | |/ // __ \/ __ \/ /   / __ \   / | / /__  / /_/ ____/__  ____  ")
-    print("  |   // /_/ / /_/ / /   / / / /  /  |/ / _ \/ __/ / __/ _ \/ __ \ ")
-    print(" /   |/ _, _/ ____/ /___/ /_/ /  / /|  /  __/ /_/ /_/ /  __/ / / / ")
-    print("/_/|_/_/ |_/_/   /_____/_____/  /_/ |_/\___/\__/\____/\___/_/ /_/  ")
-    print("")
-
-    check_deps([f"{basedir}/deploykit/prerequisites.sh"])
-
-    print(f"{bcolors.BLUE}Removing existing containers: {bcolors.RED}")
-    remove_containers("docker stop xahau")
-    remove_containers("docker rm xahau")
-    remove_containers("docker stop explorer")
-    remove_containers("docker rm explorer")
-    remove_containers("docker stop xrpl")
-    remove_containers("docker rm xrpl")
-
     parser = argparse.ArgumentParser(
         description="A python cli to build xrpld networks and standalone ledgers."
     )
     subparsers = parser.add_subparsers(dest="command")
+
+    # LOGS
+    # logs:hooks
+    subparsers.add_parser("logs:hooks", help="Log Hooks")
 
     # LOCAL
     # start:local
@@ -325,6 +312,76 @@ def main():
 
     args = parser.parse_args()
 
+    # LOGS
+    if args.command == "logs:hooks":
+        return run_logs()
+
+    if args.command == "stop":
+        NAME = args.name
+        print(f"{bcolors.BLUE}Stopping Network: {NAME}{bcolors.END}")
+        return run_stop(f"{basedir}/{NAME}/stop.sh")
+
+    if args.command == "remove":
+        NAME = args.name
+        print(f"{bcolors.BLUE}Removing Network: {NAME}{bcolors.END}")
+        return remove_directory(f"{basedir}/{NAME}")
+
+    # DOWN STANDALONE
+    if args.command == "down:standalone":
+        NAME = args.name
+        print(
+            f"{bcolors.BLUE}Taking Down Standalone Network with the following parameters:{bcolors.END}"
+        )
+
+        if NAME:
+            print(f"    - Network Name: {NAME}")
+            run_stop([f"{basedir}/{NAME}/stop.sh"])
+            remove_directory(f"{basedir}/{NAME}")
+            return
+
+        PROTOCOL = args.protocol
+        BUILD_VERSION = args.version
+
+        if PROTOCOL == "xahau" and not BUILD_VERSION:
+            BUILD_VERSION: str = XAHAU_RELEASE
+
+        if PROTOCOL == "xrpl" and not BUILD_VERSION:
+            BUILD_VERSION: str = XRPL_RELEASE
+
+        print(f"    - Network Name: {NAME}")
+        print(f"    - Protocol: {PROTOCOL}")
+        print(f"    - Build Version: {BUILD_VERSION}")
+        return run_stop([f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/stop.sh"])
+
+    # MANAGE NETWORK/STANDALONE
+    if args.command == "start":
+        NAME = args.name
+        print(f"{bcolors.BLUE}Starting Network: {NAME}{bcolors.END}")
+        return run_start(
+            [f"{basedir}/{NAME}/start.sh"],
+            PROTOCOL,
+            BUILD_VERSION,
+            "network",
+        )
+
+    print("")
+    print("   _  __ ____  ____  __    ____     _   __     __  ______          ")
+    print("  | |/ // __ \/ __ \/ /   / __ \   / | / /__  / /_/ ____/__  ____  ")
+    print("  |   // /_/ / /_/ / /   / / / /  /  |/ / _ \/ __/ / __/ _ \/ __ \ ")
+    print(" /   |/ _, _/ ____/ /___/ /_/ /  / /|  /  __/ /_/ /_/ /  __/ / / / ")
+    print("/_/|_/_/ |_/_/   /_____/_____/  /_/ |_/\___/\__/\____/\___/_/ /_/  ")
+    print("")
+
+    check_deps([f"{basedir}/deploykit/prerequisites.sh"])
+
+    print(f"{bcolors.BLUE}Removing existing containers: {bcolors.RED}")
+    remove_containers("docker stop xahau")
+    remove_containers("docker rm xahau")
+    remove_containers("docker stop explorer")
+    remove_containers("docker rm explorer")
+    remove_containers("docker stop xrpl")
+    remove_containers("docker rm xrpl")
+
     # LOCAL
     if args.command == "start:local":
         LOG_LEVEL = args.log_level
@@ -433,27 +490,6 @@ def main():
         print(f"    - Node Type: {NODE_VERSION}")
         enable_node_amendment(NAME, AMENDMENT_NAME, NODE_ID, NODE_VERSION)
 
-    # MANAGE NETWORK/STANDALONE
-    if args.command == "start":
-        NAME = args.name
-        print(f"{bcolors.BLUE}Starting Network: {NAME}{bcolors.END}")
-        run_start(
-            [f"{basedir}/{NAME}/start.sh"],
-            PROTOCOL,
-            BUILD_VERSION,
-            "network",
-        )
-
-    if args.command == "stop":
-        NAME = args.name
-        print(f"{bcolors.BLUE}Stopping Network: {NAME}{bcolors.END}")
-        run_stop(f"{basedir}/{NAME}/stop.sh")
-
-    if args.command == "remove":
-        NAME = args.name
-        print(f"{bcolors.BLUE}Removing Network: {NAME}{bcolors.END}")
-        remove_directory(f"{basedir}/{NAME}")
-
     # UP STANDALONE
     if args.command == "up:standalone":
         LOG_LEVEL = args.log_level
@@ -472,15 +508,19 @@ def main():
                 "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1"
             )
 
-        if PROTOCOL == "xahau" and not BUILD_VERSION:
-            BUILD_VERSION: str = XAHAU_RELEASE
+        if PROTOCOL == "xahau":
             BUILD_SERVER: str = "https://build.xahau.tech"
             BUILD_TYPE: str = "binary"
 
-        if PROTOCOL == "xrpl" and not BUILD_VERSION:
-            BUILD_VERSION: str = XRPL_RELEASE
+        if PROTOCOL == "xahau" and not BUILD_VERSION:
+            BUILD_VERSION: str = XAHAU_RELEASE
+
+        if PROTOCOL == "xrpl":
             BUILD_SERVER: str = "rippleci"
             BUILD_TYPE: str = "image"
+
+        if PROTOCOL == "xrpl" and not BUILD_VERSION:
+            BUILD_VERSION: str = XRPL_RELEASE
 
         print(
             f"{bcolors.BLUE}Setting Up Standalone Network with the following parameters:{bcolors.END}"
@@ -527,33 +567,6 @@ def main():
             BUILD_VERSION,
             "standalone",
         )
-
-    # DOWN STANDALONE
-    if args.command == "down:standalone":
-        NAME = args.name
-        print(
-            f"{bcolors.BLUE}Taking Down Standalone Network with the following parameters:{bcolors.END}"
-        )
-
-        if NAME:
-            print(f"    - Network Name: {NAME}")
-            run_stop([f"{basedir}/{NAME}/stop.sh"])
-            remove_directory(f"{basedir}/{NAME}")
-            return
-
-        PROTOCOL = args.protocol
-        BUILD_VERSION = args.version
-
-        if PROTOCOL == "xahau" and not BUILD_VERSION:
-            BUILD_VERSION: str = XAHAU_RELEASE
-
-        if PROTOCOL == "xrpl" and not BUILD_VERSION:
-            BUILD_VERSION: str = XRPL_RELEASE
-
-        print(f"    - Network Name: {NAME}")
-        print(f"    - Protocol: {PROTOCOL}")
-        print(f"    - Build Version: {BUILD_VERSION}")
-        run_stop([f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/stop.sh"])
 
 
 if __name__ == "__main__":
