@@ -47,8 +47,11 @@ from xrpld_netgen.network import (
     enable_node_amendment,
 )
 from xrpld_netgen.utils.misc import (
-    run_file,
     remove_directory,
+    bcolors,
+    check_deps,
+    run_start,
+    run_stop,
 )
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -58,6 +61,16 @@ XRPL_RELEASE: str = "2.0.0-b4"
 
 
 def main():
+    print("")
+    print("   _  __ ____  ____  __    ____     _   __     __  ______          ")
+    print("  | |/ // __ \/ __ \/ /   / __ \   / | / /__  / /_/ ____/__  ____  ")
+    print("  |   // /_/ / /_/ / /   / / / /  /  |/ / _ \/ __/ / __/ _ \/ __ \ ")
+    print(" /   |/ _, _/ ____/ /___/ /_/ /  / /|  /  __/ /_/ /_/ /  __/ / / / ")
+    print("/_/|_/_/ |_/_/   /_____/_____/  /_/ |_/\___/\__/\____/\___/_/ /_/  ")
+    print("")
+
+    check_deps([f"{basedir}/deploykit/prerequisites.sh"])
+
     parser = argparse.ArgumentParser(
         description="A python cli to build xrpld networks and standalone ledgers."
     )
@@ -312,12 +325,23 @@ def main():
         NETWORK_TYPE = args.network_type
         NETWORK_ID = args.network_id
 
+        print(
+            f"{bcolors.BLUE}Starting Local Network with the following parameters:{bcolors.END}"
+        )
+        print(f"    - Log Level: {LOG_LEVEL}")
+        print(f"    - Public Key: {PUBLIC_KEY}")
+        print(f"    - Import Key: {IMPORT_KEY}")
+        print(f"    - Protocol: {PROTOCOL}")
+        print(f"    - Network Type: {NETWORK_TYPE}")
+        print(f"    - Network ID: {NETWORK_ID}")
+
         start_local(
             LOG_LEVEL, PUBLIC_KEY, IMPORT_KEY, PROTOCOL, NETWORK_TYPE, NETWORK_ID
         )
 
     if args.command == "stop:local":
-        run_file("./stop.sh")
+        print(f"{bcolors.BLUE}Stopping Local Network{bcolors.END}")
+        run_stop(["./stop.sh"])
 
     # CREATE NETWORK
     if args.command == "create:network":
@@ -344,6 +368,19 @@ def main():
         if not QUORUM:
             QUORUM = NUM_VALIDATORS - 1
 
+        print(
+            f"{bcolors.BLUE}Creating Network with the following parameters:{bcolors.END}"
+        )
+        print(f"    - Log Level: {LOG_LEVEL}")
+        print(f"    - Protocol: {PROTOCOL}")
+        print(f"    - Number of Validators: {NUM_VALIDATORS}")
+        print(f"    - Number of Peers: {NUM_PEERS}")
+        print(f"    - Network ID: {NETWORK_ID}")
+        print(f"    - Build Server: {BUILD_SERVER}")
+        print(f"    - Build Version: {BUILD_VERSION}")
+        print(f"    - Genesis: {GENESIS}")
+        print(f"    - Quorum: {QUORUM}")
+
         create_network(
             LOG_LEVEL,
             import_vl_key,
@@ -363,6 +400,14 @@ def main():
         NODE_VERSION = args.node_version
         BUILD_SERVER = args.build_server
         BUILD_VERSION = args.build_version
+        print(
+            f"{bcolors.BLUE}Updating Node Version with the following parameters:{bcolors.END}"
+        )
+        print(f"    - Network Name: {NAME}")
+        print(f"    - Node ID: {NODE_ID}")
+        print(f"    - Node Type: {NODE_VERSION}")
+        print(f"    - Build Server: {BUILD_SERVER}")
+        print(f"    - Build Version: {BUILD_VERSION}")
         update_node_binary(NAME, NODE_ID, NODE_VERSION, BUILD_SERVER, BUILD_VERSION)
 
     if args.command == "enable:amendment":
@@ -370,19 +415,34 @@ def main():
         AMENDMENT_NAME = args.amendment_name
         NODE_ID = args.node_id
         NODE_VERSION = args.node_version
+        print(
+            f"{bcolors.BLUE}Enabling Amendment with the following parameters:{bcolors.END}"
+        )
+        print(f"    - Network Name: {NAME}")
+        print(f"    - Amendment Name: {AMENDMENT_NAME}")
+        print(f"    - Node ID: {NODE_ID}")
+        print(f"    - Node Type: {NODE_VERSION}")
         enable_node_amendment(NAME, AMENDMENT_NAME, NODE_ID, NODE_VERSION)
 
     # MANAGE NETWORK/STANDALONE
     if args.command == "start":
         NAME = args.name
-        run_file(f"{basedir}/{NAME}/start.sh")
+        print(f"{bcolors.BLUE}Starting Network: {NAME}{bcolors.END}")
+        run_start(
+            [f"{basedir}/{NAME}/start.sh"],
+            PROTOCOL,
+            BUILD_VERSION,
+            "network",
+        )
 
     if args.command == "stop":
         NAME = args.name
-        run_file(f"{basedir}/{NAME}/stop.sh")
+        print(f"{bcolors.BLUE}Stopping Network: {NAME}{bcolors.END}")
+        run_stop(f"{basedir}/{NAME}/stop.sh")
 
     if args.command == "remove":
         NAME = args.name
+        print(f"{bcolors.BLUE}Removing Network: {NAME}{bcolors.END}")
         remove_directory(f"{basedir}/{NAME}")
 
     # UP STANDALONE
@@ -413,6 +473,20 @@ def main():
             BUILD_SERVER: str = "rippleci"
             BUILD_TYPE: str = "image"
 
+        print(
+            f"{bcolors.BLUE}Setting Up Standalone Network with the following parameters:{bcolors.END}"
+        )
+        print(f"    - Log Level: {LOG_LEVEL}")
+        print(f"    - Build Type: {BUILD_TYPE}")
+        print(f"    - Public Key: {PUBLIC_KEY}")
+        print(f"    - Import Key: {IMPORT_KEY}")
+        print(f"    - Protocol: {PROTOCOL}")
+        print(f"    - Network Type: {NETWORK_TYPE}")
+        print(f"    - Network ID: {NETWORK_ID}")
+        print(f"    - Build Server: {BUILD_SERVER}")
+        print(f"    - Build Version: {BUILD_VERSION}")
+        print(f"    - IPFS Server: {IPFS_SERVER}")
+
         if BUILD_TYPE == "image":
             create_standalone_image(
                 LOG_LEVEL,
@@ -438,14 +512,23 @@ def main():
                 IPFS_SERVER,
             )
 
-        run_file(f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/start.sh")
-        print(f"Run with: xrpld-netgen start --name {PROTOCOL}-{BUILD_VERSION}")
+        run_start(
+            [f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/start.sh"],
+            PROTOCOL,
+            BUILD_VERSION,
+            "standalone",
+        )
 
     # DOWN STANDALONE
     if args.command == "down:standalone":
         NAME = args.name
+        print(
+            f"{bcolors.BLUE}Taking Down Standalone Network with the following parameters:{bcolors.END}"
+        )
+
         if NAME:
-            run_file(f"{basedir}/{NAME}/stop.sh")
+            print(f"    - Network Name: {NAME}")
+            run_stop([f"{basedir}/{NAME}/stop.sh"])
             remove_directory(f"{basedir}/{NAME}")
             return
 
@@ -458,8 +541,10 @@ def main():
         if PROTOCOL == "xrpl" and not BUILD_VERSION:
             BUILD_VERSION: str = XRPL_RELEASE
 
-        run_file(f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/stop.sh")
-        # remove_directory(f"{basedir}/{PROTOCOL}-{BUILD_VERSION}")
+        print(f"    - Network Name: {NAME}")
+        print(f"    - Protocol: {PROTOCOL}")
+        print(f"    - Build Version: {BUILD_VERSION}")
+        run_stop([f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/stop.sh"])
 
 
 if __name__ == "__main__":

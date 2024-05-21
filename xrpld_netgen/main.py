@@ -13,11 +13,7 @@ from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
     download_file_at_commit,
 )
-from xrpld_netgen.utils.misc import (
-    generate_ports,
-    save_local_config,
-    run_file,
-)
+from xrpld_netgen.utils.misc import generate_ports, save_local_config, bcolors
 from xrpl_helpers.common.utils import write_file, read_json
 from xrpl_helpers.rippled.utils import (
     update_amendments,
@@ -132,6 +128,7 @@ def create_standalone_folder(
     )
     os.makedirs(f"{basedir}/{protocol}-{name}/config", exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
+    print(f"✅ {bcolors.CYAN}Creating config")
 
     lines: List[str] = get_feature_lines_from_content(feature_content)
     features_json: Dict[str, Any] = parse_rippled_amendments(lines)
@@ -140,6 +137,8 @@ def create_standalone_folder(
         f"{basedir}/{protocol}-{name}/genesis.json",
         json.dumps(genesis_json, indent=4, sort_keys=True),
     )
+    print(f"✅ {bcolors.CYAN}Updating features")
+
     dockerfile: str = create_dockerfile(
         binary,
         name,
@@ -160,6 +159,7 @@ def create_standalone_folder(
         f"{basedir}/deploykit/{protocol}.entrypoint",
         f"{basedir}/{protocol}-{name}/entrypoint",
     )
+    print(f"✅ {bcolors.CYAN}Building docker container...")
     pwd_str: str = "${PWD}"
     services[f"{protocol}"] = {
         "build": {
@@ -318,6 +318,7 @@ def create_binary_folder(
     )
     os.makedirs(f"{basedir}/{protocol}-{name}/config", exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
+    print(f"✅ {bcolors.CYAN}Creating config")
 
     lines: List[str] = get_feature_lines_from_content(feature_content)
     features_json: Dict[str, Any] = parse_rippled_amendments(lines)
@@ -326,6 +327,10 @@ def create_binary_folder(
         f"{basedir}/{protocol}-{name}/genesis.json",
         json.dumps(genesis_json, indent=4, sort_keys=True),
     )
+    print(f"✅ {bcolors.CYAN}Updating features")
+    # for k, v in features_json.items():
+    #     print(f"{bcolors.GREEN}feature: {bcolors.BLUE}{k}")
+
     dockerfile: str = create_dockerfile(
         binary,
         name,
@@ -346,6 +351,7 @@ def create_binary_folder(
         f"{basedir}/deploykit/{protocol}.entrypoint",
         f"{basedir}/{protocol}-{name}/entrypoint",
     )
+    print(f"✅ {bcolors.CYAN}Building docker container...")
     pwd_str: str = "${PWD}"
     services[f"{protocol}"] = {
         "build": {
@@ -502,6 +508,8 @@ def create_local_folder(
     )
     os.makedirs(cfg_path, exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
+    print(f"✅ {bcolors.CYAN}Creating config")
+
     content: str = get_feature_lines_from_path(
         "../src/ripple/protocol/impl/Feature.cpp"
     )
@@ -511,6 +519,7 @@ def create_local_folder(
         f"{cfg_path}/genesis.json",
         json.dumps(genesis_json, indent=4, sort_keys=True),
     )
+    print(f"✅ {bcolors.CYAN}Updating features")
 
 
 def start_local(
@@ -564,4 +573,27 @@ docker compose -f docker-compose.yml up --build --force-recreate -d
     stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, False, True)
     write_file("stop.sh", stop_sh_content)
     os.chmod("stop.sh", 0o755)
-    run_file("./start.sh")
+    import sys
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["./start.sh"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if result.returncode == 0:
+            print(
+                f"{bcolors.CYAN}{protocol.capitalize()} local running at: {bcolors.PURPLE}6006 {bcolors.END}"
+            )
+            print(f"{bcolors.CYAN}Explorer running / starting container{bcolors.END}")
+            print(f"Listening at: {bcolors.PURPLE}http://localhost:4000{bcolors.END}")
+        else:
+            print(f"{bcolors.RED}ERROR{bcolors.END}", file=sys.stderr)
+            sys.exit(1)
+    except subprocess.CalledProcessError:
+        print(
+            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. Is the docker daemon running?{bcolors.END}"
+        )
+        sys.exit(1)

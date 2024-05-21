@@ -6,6 +6,8 @@ import re
 import os
 import yaml
 
+from .misc import bcolors
+
 
 class DockerVars:
     def __init__(
@@ -101,12 +103,18 @@ def create_dockerfile(
 
 
 def download_binary(url: str, save_path: str) -> None:
-    # Check if the file already exists
+    version: str = url.split("/")[-1]
+    print(f"{bcolors.END}Fetching versions of xahaud..")
     if os.path.exists(save_path):
-        print(f"The file {save_path} already exists.")
+        print(
+            f"{bcolors.GREEN}version: {bcolors.BLUE}{version} {bcolors.END}already exists..."
+        )
         return
 
     try:
+        print(
+            f"{bcolors.GREEN}Found latest version: {bcolors.BLUE}{version}, downloading..."
+        )
         # Send a GET request to the URL
         response = requests.get(url, stream=True)
 
@@ -120,9 +128,8 @@ def download_binary(url: str, save_path: str) -> None:
 
         # Set the file permissions to be readable and executable by the owner
         os.chmod(save_path, 0o755)
-        print(f"Download complete. File saved as {save_path}")
     except requests.exceptions.RequestException as e:
-        print(f"An error occurred: {e}")
+        print(f"{bcolors.GREEN}An error occurred: {e}")
 
 
 def update_dockerfile(build_version: str, save_path: str) -> None:

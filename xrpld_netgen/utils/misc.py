@@ -8,34 +8,113 @@ import shutil
 import subprocess
 import shlex
 import hashlib
+import sys
 
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
+
+
+class bcolors:
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    BLUE = "\033[34m"
+    PURPLE = "\033[35m"
+    CYAN = "\033[36m"
+    END = "\033[0m"
 
 
 def remove_directory(directory_path: str) -> None:
     try:
+        name: str = directory_path.split("/")[-1]
         shutil.rmtree(directory_path)
-        print(f"Directory '{directory_path}' has been removed successfully.")
+        print(
+            f"{bcolors.CYAN}Directory {name} has been removed successfully. {bcolors.END}"
+        )
     except FileNotFoundError:
-        print(f"The directory '{directory_path}' does not exist.")
+        print(
+            f"{bcolors.RED}❌ The file {directory_path} does not exist or cannot be found.{bcolors.END}"
+        )
     except PermissionError:
-        print(f"Permission denied: Unable to remove '{directory_path}'.")
+        print(
+            f"{bcolors.RED}❌ Permission denied: Unable to remove '{directory_path}'."
+        )
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"{bcolors.RED}❌ An OS error occurred: {e}.{bcolors.END}")
 
 
-def run_file(file_path: str) -> None:
+def run_start(cmd: List[str], protocol: str, version: str, type: str):
     try:
-        # Run the file as a subprocess
-        result = subprocess.run(file_path, check=True)
-        print(result)
-        print(f"File {file_path} executed successfully.")
-    except subprocess.CalledProcessError as e:
-        print(f"An error occurred while trying to run the file: {e}")
+        result = subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if result.returncode == 0:
+            print(
+                f"{bcolors.CYAN}{protocol.capitalize()} {bcolors.GREEN}{version} {type} running at: {bcolors.PURPLE}6006 {bcolors.END}"
+            )
+            print(f"{bcolors.CYAN}Explorer running / starting container{bcolors.END}")
+            print(f"Listening at: {bcolors.PURPLE}http://localhost:4000{bcolors.END}")
+        else:
+            print(f"{bcolors.RED}ERROR{bcolors.END}", file=sys.stderr)
+            sys.exit(1)
+    except subprocess.CalledProcessError:
+        print(
+            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. Is the docker daemon running?{bcolors.END}"
+        )
+        sys.exit(1)
     except FileNotFoundError:
-        print(f"The file {file_path} does not exist or cannot be found.")
+        print(f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be found.")
+        sys.exit(1)
     except OSError as e:
-        print(f"An error occurred while trying to run the file: {e}")
+        print(f"{bcolors.RED}❌ An OS error occurred: {e}")
+        sys.exit(1)
+
+
+def run_stop(cmd: List[str]):
+    try:
+        result = subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if result.returncode == 0:
+            print(f"{bcolors.CYAN}shut down docker container {bcolors.END}")
+        else:
+            print(f"{bcolors.RED}ERROR{bcolors.END}", file=sys.stderr)
+            sys.exit(1)
+    except subprocess.CalledProcessError:
+        print(
+            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. Is the docker daemon running?{bcolors.END}"
+        )
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be found.")
+        sys.exit(1)
+    except OSError as e:
+        print(f"{bcolors.RED}❌ An OS error occurred: {e}")
+        sys.exit(1)
+
+
+def check_deps(cmd: List[str]) -> None:
+    try:
+        print(bcolors.BLUE + "Checking dependencies: \n")
+        result = subprocess.run(cmd, check=True)
+        if result.returncode == 0:
+            print(f"{bcolors.GREEN}Dependencies OK{bcolors.END}")
+        else:
+            print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
+            sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
+        sys.exit(1)
+    except OSError as e:
+        print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
+        sys.exit(1)
 
 
 def run_command(dir: str, command: str) -> None:

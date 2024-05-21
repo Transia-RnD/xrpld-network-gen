@@ -28,8 +28,9 @@ from xrpld_netgen.utils.misc import (
     save_local_config,
     get_node_port,
     sha512_half,
-    run_file,
+    run_stop,
     remove_directory,
+    bcolors,
 )
 
 from xrpl_helpers.common.utils import write_file, read_json
@@ -102,6 +103,8 @@ def create_node_folders(
         validators.append(keys["public_key"])
         tokens.append(token)
 
+    print(f"✅ {bcolors.CYAN}Created validator keys")
+
     for i in range(1, num_validators + 1):
         ips_dir = ips[i - 1] if ansible else f"vnode{i}"
         node_dir = f"vnode{i}"
@@ -141,6 +144,8 @@ def create_node_folders(
         os.makedirs(f"{basedir}/{name}-cluster/{node_dir}/config", exist_ok=True)
         save_local_config(cfg_path, configs[0].data, configs[1].data)
 
+        print(f"✅ {bcolors.CYAN}Created validator: {i} config")
+
         # default features
         features_json: Any = read_json(f"{basedir}/default.{protocol}.features.json")
 
@@ -165,6 +170,8 @@ def create_node_folders(
             f"{basedir}/{name}-cluster/{node_dir}/features.json",
             json.dumps(features_json, indent=4, sort_keys=True),
         )
+
+        print(f"✅ {bcolors.CYAN}Updated validator: {i} features")
 
         if protocol == "xahau":
             shutil.copyfile(
@@ -193,6 +200,8 @@ def create_node_folders(
             f"{basedir}/deploykit/{protocol}.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
+
+        print(f"✅ {bcolors.CYAN}Built validator: {i} docker container...")
 
         pwd_str: str = basedir
         services[f"vnode{i}"] = {
@@ -250,6 +259,8 @@ def create_node_folders(
         os.makedirs(f"{basedir}/{name}-cluster/{node_dir}/config", exist_ok=True)
         save_local_config(cfg_path, configs[0].data, configs[1].data)
 
+        print(f"✅ {bcolors.CYAN}Created peer: {i} config")
+
         # default features
         features_json: Any = read_json(f"{basedir}/default.xahau.features.json")
 
@@ -274,6 +285,8 @@ def create_node_folders(
             f"{basedir}/{name}-cluster/{node_dir}/features.json",
             json.dumps(features_json, indent=4, sort_keys=True),
         )
+
+        print(f"✅ {bcolors.CYAN}Updated peer: {i} features")
 
         if protocol == "xahau":
             shutil.copyfile(
@@ -302,6 +315,9 @@ def create_node_folders(
             f"{basedir}/deploykit/{protocol}.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
+
+        print(f"✅ {bcolors.CYAN}Built peer: {i} docker container...")
+
         pwd_str: str = basedir
         services[f"pnode{i}"] = {
             "build": {
@@ -716,15 +732,11 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
     write_file(f"{basedir}/{name}-cluster/ansible/hosts.txt", hosts_content)
 
 
-def start_network(name: str):
-    run_file(f"{basedir}/{name}/start.sh")
-
-
 def stop_network(name: str, remove: bool = False):
     cmd: List[str] = [f"{basedir}/{name}/stop.sh"]
     if remove:
         cmd.append("--remove")
-    run_file(cmd)
+    run_stop(cmd)
 
 
 def remove_network(name: str):
