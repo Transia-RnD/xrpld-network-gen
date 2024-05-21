@@ -581,7 +581,7 @@ docker compose -f docker-compose.yml up --build --force-recreate -d
             ["./start.sh"],
             check=True,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            # stderr=subprocess.DEVNULL,
         )
         if result.returncode == 0:
             print(

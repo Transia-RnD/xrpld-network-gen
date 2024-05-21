@@ -50,6 +50,7 @@ from xrpld_netgen.utils.misc import (
     remove_directory,
     bcolors,
     check_deps,
+    remove_containers,
     run_start,
     run_stop,
 )
@@ -70,6 +71,14 @@ def main():
     print("")
 
     check_deps([f"{basedir}/deploykit/prerequisites.sh"])
+
+    print(f"{bcolors.BLUE}Removing existing containers: {bcolors.RED}")
+    remove_containers("docker stop xahau")
+    remove_containers("docker rm xahau")
+    remove_containers("docker stop explorer")
+    remove_containers("docker rm explorer")
+    remove_containers("docker stop xrpl")
+    remove_containers("docker rm xrpl")
 
     parser = argparse.ArgumentParser(
         description="A python cli to build xrpld networks and standalone ledgers."

@@ -47,7 +47,7 @@ def run_start(cmd: List[str], protocol: str, version: str, type: str):
             cmd,
             check=True,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            # stderr=subprocess.DEVNULL,
         )
         if result.returncode == 0:
             print(
@@ -77,7 +77,7 @@ def run_stop(cmd: List[str]):
             cmd,
             check=True,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            # stderr=subprocess.DEVNULL,
         )
         if result.returncode == 0:
             print(f"{bcolors.CYAN}shut down docker container {bcolors.END}")
@@ -115,6 +115,27 @@ def check_deps(cmd: List[str]) -> None:
     except OSError as e:
         print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
         sys.exit(1)
+
+
+def remove_containers(cmd: str) -> None:
+    try:
+        args = shlex.split(cmd)
+        result = subprocess.run(
+            args,
+            check=True,
+            stdout=subprocess.STDOUT,
+        )
+        if result.returncode == 0:
+            print(f"{bcolors.GREEN}Docker Ready{bcolors.END}")
+        else:
+            print(f"{bcolors.RED}Docker ERROR{bcolors.END}")
+            return
+    except subprocess.CalledProcessError as e:
+        return
+    except FileNotFoundError:
+        return
+    except OSError as e:
+        return
 
 
 def run_command(dir: str, command: str) -> None:
