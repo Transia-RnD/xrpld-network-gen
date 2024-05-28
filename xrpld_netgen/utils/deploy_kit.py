@@ -151,3 +151,34 @@ def update_dockerfile(build_version: str, save_path: str) -> None:
                 file.write(line)
 
     print(f"Dockerfile has been updated with the new rippled version: {build_version}")
+
+
+def get_newest_binary_version(url: str):
+    import requests
+    from bs4 import BeautifulSoup
+    from datetime import datetime
+
+    response = requests.get(url)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+    links = soup.find_all("a")
+    newest_date = None
+    newest_file = None
+    for link in links:
+        file_name = link.get_text()
+
+        if "-release" not in file_name.lower():
+            continue
+
+        try:
+            date_str = file_name.split("-")[0]
+            file_date = datetime.strptime(date_str, "%Y.%m.%d")
+            if newest_date is None or file_date > newest_date:
+                newest_date = file_date
+                newest_file = file_name
+        except (ValueError, IndexError):
+            continue
+    if newest_file:
+        return newest_file
+    else:
+        return None

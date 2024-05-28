@@ -46,6 +46,9 @@ from xrpld_netgen.network import (
     update_node_binary,
     enable_node_amendment,
 )
+from xrpld_netgen.utils.deploy_kit import (
+    get_newest_binary_version,
+)
 from xrpld_netgen.utils.misc import (
     remove_directory,
     bcolors,
@@ -58,7 +61,6 @@ from xrpld_netgen.utils.misc import (
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-XAHAU_RELEASE: str = "2024.4.21-release+858"
 XRPL_RELEASE: str = "2.0.0-b4"
 
 
@@ -343,7 +345,7 @@ def main():
         BUILD_VERSION = args.version
 
         if PROTOCOL == "xahau" and not BUILD_VERSION:
-            BUILD_VERSION: str = XAHAU_RELEASE
+            BUILD_VERSION: str = get_newest_binary_version(BUILD_SERVER)
 
         if PROTOCOL == "xrpl" and not BUILD_VERSION:
             BUILD_VERSION: str = XRPL_RELEASE
@@ -421,6 +423,9 @@ def main():
         GENESIS = args.genesis
         QUORUM = args.quorum
 
+        if PROTOCOL == "xrpl":
+            raise ValueError("XRPL networks are not currently supported")
+
         import_vl_key: str = (
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
         )
@@ -429,7 +434,7 @@ def main():
             BUILD_SERVER: str = "https://build.xahau.tech"
 
         if not BUILD_VERSION:
-            BUILD_VERSION: str = XAHAU_RELEASE
+            BUILD_VERSION: str = get_newest_binary_version(BUILD_SERVER)
 
         if not QUORUM:
             QUORUM = NUM_VALIDATORS - 1
@@ -513,7 +518,7 @@ def main():
             BUILD_TYPE: str = "binary"
 
         if PROTOCOL == "xahau" and not BUILD_VERSION:
-            BUILD_VERSION: str = XAHAU_RELEASE
+            BUILD_VERSION: str = get_newest_binary_version(BUILD_SERVER)
 
         if PROTOCOL == "xrpl":
             BUILD_SERVER: str = "rippleci"

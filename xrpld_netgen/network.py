@@ -146,19 +146,14 @@ def create_node_folders(
 
         print(f"✅ {bcolors.CYAN}Created validator: {i} config")
 
-        # default features
-        features_json: Any = read_json(f"{basedir}/default.{protocol}.features.json")
+        if protocol == "xahau":
+            lines: List[str] = get_feature_lines_from_content(feature_content)
+            features_json: Dict[str, Any] = parse_rippled_amendments(lines)
 
-        # genesis (enable all features)
-        if enable_all:
-            if protocol == "xahau":
-                lines: List[str] = get_feature_lines_from_content(feature_content)
-                features_json: Dict[str, Any] = parse_rippled_amendments(lines)
-
-            if protocol == "xrpl":
-                features_json: Dict[str, Any] = download_json(
-                    feature_content, f"{basedir}/{name}-cluster"
-                )
+        if protocol == "xrpl":
+            features_json: Dict[str, Any] = download_json(
+                feature_content, f"{basedir}/{name}-cluster"
+            )
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -261,19 +256,14 @@ def create_node_folders(
 
         print(f"✅ {bcolors.CYAN}Created peer: {i} config")
 
-        # default features
-        features_json: Any = read_json(f"{basedir}/default.xahau.features.json")
+        if protocol == "xahau":
+            lines: List[str] = get_feature_lines_from_content(feature_content)
+            features_json: Dict[str, Any] = parse_rippled_amendments(lines)
 
-        # genesis (enable all features)
-        if enable_all:
-            if protocol == "xahau":
-                lines: List[str] = get_feature_lines_from_content(feature_content)
-                features_json: Dict[str, Any] = parse_rippled_amendments(lines)
-
-            if protocol == "xrpl":
-                features_json: Dict[str, Any] = download_json(
-                    feature_content, f"{basedir}/{name}-cluster"
-                )
+        if protocol == "xrpl":
+            features_json: Dict[str, Any] = download_json(
+                feature_content, f"{basedir}/{name}-cluster"
+            )
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
