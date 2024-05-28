@@ -152,7 +152,8 @@ def remove_containers(cmd: str) -> None:
         result = subprocess.run(
             args,
             check=True,
-            stdout=subprocess.STDOUT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
         )
         if result.returncode == 0:
             print(f"{bcolors.GREEN}Docker Ready{bcolors.END}")
