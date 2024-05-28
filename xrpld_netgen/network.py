@@ -18,7 +18,7 @@ from xrpld_netgen.utils.deploy_kit import (
 )
 from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
-    download_file_at_commit,
+    download_file_at_commit_or_tag,
 )
 from xrpld_netgen.utils.misc import (
     download_json,
@@ -411,7 +411,7 @@ def create_network(
         owner = "Xahau"
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
-        content: str = download_file_at_commit(
+        content: str = download_file_at_commit_or_tag(
             owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
         )
         url: str = f"{build_server}/{build_version}"
@@ -419,13 +419,12 @@ def create_network(
         image: str = "ubuntu:jammy"
 
     if protocol == "xrpl":
-        name: str = build_version.replace(":", "-")
+        name: str = build_version
         os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-        image_name, version = parse_image_name(build_version)
-        root_url = "https://storage.googleapis.com/thelab-builds/"
-        content: str = (
-            root_url
-            + f"{image_name.split('-')[0]}/{image_name.split('-')[1]}/{version}/features.json"  # noqa: E501
+        owner = "XRPLF"
+        repo = "rippled"
+        content: str = download_file_at_commit_or_tag(
+            owner, repo, build_version, "src/ripple/protocol/impl/Feature.cpp"
         )
         image: str = f"{build_server}/{build_version}"
 
@@ -571,7 +570,7 @@ def create_ansible(
         owner = "Xahau"
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
-        content: str = download_file_at_commit(
+        content: str = download_file_at_commit_or_tag(
             owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
         )
         url: str = f"{build_server}/{build_version}"

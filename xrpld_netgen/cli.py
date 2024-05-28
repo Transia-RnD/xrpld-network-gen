@@ -518,6 +518,7 @@ def main():
         if PROTOCOL == "xrpl":
             BUILD_SERVER: str = "rippleci"
             BUILD_TYPE: str = "image"
+            NETWORK_ID: int = 1
 
         if PROTOCOL == "xrpl" and not BUILD_VERSION:
             BUILD_VERSION: str = XRPL_RELEASE

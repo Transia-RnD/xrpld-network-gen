@@ -11,7 +11,7 @@ from xrpld_netgen.rippled_cfg import gen_config, RippledBuild
 from xrpld_netgen.utils.deploy_kit import create_dockerfile, download_binary
 from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
-    download_file_at_commit,
+    download_file_at_commit_or_tag,
 )
 from xrpld_netgen.utils.misc import generate_ports, save_local_config, bcolors
 from xrpl_helpers.common.utils import write_file, read_json
@@ -184,9 +184,6 @@ def create_standalone_folder(
     }
 
 
-ripple_commits = {"2.0.0-b4": "2a66bb3fc725435db5d3551e390001e9352b63a9"}
-
-
 def create_standalone_image(
     log_level: str,
     public_key: str,
@@ -202,8 +199,8 @@ def create_standalone_image(
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
     owner = "XRPLF"
     repo = "rippled"
-    content: str = download_file_at_commit(
-        owner, repo, ripple_commits[build_name], "src/ripple/protocol/impl/Feature.cpp"
+    content: str = download_file_at_commit_or_tag(
+        owner, repo, build_name, "src/ripple/protocol/impl/Feature.cpp"
     )
     image: str = f"{build_system}/rippled:{build_name}"
     create_standalone_folder(
@@ -393,7 +390,7 @@ def create_standalone_binary(
     owner = "Xahau"
     repo = "xahaud"
     commit_hash = get_commit_hash_from_server_version(build_server, build_version)
-    content: str = download_file_at_commit(
+    content: str = download_file_at_commit_or_tag(
         owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
     )
     url: str = f"{build_server}/{build_version}"

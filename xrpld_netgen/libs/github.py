@@ -35,20 +35,20 @@ def get_commit_hash_from_server_version(server: str, version: str) -> str:
         response.raise_for_status()
 
 
-def download_file_at_commit(
-    owner: str, repo: str, commit_hash: str, file_path: str
+def download_file_at_commit_or_tag(
+    owner: str, repo: str, commit_hash_or_tag: str, file_path: str
 ) -> str:
     """
-    Download a specific file from a GitHub repository at a given commit hash.
+    Download a specific file from a GitHub repository at a given commit hash or tag.
 
     :param owner: The owner of the repository (username or organization)
     :param repo: The name of the repository
-    :param commit_hash: The commit hash
+    :param commit_hash_or_tag: The commit hash or version tag
     :param file_path: The path to the file in the repository
     :return: The content of the file
     """
     # Construct the raw content URL
-    url = f"https://raw.githubusercontent.com/{owner}/{repo}/{commit_hash}/{file_path}"
+    url = f"https://raw.githubusercontent.com/{owner}/{repo}/{commit_hash_or_tag}/{file_path}"
 
     # Send a GET request to the URL
     response = requests.get(url)
