@@ -359,8 +359,8 @@ def main():
         print(f"{bcolors.BLUE}Starting Network: {NAME}{bcolors.END}")
         return run_start(
             [f"{basedir}/{NAME}/start.sh"],
-            PROTOCOL,
-            BUILD_VERSION,
+            None,
+            None,
             "network",
         )
 

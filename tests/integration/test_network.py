@@ -18,7 +18,7 @@ logger = logging.getLogger("app")
 
 
 class TestINetGenXahau(BaseTestConfig):
-    def test_create_xahau_network(cls):
+    def _test_create_xahau_network(cls):
         create_network(
             "trace",
             "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
@@ -27,21 +27,21 @@ class TestINetGenXahau(BaseTestConfig):
             2,  # num peers
             21336,  # network id
             "https://build.xahau.tech",  # image host
-            "2024.4.21-release+858",  # image name
-            False,
+            "2024.6.3-jshooks+903",  # image name
+            True,
             3,
         )
 
-    def _test_create_ansible(cls):
+    def test_create_ansible(cls):
         create_ansible(
             "trace",
             "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
             "xahau",  # protocol
             6,  # num validators
             2,  # num peers
-            21336,  # network id
+            21339,  # network id
             "https://build.xahau.tech",  # image host
-            "2024.5.13-HEAD+864",  # image name
+            "2024.6.3-jshooks+903",  # image name
             True,
             3,
             [
