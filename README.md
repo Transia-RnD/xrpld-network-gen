@@ -22,7 +22,13 @@ Before using the XRPLD Network Generator CLI, ensure that you have the following
 To install the XRPLD Network Generator CLI, use pypi to install the package.
 
 ```bash
-pip3 install xrpld-netgen
+pip3 install xrpld-netgen --break-system-packages
+```
+
+Add/Make sure the path is in your profile
+
+```bash
+export PATH="/usr/local/bin:$PATH"
 ```
 
 ## Usage

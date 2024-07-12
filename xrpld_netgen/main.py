@@ -13,9 +13,8 @@ from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
     download_file_at_commit_or_tag,
 )
-from xrpld_netgen.utils.misc import generate_ports, save_local_config, bcolors
-from xrpl_helpers.common.utils import write_file, read_json
-from xrpl_helpers.rippled.utils import (
+from xrpld_netgen.utils.misc import generate_ports, save_local_config, bcolors, write_file, read_json
+from xrpld_netgen.libs.rippled import (
     update_amendments,
     parse_rippled_amendments,
     get_feature_lines_from_content,

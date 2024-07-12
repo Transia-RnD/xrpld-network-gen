@@ -31,10 +31,11 @@ from xrpld_netgen.utils.misc import (
     run_stop,
     remove_directory,
     bcolors,
+    write_file, 
+    read_json
 )
 
-from xrpl_helpers.common.utils import write_file, read_json
-from xrpl_helpers.rippled.utils import (
+from xrpld_netgen.libs.rippled import (
     update_amendments,
     parse_rippled_amendments,
     get_feature_lines_from_content,
