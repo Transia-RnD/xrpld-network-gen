@@ -39,4 +39,4 @@ else
 fi
 
 # Start rippled with or without ledgerfile and quorum
-exec /opt/ripple/bin/rippled $ledgerfile $quorum $standalone --conf /etc/opt/ripple/rippled.cfg
+exec /app/rippled $ledgerfile $quorum $standalone --conf /etc/opt/ripple/rippled.cfg

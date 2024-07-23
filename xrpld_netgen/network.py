@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from xrpld_netgen.rippled_cfg import gen_config, RippledBuild
 from xrpld_netgen.utils.deploy_kit import (
     create_dockerfile,
+    copy_file,
     download_binary,
     update_dockerfile,
     DockerVars,
@@ -22,7 +23,6 @@ from xrpld_netgen.libs.github import (
 )
 from xrpld_netgen.utils.misc import (
     download_json,
-    parse_image_name,
     run_command,
     generate_ports,
     save_local_config,
@@ -31,8 +31,8 @@ from xrpld_netgen.utils.misc import (
     run_stop,
     remove_directory,
     bcolors,
-    write_file, 
-    read_json
+    write_file,
+    read_json,
 )
 
 from xrpld_netgen.libs.rippled import (
@@ -152,14 +152,8 @@ def create_node_folders(
 
         # genesis (enable all features)
         if enable_all:
-            if protocol == "xahau":
-                lines: List[str] = get_feature_lines_from_content(feature_content)
-                features_json: Dict[str, Any] = parse_rippled_amendments(lines)
-
-            if protocol == "xrpl":
-                features_json: Dict[str, Any] = download_json(
-                    feature_content, f"{basedir}/{name}-cluster"
-                )
+            lines: List[str] = get_feature_lines_from_content(feature_content)
+            features_json: Dict[str, Any] = parse_rippled_amendments(lines)
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -174,15 +168,14 @@ def create_node_folders(
 
         print(f"✅ {bcolors.CYAN}Updated validator: {i} features")
 
-        if protocol == "xahau":
-            shutil.copyfile(
-                f"{basedir}/{name}-cluster/rippled.{name}",
-                f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
-            )
-            os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
+        shutil.copyfile(
+            f"{basedir}/{name}-cluster/rippled.{name}",
+            f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
+        )
+        os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
 
         dockerfile: str = create_dockerfile(
-            binary and protocol == "xahau",
+            binary,
             name,
             image,
             rpc_public,
@@ -266,15 +259,8 @@ def create_node_folders(
         features_json: Any = read_json(f"{basedir}/default.xahau.features.json")
 
         # genesis (enable all features)
-        if enable_all:
-            if protocol == "xahau":
-                lines: List[str] = get_feature_lines_from_content(feature_content)
-                features_json: Dict[str, Any] = parse_rippled_amendments(lines)
-
-            if protocol == "xrpl":
-                features_json: Dict[str, Any] = download_json(
-                    feature_content, f"{basedir}/{name}-cluster"
-                )
+        lines: List[str] = get_feature_lines_from_content(feature_content)
+        features_json: Dict[str, Any] = parse_rippled_amendments(lines)
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -289,15 +275,14 @@ def create_node_folders(
 
         print(f"✅ {bcolors.CYAN}Updated peer: {i} features")
 
-        if protocol == "xahau":
-            shutil.copyfile(
-                f"{basedir}/{name}-cluster/rippled.{name}",
-                f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
-            )
-            os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
+        shutil.copyfile(
+            f"{basedir}/{name}-cluster/rippled.{name}",
+            f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
+        )
+        os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
 
         dockerfile: str = create_dockerfile(
-            binary and protocol == "xahau",
+            binary,
             name,
             image,
             rpc_public,
@@ -420,14 +405,27 @@ def create_network(
         image: str = "ubuntu:jammy"
 
     if protocol == "xrpl":
-        name: str = build_version
-        os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-        owner = "XRPLF"
-        repo = "rippled"
-        content: str = download_file_at_commit_or_tag(
-            owner, repo, build_version, "src/ripple/protocol/impl/Feature.cpp"
-        )
-        image: str = f"{build_server}/{build_version}"
+        if build_server.startswith("https://github.com/"):
+            name: str = build_server.split(
+                "https://github.com/Transia-RnD/rippled/tree/"
+            )[-1]
+            os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+            owner = "Transia-RnD"
+            repo = "rippled"
+            copy_file(f"./rippled", f"{basedir}/{name}-cluster/rippled.{name}")
+            content: str = download_file_at_commit_or_tag(
+                owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
+            )
+            image: str = "ubuntu:jammy"
+        else:
+            name: str = build_version
+            os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+            owner = "XRPLF"
+            repo = "rippled"
+            content: str = download_file_at_commit_or_tag(
+                owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
+            )
+            image: str = f"{build_server}/{build_version}"
 
     client = PublisherClient()
     client.create_keys()

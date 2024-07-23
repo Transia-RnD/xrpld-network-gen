@@ -13,7 +13,13 @@ from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
     download_file_at_commit_or_tag,
 )
-from xrpld_netgen.utils.misc import generate_ports, save_local_config, bcolors, write_file, read_json
+from xrpld_netgen.utils.misc import (
+    generate_ports,
+    save_local_config,
+    bcolors,
+    write_file,
+    read_json,
+)
 from xrpld_netgen.libs.rippled import (
     update_amendments,
     parse_rippled_amendments,
@@ -506,9 +512,14 @@ def create_local_folder(
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
-    content: str = get_feature_lines_from_path(
-        "../src/ripple/protocol/impl/Feature.cpp"
-    )
+    if protocol == "xahaud":
+        content: str = get_feature_lines_from_path(
+            "../src/ripple/protocol/impl/Feature.cpp"
+        )
+    if protocol == "xrpl":
+        content: str = get_feature_lines_from_path(
+            "../src/libxrpl/protocol/Feature.cpp"
+        )
     features_json: Dict[str, Any] = parse_rippled_amendments(content)
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(

@@ -5,6 +5,7 @@ import requests
 import re
 import os
 import yaml
+import shutil
 
 from .misc import bcolors
 
@@ -102,6 +103,31 @@ def create_dockerfile(
     return dockerfile
 
 
+def copy_file(source_path: str, destination_path: str) -> None:
+    """
+    Copies a file from the source path to the destination path
+    and sets the file permissions to be readable and executable by the owner.
+
+    :param source_path: The path to the source file
+    :param destination_path: The path to the destination file
+    """
+    if not os.path.exists(source_path):
+        raise ValueError(f"{bcolors.RED}Source file {source_path} does not exist.")
+
+    try:
+        print(
+            f"{bcolors.GREEN}Copying file from {source_path} to {destination_path}..."
+        )
+        shutil.copy2(source_path, destination_path)
+
+        # Set the file permissions to be readable and executable by the owner
+        os.chmod(destination_path, 0o755)
+        print(f"{bcolors.BLUE}Copied and set permissions for {destination_path}.")
+
+    except Exception as e:
+        raise ValueError(f"{bcolors.RED}An error occurred while copying the file: {e}")
+
+
 def download_binary(url: str, save_path: str) -> None:
     version: str = url.split("/")[-1]
     print(f"{bcolors.END}Fetching versions of xahaud..")
@@ -130,7 +156,7 @@ def download_binary(url: str, save_path: str) -> None:
         # Set the file permissions to be readable and executable by the owner
         os.chmod(save_path, 0o755)
     except requests.exceptions.RequestException as e:
-        print(f"{bcolors.GREEN}An error occurred: {e}")
+        raise ValueError(f"{bcolors.RED}An error occurred: {e}")
 
 
 def update_dockerfile(build_version: str, save_path: str) -> None:
