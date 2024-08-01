@@ -132,12 +132,6 @@ export async function downloadBinary(url: string, savePath: string): Promise<voi
       `${bcolors.GREEN}Found latest version: ${bcolors.BLUE}${version}, downloading...`
     );
 
-    // const response = await new Promise<request.Response>((resolve, reject) => {
-    //   request.get(url, { encoding: null }, (err, res, body) => {
-    //     if (err) reject(err);
-    //     else resolve(res);
-    //   });
-    // });
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to download binary: ${response.status}`);

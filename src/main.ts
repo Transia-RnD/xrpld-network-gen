@@ -3,7 +3,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import * as child_process from 'child_process';
 import { genConfig, RippledBuild } from './rippled_cfg';
 import { createDockerfile, downloadBinary } from './utils/deployKit';
 import { getCommitHashFromServerVersion, downloadFileAtCommitOrTag } from './libs/github';
@@ -27,17 +26,16 @@ interface ValidatorConfig {
   import_vl_keys?: string[]
 }
 
-async function generateValidatorConfig(protocol: string, network: string): Promise<ValidatorConfig> {
+async function generateValidatorConfig(protocol: string): Promise<ValidatorConfig> {
   try {
     const config = JSON.parse(fs.readFileSync(`${srcDir}/deploykit/config.json`, 'utf-8'));
-    return config[protocol][network];
+    return config[protocol];
   } catch (e) {
     console.error(e);
     throw e
   }
 }
 
-let deploykitPath = '';
 let services: Record<string, any> = {};
 
 function updateStopSh(
@@ -89,12 +87,11 @@ async function createStandaloneFolder(
   vlKey: string,
   ivlKey: string,
   protocol: string,
-  netType: string,
   logLevel: string
 ) {
   const cfgPath = `${basedir}/${protocol}-${name}/config`;
   const [rpcPublic, rpcAdmin, wsPublic, wsAdmin, peer] = generatePorts(0, 'standalone');
-  const vlConfig = await generateValidatorConfig(protocol, netType);
+  const vlConfig = await generateValidatorConfig(protocol);
 
   if (networkId) {
     vlConfig.network_id = networkId;
@@ -195,7 +192,6 @@ export async function createStandaloneImage(
   publicKey: string,
   importKey: string,
   protocol: string,
-  netType: string,
   networkId: number,
   buildSystem: string,
   buildName: string,
@@ -210,6 +206,7 @@ export async function createStandaloneImage(
     repo,
     buildName,
     'src/ripple/protocol/impl/Feature.cpp'
+    // src/libxrpl/protocol/Feature.cpp'
   );
   const image = `${buildSystem}/rippled:${buildName}`;
   await createStandaloneFolder(
@@ -221,7 +218,6 @@ export async function createStandaloneImage(
     publicKey,
     importKey,
     protocol,
-    netType,
     logLevel
   );
   services['explorer'] = {
@@ -282,12 +278,11 @@ async function createBinaryFolder(
   vlKey: string,
   ivlKey: string,
   protocol: string,
-  netType: string,
   logLevel: string
 ) {
   const cfgPath = `${basedir}/${protocol}-${name}/config`;
   const [rpcPublic, rpcAdmin, wsPublic, wsAdmin, peer] = generatePorts(0, 'standalone');
-  const vlConfig = await generateValidatorConfig(protocol, netType);
+  const vlConfig = await generateValidatorConfig(protocol);
 
   if (networkId) {
     vlConfig.network_id = networkId;
@@ -388,7 +383,6 @@ export async function createStandaloneBinary(
   publicKey: string,
   importKey: string,
   protocol: string,
-  netType: string,
   networkId: number,
   buildServer: string,
   buildVersion: string,
@@ -417,7 +411,6 @@ export async function createStandaloneBinary(
     publicKey,
     importKey,
     protocol,
-    netType,
     logLevel
   );
   services['explorer'] = {
@@ -467,143 +460,4 @@ docker compose -f ${basedir}/${protocol}-${name}/docker-compose.yml up --build -
   const stopShContent = updateStopSh(protocol, name, 0, 0, true);
   fs.writeFileSync(`${basedir}/${protocol}-${name}/stop.sh`, stopShContent);
   fs.chmodSync(`${basedir}/${protocol}-${name}/stop.sh`, 0o755);
-}
-
-async function createLocalFolder(
-  name: string,
-  networkId: number,
-  vlKey: string,
-  ivlKey: string,
-  protocol: string,
-  netType: string,
-  logLevel: string
-) {
-  const cfgPath = 'config';
-  const [rpcPublic, rpcAdmin, wsPublic, wsAdmin, peer] = generatePorts(0, 'standalone');
-  const vlConfig = await generateValidatorConfig(protocol, netType);
-
-  if (networkId) {
-    vlConfig.network_id = networkId;
-  }
-
-  if (vlKey) {
-    vlConfig.validator_list_keys = [vlKey];
-  }
-
-  if (ivlKey) {
-    vlConfig.import_vl_keys = [ivlKey];
-  }
-
-  const configs: RippledBuild[] = genConfig(
-    false,
-    protocol,
-    name,
-    vlConfig.network_id,
-    0,
-    rpcPublic,
-    rpcAdmin,
-    wsPublic,
-    wsAdmin,
-    peer,
-    'huge',
-    10000,
-    'db/nudb',
-    'db',
-    'debug.log',
-    logLevel,
-    null,
-    [],
-    vlConfig.validator_list_sites,
-    vlConfig.validator_list_keys,
-    protocol === 'xahau' ? vlConfig.import_vl_keys! : [],
-    vlConfig.ips,
-    vlConfig.ips_fixed
-  );
-  fs.mkdirSync(cfgPath, { recursive: true });
-  saveLocalConfig(cfgPath, configs[0].data, configs[1].data);
-  console.log(`✅ ${bcolors.CYAN}Creating config`);
-  let path = ''
-  if (protocol === 'xahaud') 
-    path = "../src/ripple/protocol/impl/Feature.cpp"
-  if (protocol === 'xrpl') 
-    path = "../src/libxrpl/protocol/Feature.cpp"
-
-  const content = getFeatureLinesFromPath(path);
-  const featuresJson = parseRippledAmendments(content);
-  const genesisJson = await updateAmendments(featuresJson, protocol);
-  fs.writeFileSync(
-    `${cfgPath}/genesis.json`,
-    JSON.stringify(genesisJson, null, 4)
-  );
-  console.log(`✅ ${bcolors.CYAN}Updating features`);
-}
-
-export async function startLocal(
-  logLevel: string,
-  publicKey: string,
-  importKey: string,
-  protocol: string,
-  netType: string,
-  networkId: number
-) {
-  const name = 'local';
-  fs.mkdirSync(`${basedir}/${protocol}-${name}`, { recursive: true });
-  await createLocalFolder(
-    name,
-    networkId,
-    publicKey,
-    importKey,
-    protocol,
-    netType,
-    logLevel
-  );
-  services['explorer'] = {
-    image: 'transia/explorer:latest',
-    container_name: 'explorer',
-    environment: [
-      'PORT=4000',
-      `VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:${6006}`,
-    ],
-    ports: ['4000:4000'],
-    networks: ['standalone-network'],
-  };
-
-  const compose = {
-    version: '3.9',
-    services: services,
-    networks: { 'standalone-network': { driver: 'bridge' } },
-  };
-
-  fs.writeFileSync('docker-compose.yml', yaml.dump(compose));
-
-  fs.writeFileSync(
-    'start.sh',
-    `\
-#! /bin/bash
-docker-compose.yml up --build --force-recreate -d
-./rippled ${netType === 'standalone' ? '-a' : ''} --conf config/rippled.cfg --ledgerfile config/genesis.json
-`
-  );
-  fs.chmodSync('start.sh', 0o755);
-  const stopShContent = updateStopSh(protocol, name, 0, 0, false, true);
-  fs.writeFileSync('stop.sh', stopShContent);
-  fs.chmodSync('stop.sh', 0o755);
-  try {
-    const result = child_process.spawnSync('./start.sh', {});
-    if (result.status === 0) {
-      console.log(
-        `${bcolors.CYAN}${protocol.charAt(0).toUpperCase() + protocol.slice(1)} local running at: ${bcolors.PURPLE}6006 ${bcolors.END}`
-      );
-      console.log(`${bcolors.CYAN}Explorer running / starting container${bcolors.END}`);
-      console.log(`Listening at: ${bcolors.PURPLE}http://localhost:4000${bcolors.END}`);
-    } else {
-      console.error(`${bcolors.RED}ERROR${bcolors.END}`);
-      process.exit(1);
-    }
-  } catch (error) {
-    console.error(
-      `${bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock.Is the docker daemon running ? ${bcolors.END}`
-    );
-    process.exit(1);
-  }
 }
