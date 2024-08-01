@@ -1,2 +1,2 @@
-#! /usr/bin/env node
+#!/usr/bin/env node
 const cli = require('../dist/npm/cli')

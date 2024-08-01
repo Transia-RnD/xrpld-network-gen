@@ -2,7 +2,7 @@
   "name": "xrpld-network-gen",
   "version": "1.0.0",
   "bin": {
-    "xrpld-network-gen": "./bin/index.js"
+    "xrpld-standalone-cli": "./bin/cli.js"
   },
   "main": "index.js",
   "repository": "git@github.com:Transia-RnD/xrpld-network-gen.git",
@@ -11,8 +11,12 @@
     "url": "https://github.com/dangell7"
   },
   "license": "GPL-3.0-or-later",
+  "files": [
+    "./dist/npm",
+    "./bin"
+  ],
   "scripts": {
-    "build": "tsc & cp -r src/genesis*.json dist/npm/ & cp -r src/deploykit dist/npm/"
+    "build": "tsc && cp -r src/genesis*.json dist/npm/ && cp -r src/deploykit dist/npm/"
   },
   "devDependencies": {
     "@tsconfig/node18": "^18.2.4",
