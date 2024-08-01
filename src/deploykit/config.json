@@ -1,0 +1,67 @@
+{
+    "xrpl": {
+        "standalone": {
+            "ips": [],
+            "ips_fixed": [
+                "0.0.0.0 51235"
+            ],
+            "network_id": 21337,
+            "validator_list_sites": [
+                "http://vl/vl.json"
+            ],
+            "validator_list_keys": [
+                "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
+            ]
+        },
+        "testnet": {
+            "ips": [
+                "s.altnet.rippletest.net 51235"
+            ],
+            "ips_fixed": [],
+            "network_id": "testnet",
+            "validator_list_sites": [
+                "https://vl.altnet.rippletest.net"
+            ],
+            "validator_list_keys": [
+                "ED264807102805220DA0F312E71FC2C69E1552C9C5790F6C25E3729DEB573D5860"
+            ]
+        }
+    },
+    "xahau": {
+        "standalone": {
+            "ips": [],
+            "ips_fixed": [
+                "0.0.0.0 51235"
+            ],
+            "network_id": 21339,
+            "validator_list_sites": [
+                "http://vl/vl.json"
+            ],
+            "validator_list_keys": [
+                "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
+            ],
+            "import_vl_keys": [
+                "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1"
+            ]
+        },
+        "testnet": {
+            "ips": [
+                "159.65.199.56 21338",
+                "139.59.98.59 21338",
+                "88.99.3.241 21338",
+                "88.99.4.45 21338"
+            ],
+            "ips_fixed": [],
+            "network_id": 21338,
+            "validator_list_sites": [
+                "https://vl.test.xahauexplorer.com"
+            ],
+            "validator_list_keys": [
+                "EDED8F699B46702A9ACD8D6C39ECB1C627842554C88BCFCCAF5F907FEB92A7B5E9"
+            ],
+            "import_vl_keys": [
+                "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1"
+            ]
+        }
+    }
+}

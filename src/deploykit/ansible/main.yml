@@ -1,0 +1,37 @@
+- hosts: all
+  become: true
+  remote_user: root
+    
+  tasks:
+  - name: set docker to use systemd cgroups driver
+    copy:
+      dest: "/etc/docker/daemon.json"
+      content: |
+        {
+          "exec-opts": ["native.cgroupdriver=systemd"]
+        }
+  - name: restart docker
+    service:
+      name: docker
+      state: restarted
+  - name: Remove Docker cache
+    command: docker system prune --all --volumes --force
+  - name: Remove Docker image
+    command: docker rmi -f "{{ docker_image_name }}"
+  - name: Delete folders
+    file:
+      path: "{{ item }}"
+      state: absent
+    loop: "{{ volumes }}"
+  - name: Pull Docker Image
+    docker_image:
+      name: "{{ docker_image_name }}"
+      source: pull
+  - name: Deploy Docker Image
+    docker_container:
+      name: "{{ docker_container_name }}"
+      image: "{{ docker_image_name }}"
+      ports: "{{ docker_container_ports }}"
+      volumes: "{{ docker_volumes }}"
+      state: started
+      restart_policy: always

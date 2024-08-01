@@ -1,0 +1,18 @@
+- hosts: all
+  become: true
+  remote_user: root
+    
+  tasks:
+  - name: Stop Docker Container
+    docker_container:
+      name: "{{ docker_container_name }}"
+      state: stopped
+  - name: Remove Docker cache
+    command: docker system prune --all --volumes --force
+  - name: Remove Docker image
+    command: docker rmi -f "{{ docker_image_name }}"
+  - name: Delete folders
+    file:
+      path: "{{ item }}"
+      state: absent
+    loop: "{{ volumes }}"

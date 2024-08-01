@@ -1,0 +1,23 @@
+{
+  "name": "xrpld-network-gen",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:Transia-RnD/xrpld-network-gen.git",
+  "author": {
+    "name": "Denis Angell",
+    "url": "https://github.com/dangell7"
+  },
+  "license": "GPL-3.0-or-later",
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.2",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@transia/xrpld-publisher": "^2.0.2",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "js-yaml": "^4.1.0",
+    "shlex": "^2.1.2"
+  }
+}
