@@ -23,6 +23,7 @@ import {
 } from './utils/misc';
 
 const basedir = process.cwd()
+const srcdir = path.resolve(__dirname);
 
 const XAHAU_RELEASE = "2024.4.21-release+858";
 const XRPL_RELEASE = "2.0.0-b4";
@@ -207,10 +208,23 @@ program
       network_id, network_type, server, version, ipfs
     } = options;
 
-    const importKey = protocol === 'xahau' && !import_key ? "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1" : import_key;
-    const buildServer = protocol === 'xahau' ? "https://build.xahau.tech" : server;
-    const buildType = protocol === 'xahau' ? "binary" : build_type;
-    const buildVersion = protocol === 'xahau' && !version ? XAHAU_RELEASE : version;
+
+    let importKey: string = import_key
+    let buildServer: string = server
+    let buildType: string = build_type
+    let buildVersion: string = version
+    if (protocol === 'xahau') {
+      importKey = import_key || 'ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1'
+      buildServer = 'https://build.xahau.tech'
+      buildType = 'binary'
+      buildVersion = version || XAHAU_RELEASE
+    }
+
+    if (protocol === 'xrpl') {
+      buildServer = 'rippleci'
+      buildType = 'image'
+      buildVersion = version || XRPL_RELEASE
+    }
 
     console.log(`${bcolors.BLUE}Setting Up Standalone Network with the following parameters:${bcolors.END}`);
     console.log(`    - Log Level: ${log_level}`);
@@ -236,7 +250,7 @@ program
         buildVersion,
         ipfs
       );
-    } else {
+    } else if (buildType === 'binary') {
       await createStandaloneBinary(
         log_level,
         public_key,
@@ -248,6 +262,8 @@ program
         buildVersion,
         ipfs
       );
+    } else {
+      throw new Error('Invalid build type');
     }
 
     runStart([`${basedir}/${protocol}-${buildVersion}/start.sh`], protocol, buildVersion, 'standalone');
@@ -280,23 +296,21 @@ program
 
 program.parse(process.argv);
 
-if (!process.argv.slice(2).length) {
-  program.outputHelp();
-  console.log("");
-  console.log("   _  __ ____  ____  __    ____     _   __     __  ______          ");
-  console.log("  | |/ // __ \\/ __ \\/ /   / __ \\   / | / /__  / /_/ ____/__  ____  ");
-  console.log("  |   // /_/ / /_/ / /   / / / /  /  |/ / _ \\/ __/ / __/ _ \\/ __ \\ ");
-  console.log(" /   |/ _, _/ ____/ /___/ /_/ /  / /|  /  __/ /_/ /_/ /  __/ / / / ");
-  console.log("/_/|_/_/ |_/_/   /_____/_____/  /_/ |_|\\___/\\__/\\____/\\___/_/ /_/  ");
-  console.log("");
+console.log("");
+console.log("   _  __ ____  ____  __    ____     _   __     __  ______          ");
+console.log("  | |/ // __ \\/ __ \\/ /   / __ \\   / | / /__  / /_/ ____/__  ____  ");
+console.log("  |   // /_/ / /_/ / /   / / / /  /  |/ / _ \\/ __/ / __/ _ \\/ __ \\ ");
+console.log(" /   |/ _, _/ ____/ /___/ /_/ /  / /|  /  __/ /_/ /_/ /  __/ / / / ");
+console.log("/_/|_/_/ |_/_/   /_____/_____/  /_/ |_|\\___/\\__/\\____/\\___/_/ /_/  ");
+console.log("");
 
-  checkDeps([`${basedir}/deploykit/prerequisites.sh`]);
+checkDeps([`${srcdir}/deploykit/prerequisites.sh`]);
 
-  console.log(`${bcolors.BLUE}Removing existing containers: ${bcolors.RED}`);
-  removeContainers("docker stop xahau");
-  removeContainers("docker rm xahau");
-  removeContainers("docker stop explorer");
-  removeContainers("docker rm explorer");
-  removeContainers("docker stop xrpl");
-  removeContainers("docker rm xrpl");
-}
+console.log(`${bcolors.BLUE}Removing existing containers: ${bcolors.RED}`);
+removeContainers("docker stop xahau");
+removeContainers("docker rm xahau");
+removeContainers("docker stop explorer");
+removeContainers("docker rm explorer");
+removeContainers("docker stop xrpl");
+removeContainers("docker rm xrpl");
+

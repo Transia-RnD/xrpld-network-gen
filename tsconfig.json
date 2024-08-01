@@ -1,0 +1,10 @@
+{
+  "extends": "@tsconfig/node18",
+  "compilerOptions": {
+    "outDir": "./dist/npm",
+    "rootDir": "src",
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

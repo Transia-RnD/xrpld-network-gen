@@ -354,7 +354,7 @@ function generateRippledCfg(
       { name: 'docker', path: `${nodeConfigPath}/validators.txt`, data: validatorsOut }
     ];
 
-  } catch (e) {
+  } catch (e: any) {
     console.error(`line: ${e.lineNumber} error: ${e.message}`);
     console.error(buildPath);
     console.error(nodeIndex);

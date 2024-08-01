@@ -19,7 +19,7 @@ export function removeDirectory(directoryPath: string): void {
     const name: string = path.basename(directoryPath);
     fs.rmdirSync(directoryPath, { recursive: true });
     console.log(`${bcolors.CYAN}Directory ${name} has been removed successfully. ${bcolors.END}`);
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === 'ENOENT') {
       console.log(`${bcolors.RED}❌ The file ${directoryPath} does not exist or cannot be found.${bcolors.END}`);
     } else if (error.code === 'EACCES') {
@@ -41,7 +41,7 @@ export function runStart(cmd: string[], protocol: string, version: string, type:
       console.error(`${bcolors.RED}ERROR${bcolors.END}`);
       process.exit(1);
     }
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === 'ENOENT') {
       console.log(`${bcolors.RED}❌ The file ${cmd[0]} does not exist or cannot be found.`);
     } else {
@@ -60,7 +60,7 @@ export function runStop(cmd: string[]): void {
       console.error(`${bcolors.RED}ERROR${bcolors.END}`);
       process.exit(1);
     }
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === 'ENOENT') {
       console.log(`${bcolors.RED}❌ The file ${cmd[0]} does not exist or cannot be found.`);
     } else {
@@ -115,7 +115,7 @@ export function removeContainers(cmd: string): void {
   try {
     const args = shlex.split(cmd);
     const result = child_process.spawnSync(args[0], args.slice(1), { stdio: 'pipe' });
-    if (result.status === 0) {
+    if (result.status === 0 || result.stderr.includes('No such container')) {
       console.log(`${bcolors.GREEN}Docker Ready${bcolors.END}`);
     } else {
       console.log(`${bcolors.RED}Docker ERROR${bcolors.END}`);
@@ -134,7 +134,7 @@ export function runCommand(dir: string, command: string): void {
       console.log(result.stderr.toString());
     }
     console.log(`Command '${command}' executed successfully.`);
-  } catch (error) {
+  } catch (error: any) {
     console.log(`An error occurred while trying to run the command: ${error.message}`);
   }
 }

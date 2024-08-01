@@ -11,7 +11,7 @@ interface Amendments {
 }
 
 const basedir = process.cwd()
-const srcDir = path.join(basedir, 'src')
+const srcDir = path.resolve(__dirname, '..');
 
 function readJson(filePath: string): any {
   const data = fs.readFileSync(filePath, 'utf-8');
