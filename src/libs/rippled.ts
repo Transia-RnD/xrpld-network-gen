@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import { downloadFileAtCommitOrTag } from './github';
+import path from 'path';
 
 interface Amendments {
   [key: string]: {
@@ -8,6 +9,9 @@ interface Amendments {
     default_vote: boolean;
   };
 }
+
+const basedir = process.cwd()
+const srcDir = path.join(basedir, 'src')
 
 function readJson(filePath: string): any {
   const data = fs.readFileSync(filePath, 'utf-8');
@@ -21,7 +25,7 @@ function convertToListOfHashes(features: Record<string, any>): string[] {
 }
 
 export async  function updateAmendments(features: Record<string, any>, xrplProtocol: string) {
-  const jsonText = await downloadFileAtCommitOrTag('Transia-RnD', 'xrpl-helpers', 'main', `/py/genesis.${xrplProtocol}.json`)
+  const jsonText = fs.readFileSync(`${srcDir}/genesis.${xrplProtocol}.json`, 'utf-8')
   const jsonDict = JSON.parse(jsonText);
 
   const newAmendments: string[] = convertToListOfHashes(features);

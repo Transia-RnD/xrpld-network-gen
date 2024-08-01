@@ -23,7 +23,7 @@ const services: Services = {};
 
 async function generateValidatorConfig(protocol: string, network: string) {
   try {
-    const config = JSON.parse(fs.readFileSync(`${basedir}/deploykit/config.json`,'utf-8'));
+    const config = JSON.parse(fs.readFileSync(`${basedir}/deploykit/config.json`, 'utf-8'));
     return config[protocol][network];
   } catch (e) {
     console.error(e);
@@ -111,15 +111,11 @@ async function createNodeFolders(
 
     console.log(`✅ ${bcolors.CYAN}Created validator: ${i} config`);
 
-    let featuresJson: any = JSON.parse(fs.readFileSync(`${basedir}/default.${protocol}.features.json`,'utf-8'));
+    let featuresJson: any = JSON.parse(fs.readFileSync(`${basedir}/default.${protocol}.features.json`, 'utf-8'));
 
     if (enableAll) {
-      if (protocol === 'xahau') {
-        const lines: string[] = getFeatureLinesFromContent(featureContent);
-        featuresJson = parseRippledAmendments(lines);
-      } else if (protocol === 'xrpl') {
-        featuresJson = await downloadJson(featureContent, `${basedir}/${name}-cluster`);
-      }
+      const lines: string[] = getFeatureLinesFromContent(featureContent);
+      featuresJson = parseRippledAmendments(lines);
     }
 
     const genesisJson: any = await updateAmendments(featuresJson, protocol);
@@ -135,16 +131,14 @@ async function createNodeFolders(
 
     console.log(`✅ ${bcolors.CYAN}Updated validator: ${i} features`);
 
-    if (protocol === 'xahau') {
-      fs.copyFileSync(
-        `${basedir}/${name}-cluster/rippled.${name}`,
-        `${basedir}/${name}-cluster/${nodeDir}/rippled.${name}`,
-      );
-      fs.chmodSync(`${basedir}/${name}-cluster/${nodeDir}/rippled.${name}`, 0o755);
-    }
+    fs.copyFileSync(
+      `${basedir}/${name}-cluster/rippled.${name}`,
+      `${basedir}/${name}-cluster/${nodeDir}/rippled.${name}`,
+    );
+    fs.chmodSync(`${basedir}/${name}-cluster/${nodeDir}/rippled.${name}`, 0o755);
 
     const dockerfile: string = createDockerfile(
-      binary && protocol === 'xahau',
+      binary,
       name,
       image,
       rpcPublic,
@@ -224,15 +218,11 @@ async function createNodeFolders(
 
     console.log(`✅ ${bcolors.CYAN}Created peer: ${i} config`);
 
-    let featuresJson: any = JSON.parse(fs.readFileSync(`${basedir}/default.xahau.features.json`,'utf-8'));
+    let featuresJson: any = JSON.parse(fs.readFileSync(`${basedir}/default.xahau.features.json`, 'utf-8'));
 
     if (enableAll) {
-      if (protocol === 'xahau') {
-        const lines: string[] = getFeatureLinesFromContent(featureContent);
-        featuresJson = parseRippledAmendments(lines);
-      } else if (protocol === 'xrpl') {
-        featuresJson = await downloadJson(featureContent, `${basedir}/${name}-cluster`);
-      }
+      const lines: string[] = getFeatureLinesFromContent(featureContent);
+      featuresJson = parseRippledAmendments(lines);
     }
 
     const genesisJson: any = await updateAmendments(featuresJson, protocol);
@@ -248,16 +238,15 @@ async function createNodeFolders(
 
     console.log(`✅ ${bcolors.CYAN}Updated peer: ${i} features`);
 
-    if (protocol === 'xahau') {
-      fs.copyFileSync(
-        `${basedir}/${name}-cluster/rippled.${name}`,
-        `${basedir}/${name}-cluster/${nodeDir}/rippled.${name}`,
-      );
-      fs.chmodSync(`${basedir}/${name}-cluster/${nodeDir}/rippled.${name}`, 0o755);
-    }
+    fs.copyFileSync(
+      `${basedir}/${name}-cluster/rippled.${name}`,
+      `${basedir}/${name}-cluster/${nodeDir}/rippled.${name}`,
+    );
+    fs.chmodSync(`${basedir}/${name}-cluster/${nodeDir}/rippled.${name}`, 0o755);
+
 
     const dockerfile: string = createDockerfile(
-      binary && protocol === 'xahau',
+      binary,
       name,
       image,
       rpcPublic,
@@ -381,11 +370,22 @@ export async function createNetwork(
     await downloadBinary(url, `${basedir}/${name}-cluster/rippled.${buildVersion}`);
     image = 'ubuntu:jammy';
   } else if (protocol === 'xrpl') {
+    if (buildServer.startsWith('https://github.com/')) {
+      name = buildServer.split('https://github.com/Transia-RnD/rippled/tree/').at(-1)!
+      fs.mkdirSync(`${basedir}/${name}-cluster`, { recursive: true });
+      const owner = "Transia-RnD"
+      const respo = "rippled"
+      fs.copyFileSync("./rippled", `${basedir}/${name}-cluster/rippled.${name}`);
+      content = await downloadFileAtCommitOrTag(owner, respo, name, 'src/libxrpl/protocol/Feature.cpp');
+      image = 'ubuntu:jammy';
+    } else {
+      name = buildVersion
+    }
     name = buildVersion.replace(':', '-');
     fs.mkdirSync(`${basedir}/${name}-cluster`, { recursive: true });
-    const [imageName, version] = parseImageName(buildVersion);
-    const rootUrl = 'https://storage.googleapis.com/thelab-builds/';
-    content = `${rootUrl}${imageName.split('-')[0]}/${imageName.split('-')[1]}/${version}/features.json`;
+    const owner = "XRPLF"
+    const respo = "rippled"
+    content = await downloadFileAtCommitOrTag(owner, respo, name, 'src/libxrpl/protocol/Feature.cpp');
     image = `${buildServer}/${buildVersion}`;
   } else {
     throw new Error('Invalid protocol');

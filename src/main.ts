@@ -522,8 +522,13 @@ async function createLocalFolder(
   fs.mkdirSync(cfgPath, { recursive: true });
   saveLocalConfig(cfgPath, configs[0].data, configs[1].data);
   console.log(`✅ ${bcolors.CYAN}Creating config`);
+  let path = ''
+  if (protocol === 'xahaud') 
+    path = "../src/ripple/protocol/impl/Feature.cpp"
+  if (protocol === 'xrpl') 
+    path = "../src/libxrpl/protocol/Feature.cpp"
 
-  const content = getFeatureLinesFromPath('../src/ripple/protocol/impl/Feature.cpp');
+  const content = getFeatureLinesFromPath(path);
   const featuresJson = parseRippledAmendments(content);
   const genesisJson = await updateAmendments(featuresJson, protocol);
   fs.writeFileSync(
