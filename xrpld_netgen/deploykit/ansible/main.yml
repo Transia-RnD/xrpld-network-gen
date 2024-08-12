@@ -3,6 +3,10 @@
   remote_user: root
     
   tasks:
+  - name: Copy directory to the remote server
+    copy:
+      src: "{{ config_path }}"
+      dest: /opt/ripple/config/
   - name: set docker to use systemd cgroups driver
     copy:
       dest: "/etc/docker/daemon.json"
@@ -33,5 +37,6 @@
       image: "{{ docker_image_name }}"
       ports: "{{ docker_container_ports }}"
       volumes: "{{ docker_volumes }}"
+      env: "{{ docker_env_variables }}"
       state: started
       restart_policy: always

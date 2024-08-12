@@ -13,7 +13,9 @@ from .misc import bcolors
 class DockerVars:
     def __init__(
         self,
+        config_path: int,
         ssh_port: int,
+        env_vars: int,
         ws_port: int,
         peer_port: int,
         image_name: str,
@@ -22,7 +24,9 @@ class DockerVars:
         docker_volumes: list,
         volumes: list,
     ):
+        self.config_path = config_path
         self.ssh_port = ssh_port
+        self.env_vars = env_vars
         self.ws_port = ws_port
         self.peer_port = peer_port
         self.image_name = image_name
@@ -32,8 +36,11 @@ class DockerVars:
         self.volumes = volumes
 
     def to_dict(self) -> dict:
+        env_dict = {var.split(": ")[0]: var.split(": ")[1] for var in self.env_vars}
         return {
+            "config_path": self.config_path,
             "ssh_port": self.ssh_port,
+            "docker_env_variables": env_dict,
             "ws_port": self.ws_port,
             "peer_port": self.peer_port,
             "docker_image_name": self.image_name,
@@ -50,11 +57,12 @@ def create_ansible_vars_file(
     vars: DockerVars,
 ) -> DockerVars:
     with open(os.path.join(path, f"{ip}.yml"), "w") as f:
-        yaml.dump(vars.to_dict(), f, explicit_start=True)
+        yaml.dump(vars.to_dict(), f, explicit_start=True, default_flow_style=False)
     return vars
 
 
 def create_dockerfile(
+    network: bool,
     binary: bool,
     version: str,
     image_name: str,
@@ -76,9 +84,11 @@ def create_dockerfile(
 
     RUN export LANGUAGE=C.UTF-8; export LANG=C.UTF-8; export LC_ALL=C.UTF-8; export DEBIAN_FRONTEND=noninteractive
 
-    COPY config /config
     COPY entrypoint /entrypoint.sh
     """  # noqa: E501
+
+    if not network:
+        dockerfile += "COPY config /config\n"
 
     if include_genesis:
         dockerfile += "COPY genesis.json /genesis.json\n"
@@ -86,14 +96,26 @@ def create_dockerfile(
     if binary:
         dockerfile += f"COPY rippled.{version} /app/rippled\n"
 
+    if network:
+        dockerfile += f"""
+    ENV RPC_PUBLIC={rpc_public_port}
+    ENV RPC_ADMIN={rpc_admin_port}
+    ENV WS_PUBLIC={ws_public_port}
+    ENV WS_ADMIN={ws_admin_port}
+    ENV PEER={peer_port}
+
+    EXPOSE $RPC_PUBLIC $RPC_ADMIN $WS_PUBLIC $WS_ADMIN $PEER $PEER/udp
+        """
+
     dockerfile += f"""
     RUN chmod +x /entrypoint.sh && \
         echo '#!/bin/bash' > /usr/bin/server_info && \
         echo '/entrypoint.sh server_info' >> /usr/bin/server_info && \
         chmod +x /usr/bin/server_info
-
-    EXPOSE {rpc_public_port} {rpc_admin_port} {ws_public_port} {ws_admin_port} {peer_port} {peer_port}/udp
     """  # noqa: E501
+
+    if not network:
+        dockerfile += f"EXPOSE {rpc_public_port} {rpc_admin_port} {ws_public_port} {ws_admin_port} {peer_port} {peer_port}/udp\n"
 
     if include_genesis:
         dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", "{quorum}", "{standalone}" ]'  # noqa: E501

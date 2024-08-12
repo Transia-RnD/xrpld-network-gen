@@ -79,3 +79,6 @@ playground.py
 xrpld/
 xahau/
 rippled
+rippled.batch.v0
+
+feature-batch-cluster

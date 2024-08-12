@@ -128,9 +128,9 @@ def create_node_folders(
             peer,
             "huge",
             10000,
-            "/var/lib/rippled/db/nudb",
-            "/var/lib/rippled/db",
-            "/var/log/rippled/debug.log",
+            "/opt/ripple/lib/db/nudb",
+            "/opt/ripple/lib/db",
+            "/opt/ripple/log/debug.log",
             log_level,
             tokens[i - 1],
             [v for v in validators if v != validators[i - 1]],
@@ -175,6 +175,7 @@ def create_node_folders(
         os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
 
         dockerfile: str = create_dockerfile(
+            True,
             binary,
             name,
             image,
@@ -191,7 +192,7 @@ def create_node_folders(
             file.write(dockerfile)
 
         shutil.copyfile(
-            f"{basedir}/deploykit/{protocol}.entrypoint",
+            f"{basedir}/deploykit/network.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
 
@@ -213,8 +214,9 @@ def create_node_folders(
                 f"{peer}:{peer}",
             ],
             "volumes": [
-                f"{pwd_str}/vnode{i}/log:/var/log/rippled",
-                f"{pwd_str}/vnode{i}/lib:/var/lib/rippled",
+                f"{pwd_str}/{name}-cluster/vnode{i}/config:/opt/ripple/config",
+                f"{pwd_str}/{name}-cluster/vnode{i}/log:/opt/ripple/log",
+                f"{pwd_str}/{name}-cluster/vnode{i}/lib:/opt/ripple/lib",
             ],
             "networks": [f"{name}-network"],
         }
@@ -236,9 +238,9 @@ def create_node_folders(
             peer,
             "huge",
             None,
-            "/var/lib/rippled/db/nudb",
-            "/var/lib/rippled/db",
-            "/var/log/rippled/debug.log",
+            "/opt/ripple/lib/db/nudb",
+            "/opt/ripple/lib/db",
+            "/opt/ripple/log/debug.log",
             log_level,
             None,
             validators,
@@ -282,6 +284,7 @@ def create_node_folders(
         os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
 
         dockerfile: str = create_dockerfile(
+            True,
             binary,
             name,
             image,
@@ -298,7 +301,7 @@ def create_node_folders(
             file.write(dockerfile)
 
         shutil.copyfile(
-            f"{basedir}/deploykit/{protocol}.entrypoint",
+            f"{basedir}/deploykit/network.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
 
@@ -320,8 +323,9 @@ def create_node_folders(
                 f"{peer}:{peer}",
             ],
             "volumes": [
-                f"{pwd_str}/pnode{i}/log:/var/log/rippled",
-                f"{pwd_str}/pnode{i}/lib:/var/lib/rippled",
+                f"{pwd_str}/{name}-cluster/pnode{i}/config:/opt/ripple/config",
+                f"{pwd_str}/{name}-cluster/pnode{i}/log:/opt/ripple/log",
+                f"{pwd_str}/{name}-cluster/pnode{i}/lib:/opt/ripple/lib",
             ],
             "networks": [f"{name}-network"],
         }
@@ -576,6 +580,29 @@ def create_ansible(
         download_binary(url, f"{basedir}/{name}-cluster/rippled.{build_version}")
         image: str = "ubuntu:jammy"
 
+    if protocol == "xrpl":
+        if build_server.startswith("https://github.com/"):
+            name: str = build_server.split(
+                "https://github.com/Transia-RnD/rippled/tree/"
+            )[-1]
+            os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+            owner = "Transia-RnD"
+            repo = "rippled"
+            copy_file(f"./rippled", f"{basedir}/{name}-cluster/rippled.{name}")
+            content: str = download_file_at_commit_or_tag(
+                owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
+            )
+            image: str = "ubuntu:jammy"
+        else:
+            name: str = build_version
+            os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+            owner = "XRPLF"
+            repo = "rippled"
+            content: str = download_file_at_commit_or_tag(
+                owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
+            )
+            image: str = f"{build_server}/{build_version}"
+
     client = PublisherClient()
     client.create_keys()
     keys = client.get_keys()
@@ -649,6 +676,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
 
     os.makedirs(f"{basedir}/{name}-cluster/ansible", exist_ok=True)
     os.makedirs(f"{basedir}/{name}-cluster/ansible/host_vars", exist_ok=True)
+
     shutil.copytree(
         f"{basedir}/deploykit/ansible",
         f"{basedir}/{name}-cluster/ansible",
@@ -663,56 +691,67 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
             c_name: str = v["container_name"]
             ports: List[str] = v["ports"]
             vars = DockerVars(
+                f"{basedir}/{name}-cluster/{c_name}/config/",
                 ssh_port,
+                [
+                    f'RPC_PUBLIC: {ports[0].split(':')[0]}',
+                    f'RPC_ADMIN: {ports[1].split(':')[0]}',
+                    f'WS_PUBLIC: {ports[2].split(':')[0]}',
+                    f'WS_ADMIN: {ports[3].split(':')[0]}',
+                    f'PEER: {ports[4].split(':')[0]}',
+                ],
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
-                f"transia/cluster-{c_name}:{image_name}",
+                f"transia/cluster:{image_name}",
                 c_name,
                 ports,
                 [
-                    "/var/log/rippled:/var/log/rippled",
-                    "/var/lib/rippled:/var/lib/rippled",
+                    "/opt/ripple/config:/opt/ripple/config",
+                    "/opt/ripple/log:/opt/ripple/log",
+                    "/opt/ripple/lib:/opt/ripple/lib",
                 ],
-                ["/var/log/rippled", "/var/lib/rippled"],
+                ["/opt/ripple/log", "/opt/ripple/lib"],
             )
             create_ansible_vars_file(
                 f"{basedir}/{name}-cluster/ansible/host_vars", vips[index - 1], vars
             )
-            run_command(
-                f"{basedir}/{name}-cluster/{c_name}",
-                f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster-{c_name}:{image_name} .",  # noqa: E501
-            )
-            run_command(
-                f"{basedir}/{name}-cluster/{c_name}",
-                f"docker push transia/cluster-{c_name}:{image_name}",
-            )
+
+        run_command(
+            f"{basedir}/{name}-cluster/vnode1",
+            f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster:{image_name} .",  # noqa: E501
+        )
+        run_command(
+            f"{basedir}/{name}-cluster/vnode1",
+            f"docker push transia/cluster:{image_name}",
+        )
         if k[:5] == "pnode":
             index: int = int(k[5:])
             c_name: str = v["container_name"]
             ports: List[str] = v["ports"]
             vars = DockerVars(
+                f"{basedir}/{name}-cluster/{c_name}/config/",
                 ssh_port,
+                [
+                    f'RPC_PUBLIC: {ports[0].split(':')[0]}',
+                    f'RPC_ADMIN: {ports[1].split(':')[0]}',
+                    f'WS_PUBLIC: {ports[2].split(':')[0]}',
+                    f'WS_ADMIN: {ports[3].split(':')[0]}',
+                    f'PEER: {ports[4].split(':')[0]}',
+                ],
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
-                f"transia/cluster-{c_name}:{image_name}",
+                f"transia/cluster:{image_name}",
                 c_name,
                 ports,
                 [
-                    "/var/log/rippled:/var/log/rippled",
-                    "/var/lib/rippled:/var/lib/rippled",
+                    "/opt/ripple/config:/opt/ripple/config",
+                    "/opt/ripple/log:/opt/ripple/log",
+                    "/opt/ripple/lib:/opt/ripple/lib",
                 ],
-                ["/var/log/rippled", "/var/lib/rippled"],
+                [ "/opt/ripple/log", "/opt/ripple/lib"],
             )
             create_ansible_vars_file(
                 f"{basedir}/{name}-cluster/ansible/host_vars", pips[index - 1], vars
-            )
-            run_command(
-                f"{basedir}/{name}-cluster/{c_name}",
-                f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster-{c_name}:{image_name} .",  # noqa: E501
-            )
-            run_command(
-                f"{basedir}/{name}-cluster/{c_name}",
-                f"docker push transia/cluster-{c_name}:{image_name}",
             )
     hosts_content: str = """
 # this is a basic file putting different hosts into categories

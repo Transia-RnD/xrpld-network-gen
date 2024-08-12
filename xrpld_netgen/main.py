@@ -145,6 +145,7 @@ def create_standalone_folder(
     print(f"✅ {bcolors.CYAN}Updating features")
 
     dockerfile: str = create_dockerfile(
+        False,
         binary,
         name,
         image,
@@ -334,6 +335,7 @@ def create_binary_folder(
     #     print(f"{bcolors.GREEN}feature: {bcolors.BLUE}{k}")
 
     dockerfile: str = create_dockerfile(
+        False,
         binary,
         name,
         image,
