@@ -694,11 +694,11 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
                 f"{basedir}/{name}-cluster/{c_name}/config/",
                 ssh_port,
                 [
-                    f'RPC_PUBLIC: {ports[0].split(':')[0]}',
-                    f'RPC_ADMIN: {ports[1].split(':')[0]}',
-                    f'WS_PUBLIC: {ports[2].split(':')[0]}',
-                    f'WS_ADMIN: {ports[3].split(':')[0]}',
-                    f'PEER: {ports[4].split(':')[0]}',
+                    f'RPC_PUBLIC: {ports[0].split(":")[0]}',
+                    f'RPC_ADMIN: {ports[1].split(":")[0]}',
+                    f'WS_PUBLIC: {ports[2].split(":")[0]}',
+                    f'WS_ADMIN: {ports[3].split(":")[0]}',
+                    f'PEER: {ports[4].split(":")[0]}',
                 ],
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
@@ -732,11 +732,11 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
                 f"{basedir}/{name}-cluster/{c_name}/config/",
                 ssh_port,
                 [
-                    f'RPC_PUBLIC: {ports[0].split(':')[0]}',
-                    f'RPC_ADMIN: {ports[1].split(':')[0]}',
-                    f'WS_PUBLIC: {ports[2].split(':')[0]}',
-                    f'WS_ADMIN: {ports[3].split(':')[0]}',
-                    f'PEER: {ports[4].split(':')[0]}',
+                    f'RPC_PUBLIC: {ports[0].split(":")[0]}',
+                    f'RPC_ADMIN: {ports[1].split(":")[0]}',
+                    f'WS_PUBLIC: {ports[2].split(":")[0]}',
+                    f'WS_ADMIN: {ports[3].split(":")[0]}',
+                    f'PEER: {ports[4].split(":")[0]}',
                 ],
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
@@ -748,7 +748,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
                     "/opt/ripple/log:/opt/ripple/log",
                     "/opt/ripple/lib:/opt/ripple/lib",
                 ],
-                [ "/opt/ripple/log", "/opt/ripple/lib"],
+                ["/opt/ripple/log", "/opt/ripple/lib"],
             )
             create_ansible_vars_file(
                 f"{basedir}/{name}-cluster/ansible/host_vars", pips[index - 1], vars

@@ -35,6 +35,11 @@ export PATH="/usr/local/bin:$PATH"
 
 The CLI provides several commands to manage XRPLD networks and standalone ledgers:
 
+### Available Protocols
+
+- xrpl
+- xahau
+
 ### Create a new Network
 
 To start a network or standalone ledger, use the `start` command followed by the name of the network or standalone ledger.
