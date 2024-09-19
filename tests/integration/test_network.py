@@ -77,7 +77,7 @@ class TestINetGenXahau(BaseTestConfig):
 
 
 class TestINetGenRippled(BaseTestConfig):
-    def _test_create_rippled_network(cls):
+    def test_create_network(cls):
         create_network(
             "trace",
             None,
@@ -85,13 +85,13 @@ class TestINetGenRippled(BaseTestConfig):
             6,  # num validators
             2,  # num peers
             21336,  # network id
-            "https://github.com/Transia-RnD/rippled/tree/feature-batch",  # build server
-            "70e993185c7bf5e77dc03729d6dc4e22d8607571",  # build version
+            "https://github.com/mvadari/rippled/tree/simulate",  # build server
+            "01e568318811ff8bb667fe420e021a087fda1ee3",  # build version
             True,
             3,
         )
 
-    def test_create_ansible(cls):
+    def _test_create_ansible(cls):
         create_ansible(
             "trace",
             None,

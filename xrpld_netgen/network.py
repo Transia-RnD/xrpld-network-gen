@@ -22,7 +22,6 @@ from xrpld_netgen.libs.github import (
     download_file_at_commit_or_tag,
 )
 from xrpld_netgen.utils.misc import (
-    download_json,
     run_command,
     generate_ports,
     save_local_config,
@@ -410,11 +409,11 @@ def create_network(
 
     if protocol == "xrpl":
         if build_server.startswith("https://github.com/"):
-            name: str = build_server.split(
-                "https://github.com/Transia-RnD/rippled/tree/"
-            )[-1]
+            owner: str = build_server.split("https://github.com/")[1].split("/")[0]
+            name: str = build_server.split(f"https://github.com/{owner}/rippled/tree/")[
+                -1
+            ]
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-            owner = "Transia-RnD"
             repo = "rippled"
             copy_file(f"./rippled", f"{basedir}/{name}-cluster/rippled.{name}")
             content: str = download_file_at_commit_or_tag(
@@ -463,11 +462,11 @@ def create_network(
     }
 
     services["network-explorer"] = {
-        "image": "transia/explorer-main:latest",
+        "image": "transia/explorer:latest",
         "container_name": "network-explorer",
         "environment": [
             "PORT=4000",
-            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6006}",
+            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6016}",
         ],
         "ports": ["4000:4000"],
         "networks": [f"{name}-network"],
