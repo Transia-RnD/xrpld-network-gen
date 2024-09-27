@@ -8,8 +8,8 @@ import { bcolors, checkDeps, removeContainers, removeDirectory, runLogs, runStar
 const basedir = process.cwd()
 const srcdir = path.resolve(__dirname)
 
-const XAHAU_RELEASE = '2024.4.21-release+858'
-const XRPL_RELEASE = '2.0.0-b4'
+const XAHAU_RELEASE = '2024.9.7-release+977'
+const XRPL_RELEASE = '2.2.3'
 
 const program = new Command()
 
@@ -74,6 +74,7 @@ program
     let buildServer: string = server
     let buildType: string = build_type
     let buildVersion: string = version
+    let buildNetworkId: number = network_id
     if (protocol === 'xahau') {
       importKey = import_key || 'ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1'
       buildServer = 'https://build.xahau.tech'
@@ -85,6 +86,7 @@ program
       buildServer = 'rippleci'
       buildType = 'image'
       buildVersion = buildVersion || XRPL_RELEASE
+      buildNetworkId = 1
     }
 
     console.log(`${bcolors.BLUE}Setting Up Standalone Network with the following parameters:${bcolors.END}`)
@@ -93,7 +95,7 @@ program
     console.log(`    - Public Key: ${public_key}`)
     console.log(`    - Import Key: ${importKey}`)
     console.log(`    - Protocol: ${protocol}`)
-    console.log(`    - Network ID: ${network_id}`)
+    console.log(`    - Network ID: ${buildNetworkId}`)
     console.log(`    - Build Server: ${buildServer}`)
     console.log(`    - Build Version: ${buildVersion}`)
     console.log(`    - IPFS Server: ${ipfs}`)
@@ -104,7 +106,7 @@ program
         public_key,
         importKey,
         protocol,
-        network_id,
+        buildNetworkId,
         buildServer,
         buildVersion,
         ipfs,
@@ -115,7 +117,7 @@ program
         public_key,
         importKey,
         protocol,
-        network_id,
+        buildNetworkId,
         buildServer,
         buildVersion,
         ipfs,
