@@ -4,12 +4,10 @@ import * as path from 'node:path'
 import { Command } from 'commander'
 import { createStandaloneBinary, createStandaloneImage } from './main'
 import { bcolors, checkDeps, removeContainers, removeDirectory, runLogs, runStart, runStop } from './utils/misc'
+import { XAHAU_RELEASE, XRPL_RELEASE } from './versions'
 
 const basedir = process.cwd()
 const srcdir = path.resolve(__dirname)
-
-const XAHAU_RELEASE = '2024.9.7-release+977'
-const XRPL_RELEASE = '2.2.3'
 
 const program = new Command()
 
