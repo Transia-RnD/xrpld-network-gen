@@ -11,22 +11,26 @@
     "url": "https://github.com/dangell7"
   },
   "license": "GPL-3.0-or-later",
-  "files": ["./dist/npm", "./bin"],
+  "files": [
+    "./dist/npm",
+    "./bin"
+  ],
   "scripts": {
     "build": "tsc && cp -r src/genesis*.json dist/npm/ && cp -r src/deploykit dist/npm/",
     "format": "biome format . --write",
     "lint": "biome lint .",
-    "check": "biome check --write ."
+    "check": "biome check --write .",
+    "test": "vitest"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.2",
     "@tsconfig/node18": "^18.2.4",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.2",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.1"
   },
   "dependencies": {
-    "@transia/xrpld-publisher": "^2.0.2",
     "commander": "^12.1.0",
     "dotenv": "^16.4.5",
     "js-yaml": "^4.1.0",
