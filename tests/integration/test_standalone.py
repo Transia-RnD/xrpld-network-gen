@@ -13,7 +13,7 @@ logger = logging.getLogger("app")
 
 
 class TestINetGenStandalone(BaseTestConfig):
-    def test_standalone_image(cls):
+    def _test_standalone_image(cls):
         create_standalone_image(
             "trace",
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
@@ -40,7 +40,7 @@ class TestINetGenStandalone(BaseTestConfig):
         for file in files_exist:
             cls.assertTrue(file)
 
-    def _test_standalone_binary(cls):
+    def test_standalone_binary(cls):
         create_standalone_binary(
             "trace",
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
@@ -49,9 +49,9 @@ class TestINetGenStandalone(BaseTestConfig):
             "standalone",  # net type
             21337,  # network id
             "https://build.xahau.tech",  # build server
-            "2024.1.25-release+738",  # build version
+            "2024.9.11-release+985",  # build version
         )
-        folder = f"{basedir}/xahau-2024.1.25-release+738"
+        folder = f"{basedir}/xahau-2024.9.11-release+985"
         files = [
             "Dockerfile",
             "docker-compose.yml",
