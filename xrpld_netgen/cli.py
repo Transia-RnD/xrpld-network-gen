@@ -35,6 +35,7 @@
 
 
 import os
+import shutil
 import argparse
 from xrpld_netgen.main import (
     create_standalone_binary,
@@ -54,12 +55,13 @@ from xrpld_netgen.utils.misc import (
     run_start,
     run_stop,
     run_logs,
+    run_command,
 )
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-XAHAU_RELEASE: str = "2024.4.21-release+858"
-XRPL_RELEASE: str = "2.0.0-b4"
+XAHAU_RELEASE: str = "2024.10.15-release+1020"
+XRPL_RELEASE: str = "2.2.3"
 
 
 def main():
@@ -293,6 +295,9 @@ def main():
     parser_us.add_argument(
         "--ipfs", type=bool, required=False, help="Add an IPFS server", default=False
     )
+    parser_us.add_argument(
+        "--deploy", type=bool, required=False, help="Deploy to Docker", default=False
+    )
     # down:standalone
     parser_ds = subparsers.add_parser("down:standalone", help="Down Standalone")
     parser_ds.add_argument("--name", required=False, help="The name of the network")
@@ -502,6 +507,7 @@ def main():
         BUILD_SERVER = args.server
         BUILD_VERSION = args.version
         IPFS_SERVER = args.ipfs
+        DOCKER_DEPLOY = args.deploy
 
         if PROTOCOL == "xahau" and not IMPORT_KEY:
             IMPORT_KEY: str = (
@@ -536,6 +542,7 @@ def main():
         print(f"    - Build Server: {BUILD_SERVER}")
         print(f"    - Build Version: {BUILD_VERSION}")
         print(f"    - IPFS Server: {IPFS_SERVER}")
+        print(f"    - Docker Deploy: {DOCKER_DEPLOY}")
 
         if BUILD_TYPE == "image":
             create_standalone_image(
@@ -561,6 +568,25 @@ def main():
                 BUILD_VERSION,
                 IPFS_SERVER,
             )
+
+        if DOCKER_DEPLOY:
+            if PROTOCOL == "xrpl":
+                raise Exception("Docker Deploy not supported for XRPL")
+
+            print(f"{bcolors.BLUE}Deploying to Docker{bcolors.END}")
+            shutil.copyfile(
+                f"{basedir}/deploykit/deploy.xahau.dockerfile",
+                f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/deploy.xahau.dockerfile",
+            )
+            run_command(
+                f"{basedir}/{PROTOCOL}-{BUILD_VERSION}",
+                f"docker build --tag transia/xahau:{BUILD_VERSION} .",
+            )
+            run_command(
+                f"{basedir}/{PROTOCOL}-{BUILD_VERSION}",
+                f"docker push transia/xahau:{BUILD_VERSION}",
+            )
+            return
 
         run_start(
             [f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/start.sh"],
