@@ -38,6 +38,7 @@ def parse_rippled_amendments(lines: Any):
             amendment_name: str = ""
             if re.match(r"XRPL_FIX", line):
                 amendment_name = re.search("XRPL_FIX\)?.*?\((.*?),", line).group(1) or 0
+                amendment_name = f"fix{amendment_name}"
             if re.match(r"XRPL_FEATURE", line):
                 amendment_name = re.search("XRPL_FEATURE\((.*?),", line).group(1) or 0
             supported = re.findall(r"Supported::(.*),", line)

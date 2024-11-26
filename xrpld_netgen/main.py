@@ -85,7 +85,7 @@ def update_stop_sh(
     return stop_sh_content
 
 
-def create_standalone_folder(
+def create_xrpl_standalone_folder(
     binary: bool,
     name: str,
     image: str,
@@ -127,10 +127,11 @@ def create_standalone_folder(
         nodedb_type,
         get_node_db_path(nodedb_type, "standalone"),
         get_relational_db(nodedb_type),
-        "/var/lib/rippled/db",
-        "/var/log/rippled/debug.log",
+        "/opt/ripple/lib/db",
+        "/opt/ripple/log/debug.log",
         log_level,
         None,
+        [],
         vl_config["validator_list_sites"],
         vl_config["validator_list_keys"],
         vl_config["import_vl_keys"] if protocol == "xahau" else [],
@@ -143,6 +144,7 @@ def create_standalone_folder(
 
     lines: List[str] = get_feature_lines_from_content(feature_content)
     features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+    print(json.dumps(features_json, indent=4))
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
         f"{basedir}/{protocol}-{name}/genesis.json",
@@ -216,7 +218,7 @@ def create_standalone_image(
         owner, repo, build_name, "include/xrpl/protocol/detail/features.macro"
     )
     image: str = f"{build_system}/rippled:{build_name}"
-    create_standalone_folder(
+    create_xrpl_standalone_folder(
         False,
         name,
         image,
@@ -278,7 +280,7 @@ docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml up --build --fo
     os.chmod(f"{basedir}/{protocol}-{name}/stop.sh", 0o755)
 
 
-def create_binary_folder(
+def create_xahau_standalone_folder(
     binary: bool,
     name: str,
     image: str,
@@ -320,10 +322,11 @@ def create_binary_folder(
         nodedb_type,
         get_node_db_path(nodedb_type, "standalone"),
         get_relational_db(nodedb_type),
-        "/var/lib/rippled/db",
-        "/var/log/rippled/debug.log",
+        "/opt/ripple/lib/db",
+        "/opt/ripple/log/debug.log",
         log_level,
         None,
+        [],
         vl_config["validator_list_sites"],
         vl_config["validator_list_keys"],
         vl_config["import_vl_keys"] if protocol == "xahau" else [],
@@ -415,7 +418,7 @@ def create_standalone_binary(
     url: str = f"{build_server}/{build_version}"
     download_binary(url, f"{basedir}/{protocol}-{name}/rippled.{name}")
     image: str = "ubuntu:jammy"
-    create_binary_folder(
+    create_xahau_standalone_folder(
         True,
         name,
         image,
@@ -520,6 +523,7 @@ def create_local_folder(
         "debug.log",
         log_level,
         None,
+        [],
         vl_config["validator_list_sites"],
         vl_config["validator_list_keys"],
         vl_config["import_vl_keys"] if protocol == "xahau" else [],

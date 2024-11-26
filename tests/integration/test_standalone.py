@@ -40,6 +40,7 @@ class TestINetGenStandalone(BaseTestConfig):
         cls.assertTrue(folder_exists)
         for file in files_exist:
             cls.assertTrue(file)
+        print(ee)
 
     def _test_standalone_binary(cls):
         create_standalone_binary(
