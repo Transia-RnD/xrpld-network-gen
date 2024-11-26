@@ -82,3 +82,4 @@ rippled
 rippled.batch.v0
 
 feature-batch-cluster
+xrpl-*
