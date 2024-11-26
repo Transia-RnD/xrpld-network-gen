@@ -1,16 +1,32 @@
 - hosts: all
   become: true
   remote_user: root
-    
+
   tasks:
   - name: Stop Docker Container
     docker_container:
       name: "{{ docker_container_name }}"
       state: stopped
+    ignore_errors: yes
+    register: stop_result
+  - name: Check if stopping Docker container failed
+    fail:
+      msg: "Stopping Docker container failed."
+    when: stop_result.failed
   - name: Remove Docker cache
     command: docker system prune --all --volumes --force
   - name: Remove Docker image
     command: docker rmi -f "{{ docker_image_name }}"
+    ignore_errors: yes
+    register: image_remove_result
+  - name: Check if removing Docker image failed
+    fail:
+      msg: "Removing Docker image failed."
+    when: image_remove_result.failed
+  - name: Remove Docker network
+    docker_network:
+      name: "{{ docker_network_name }}"
+      state: absent
   - name: Delete folders
     file:
       path: "{{ item }}"

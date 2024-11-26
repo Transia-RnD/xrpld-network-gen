@@ -19,10 +19,13 @@ from xrpld_netgen.utils.misc import (
     bcolors,
     write_file,
     read_json,
+    get_node_db_path,
+    get_relational_db,
 )
 from xrpld_netgen.libs.rippled import (
     update_amendments,
     parse_rippled_amendments,
+    parse_xahaud_amendments,
     get_feature_lines_from_content,
     get_feature_lines_from_path,
 )
@@ -92,7 +95,8 @@ def create_standalone_folder(
     ivl_key: str,
     protocol: str,
     net_type: str,
-    log_level: str,
+    log_level: str = "trace",
+    nodedb_type: str = "NuDB",
 ):
     cfg_path = f"{basedir}/{protocol}-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
@@ -120,7 +124,9 @@ def create_standalone_folder(
         peer,
         "huge",
         10000,
-        "/var/lib/rippled/db/nudb",
+        nodedb_type,
+        get_node_db_path(nodedb_type, "standalone"),
+        get_relational_db(nodedb_type),
         "/var/lib/rippled/db",
         "/var/log/rippled/debug.log",
         log_level,
@@ -200,13 +206,14 @@ def create_standalone_image(
     build_system: str,
     build_name: str,
     add_ipfs: bool = False,
+    nodedb_type: str = "NuDB",
 ) -> None:
     name: str = build_name
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
     owner = "XRPLF"
     repo = "rippled"
     content: str = download_file_at_commit_or_tag(
-        owner, repo, build_name, "src/ripple/protocol/impl/Feature.cpp"
+        owner, repo, build_name, "include/xrpl/protocol/detail/features.macro"
     )
     image: str = f"{build_system}/rippled:{build_name}"
     create_standalone_folder(
@@ -220,6 +227,7 @@ def create_standalone_image(
         protocol,
         net_type,
         log_level,
+        nodedb_type,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",
@@ -280,7 +288,8 @@ def create_binary_folder(
     ivl_key: str,
     protocol: str,
     net_type: str,
-    log_level: str,
+    log_level: str = "trace",
+    nodedb_type: str = "NuDB",
 ):
     cfg_path = f"{basedir}/{protocol}-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
@@ -308,7 +317,9 @@ def create_binary_folder(
         peer,
         "huge",
         10000,
-        "/var/lib/rippled/db/nudb",
+        nodedb_type,
+        get_node_db_path(nodedb_type, "standalone"),
+        get_relational_db(nodedb_type),
         "/var/lib/rippled/db",
         "/var/log/rippled/debug.log",
         log_level,
@@ -324,7 +335,7 @@ def create_binary_folder(
     print(f"✅ {bcolors.CYAN}Creating config")
 
     lines: List[str] = get_feature_lines_from_content(feature_content)
-    features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+    features_json: Dict[str, Any] = parse_xahaud_amendments(lines)
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
         f"{basedir}/{protocol}-{name}/genesis.json",
@@ -390,6 +401,7 @@ def create_standalone_binary(
     build_server: str,
     build_version: str,
     add_ipfs: bool = False,
+    nodedb_type: str = "NuDB",
 ) -> None:
     name: str = build_version
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
@@ -414,6 +426,7 @@ def create_standalone_binary(
         protocol,
         net_type,
         log_level,
+        nodedb_type,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",
@@ -471,7 +484,8 @@ def create_local_folder(
     ivl_key: str,
     protocol: str,
     net_type: str,
-    log_level: str,
+    log_level: str = "trace",
+    nodedb_type: str = "NuDB",
 ):
     cfg_path = "config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
@@ -499,7 +513,9 @@ def create_local_folder(
         peer,
         "huge",
         10000,
-        "db/nudb",
+        nodedb_type,
+        get_node_db_path(nodedb_type, "local"),
+        get_relational_db(nodedb_type),
         "db",
         "debug.log",
         log_level,
@@ -518,11 +534,13 @@ def create_local_folder(
         content: str = get_feature_lines_from_path(
             "../src/ripple/protocol/impl/Feature.cpp"
         )
+        features_json: Dict[str, Any] = parse_xahaud_amendments(content)
     if protocol == "xrpl":
         content: str = get_feature_lines_from_path(
-            "../src/libxrpl/protocol/Feature.cpp"
+            "../include/xrpl/protocol/detail/features.macro"
         )
-    features_json: Dict[str, Any] = parse_rippled_amendments(content)
+        features_json: Dict[str, Any] = parse_rippled_amendments(content)
+
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
         f"{cfg_path}/genesis.json",
@@ -538,6 +556,7 @@ def start_local(
     protocol: str,
     net_type: str,
     network_id: int,
+    nodedb_type: str,
 ) -> None:
     name: str = "local"
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
@@ -549,6 +568,7 @@ def start_local(
         protocol,
         net_type,
         log_level,
+        nodedb_type,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",

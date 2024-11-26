@@ -234,6 +234,28 @@ def parse_image_name(image_name: str) -> str:
     return name, version
 
 
+def get_node_db_path(db_type: str, type: str = "local") -> str:
+    if db_type == "NuDB" and type == "local":
+        return "db/nudb"
+    if db_type == "NuDB" and type == "standalone":
+        return "/opt/ripple/lib/db/nudb"
+    if db_type == "NuDB" and type == "network":
+        return "/var/lib/rippled/db/nudb"
+    if db_type == "Memory":
+        return "./"
+    if db_type == "rwdb" and type == "network":
+        return "/var/lib/rippled/db/nudb"
+
+
+def get_relational_db(db_type: str) -> str:
+    if db_type == "NuDB":
+        return None
+    if db_type == "Memory":
+        return "backend=memory"
+    if db_type == "rwdb":
+        return "backend=rwdb"
+
+
 RPC_PUBLIC: int = 5007
 RPC_ADMIN: int = 5005
 WS_PUBLIC: int = 6008
@@ -279,6 +301,7 @@ def sha512_half(hex_string: str) -> str:
     full_digest = hash_obj.hexdigest().upper()
     hash_size = len(full_digest) // 2
     return full_digest[:hash_size]
+
 
 def write_file(path: str, data: Any) -> str:
     """Write File

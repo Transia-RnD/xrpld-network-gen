@@ -34,7 +34,9 @@ def generate_rippled_cfg(
     crt_path: str,
     size_node: str,
     num_ledgers: str,
-    nudb_path: str,
+    nodedb_type: str,
+    nodedb_path: str,
+    relational_db: str,
     db_path: str,
     debug_path: str,
     log_level: str,
@@ -155,12 +157,17 @@ def generate_rippled_cfg(
         cfg_out += "\n"
 
         cfg_out += "[node_db]" + "\n"
-        cfg_out += "type=NuDB" + "\n"
-        cfg_out += f"path={nudb_path}" + "\n"
+        cfg_out += f"type={nodedb_type}" + "\n"
+        cfg_out += f"path={nodedb_path}" + "\n"
         if num_ledgers:
             cfg_out += "advisory_delete=0" + "\n"
             cfg_out += f"online_delete={num_ledgers}" + "\n"
         cfg_out += "\n"
+
+        if relational_db:
+            cfg_out += "[relational_db]" + "\n"
+            cfg_out += f"{relational_db}" + "\n"
+            cfg_out += "\n"
 
         fee_account_reserve: int = 5000000
         cfg_out += "[fee_account_reserve]" + "\n"
@@ -361,7 +368,9 @@ def generate_rippled_cfg(
         print(key_path)
         print(crt_path)
         print(size_node)
-        print(nudb_path)
+        print(nodedb_type)
+        print(nodedb_path)
+        print(relational_db)
         print(db_path)
         print(num_ledgers)
         print(debug_path)
@@ -401,7 +410,9 @@ def gen_config(
     peer: int,
     size_node: str,
     num_ledgers: int,
-    nudb_path: str,
+    nodedb_type: str,
+    nodedb_path: str,
+    relational_db: str,
     db_path: str,
     debug_path: str,
     log_level: str,
@@ -437,7 +448,9 @@ def gen_config(
         crt_path=None,
         size_node=size_node,
         num_ledgers=num_ledgers,
-        nudb_path=nudb_path,
+        nodedb_type=nodedb_type,
+        nodedb_path=nodedb_path,
+        relational_db=relational_db,
         db_path=db_path,
         debug_path=debug_path,
         log_level=log_level,

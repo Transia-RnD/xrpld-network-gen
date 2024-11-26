@@ -19,6 +19,7 @@ class DockerVars:
         ws_port: int,
         peer_port: int,
         image_name: str,
+        network_name: str,
         container_name: str,
         container_ports: list,
         docker_volumes: list,
@@ -30,6 +31,7 @@ class DockerVars:
         self.ws_port = ws_port
         self.peer_port = peer_port
         self.image_name = image_name
+        self.network_name = network_name
         self.container_name = container_name
         self.container_ports = container_ports
         self.docker_volumes = docker_volumes
@@ -44,6 +46,7 @@ class DockerVars:
             "ws_port": self.ws_port,
             "peer_port": self.peer_port,
             "docker_image_name": self.image_name,
+            "docker_network_name": self.network_name,
             "docker_container_name": self.container_name,
             "docker_container_ports": self.container_ports,
             "docker_volumes": self.docker_volumes,

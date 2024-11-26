@@ -32,6 +32,8 @@ from xrpld_netgen.utils.misc import (
     bcolors,
     write_file,
     read_json,
+    get_node_db_path,
+    get_relational_db,
 )
 
 from xrpld_netgen.libs.rippled import (
@@ -78,6 +80,7 @@ def create_node_folders(
     ansible: bool = False,
     ips: List[str] = [],
     log_level: str = "warning",
+    nodedb_type: str = "NuDB",
 ):
     # Create directories for validator nodes
     ips_fixed: List[str] = []
@@ -127,7 +130,9 @@ def create_node_folders(
             peer,
             "huge",
             10000,
-            "/opt/ripple/lib/db/nudb",
+            nodedb_type,
+            get_node_db_path(nodedb_type, "network"),
+            get_relational_db(nodedb_type),
             "/opt/ripple/lib/db",
             "/opt/ripple/log/debug.log",
             log_level,
@@ -237,7 +242,9 @@ def create_node_folders(
             peer,
             "huge",
             None,
-            "/opt/ripple/lib/db/nudb",
+            nodedb_type,
+            get_node_db_path(nodedb_type, "network"),
+            get_relational_db(nodedb_type),
             "/opt/ripple/lib/db",
             "/opt/ripple/log/debug.log",
             log_level,
@@ -392,6 +399,7 @@ def create_network(
     build_version: str,
     genesis: bool = False,
     quorum: int = None,
+    nodedb_type: str = "NuDB",
 ) -> None:
     if protocol == "xahau":
         name: str = build_version
@@ -449,6 +457,7 @@ def create_network(
         False,
         [],
         log_level,
+        nodedb_type,
     )
 
     services["vl"] = {
@@ -562,6 +571,7 @@ def create_ansible(
     build_version: str,
     genesis: bool = False,
     quorum: int = None,
+    nodedb_type: str = "NuDB",
     vips: List[str] = [],
     pips: List[str] = [],
 ) -> None:
@@ -621,6 +631,7 @@ def create_ansible(
         True,
         vips,
         log_level,
+        nodedb_type,
     )
 
     services["vl"] = {
@@ -702,6 +713,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
                 f"transia/cluster:{image_name}",
+                "loadnet",
                 c_name,
                 ports,
                 [
@@ -709,7 +721,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
                     "/opt/ripple/log:/opt/ripple/log",
                     "/opt/ripple/lib:/opt/ripple/lib",
                 ],
-                ["/opt/ripple/log", "/opt/ripple/lib"],
+                ["/opt/ripple/config", "/opt/ripple/log", "/opt/ripple/lib"],
             )
             create_ansible_vars_file(
                 f"{basedir}/{name}-cluster/ansible/host_vars", vips[index - 1], vars
@@ -740,6 +752,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
                 f"transia/cluster:{image_name}",
+                "loadnet",
                 c_name,
                 ports,
                 [
@@ -747,7 +760,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
                     "/opt/ripple/log:/opt/ripple/log",
                     "/opt/ripple/lib:/opt/ripple/lib",
                 ],
-                ["/opt/ripple/log", "/opt/ripple/lib"],
+                ["/opt/ripple/config", "/opt/ripple/log", "/opt/ripple/lib"],
             )
             create_ansible_vars_file(
                 f"{basedir}/{name}-cluster/ansible/host_vars", pips[index - 1], vars
@@ -765,6 +778,11 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
         hosts_content += f"{vip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{vip}.yml \n"  # noqa: E501
     for pip in pips:
         hosts_content += f"{pip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{pip}.yml \n"  # noqa: E501
+
+    hosts_content += "\n"
+    hosts_content += "[peer]\n"
+    hosts_content += f"{pips[0]} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{pips[0]}.yml \n"  # noqa: E501
+
     write_file(f"{basedir}/{name}-cluster/ansible/hosts.txt", hosts_content)
 
 

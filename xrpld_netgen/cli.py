@@ -61,7 +61,7 @@ from xrpld_netgen.utils.misc import (
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 XAHAU_RELEASE: str = "2024.10.15-release+1020"
-XRPL_RELEASE: str = "2.2.3"
+XRPL_RELEASE: str = "2.3.0"
 
 
 def main():
@@ -105,6 +105,14 @@ def main():
     )
     parser_sl.add_argument(
         "--network_id", type=int, required=False, help="The network id", default=21339
+    )
+    parser_sl.add_argument(
+        "--nodedb_type",
+        type=str,
+        required=False,
+        help="The node db",
+        choices=["Memory", "NuDB"],
+        default="NuDB",
     )
     # stop:local
     # parser_spl = subparsers.add_parser("stop:local", help="Stop Local Network")
@@ -172,6 +180,14 @@ def main():
         type=int,
         required=False,
         help="The quorum required for the network",
+    )
+    parser_cn.add_argument(
+        "--nodedb_type",
+        type=str,
+        required=False,
+        help="The node db for the network",
+        choices=["Memory", "NuDB"],
+        default="NuDB",
     )
     # update:node
     parser_un = subparsers.add_parser("update:node", help="Update Node Version")
@@ -298,6 +314,14 @@ def main():
     parser_us.add_argument(
         "--deploy", type=bool, required=False, help="Deploy to Docker", default=False
     )
+    parser_us.add_argument(
+        "--nodedb_type",
+        type=str,
+        required=False,
+        help="The node db",
+        choices=["Memory", "NuDB"],
+        default="NuDB",
+    )
     # down:standalone
     parser_ds = subparsers.add_parser("down:standalone", help="Down Standalone")
     parser_ds.add_argument("--name", required=False, help="The name of the network")
@@ -395,6 +419,7 @@ def main():
         PROTOCOL = args.protocol
         NETWORK_TYPE = args.network_type
         NETWORK_ID = args.network_id
+        NODEDB_TYPE = args.nodedb_type
 
         print(
             f"{bcolors.BLUE}Starting Local Network with the following parameters:{bcolors.END}"
@@ -405,9 +430,16 @@ def main():
         print(f"    - Protocol: {PROTOCOL}")
         print(f"    - Network Type: {NETWORK_TYPE}")
         print(f"    - Network ID: {NETWORK_ID}")
+        print(f"    - Node DB: {NODEDB_TYPE}")
 
         start_local(
-            LOG_LEVEL, PUBLIC_KEY, IMPORT_KEY, PROTOCOL, NETWORK_TYPE, NETWORK_ID
+            LOG_LEVEL,
+            PUBLIC_KEY,
+            IMPORT_KEY,
+            PROTOCOL,
+            NETWORK_TYPE,
+            NETWORK_ID,
+            NODEDB_TYPE,
         )
 
     if args.command == "stop:local":
@@ -425,6 +457,7 @@ def main():
         BUILD_VERSION = args.build_version
         GENESIS = args.genesis
         QUORUM = args.quorum
+        NODEDB_TYPE = args.nodedb_type
 
         import_vl_key: str = (
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
@@ -451,6 +484,7 @@ def main():
         print(f"    - Build Version: {BUILD_VERSION}")
         print(f"    - Genesis: {GENESIS}")
         print(f"    - Quorum: {QUORUM}")
+        print(f"    - Node DB: {NODEDB_TYPE}")
 
         create_network(
             LOG_LEVEL,
@@ -463,6 +497,7 @@ def main():
             BUILD_VERSION,
             GENESIS,
             QUORUM,
+            NODEDB_TYPE,
         )
 
     if args.command == "update:node":
@@ -508,6 +543,7 @@ def main():
         BUILD_VERSION = args.version
         IPFS_SERVER = args.ipfs
         DOCKER_DEPLOY = args.deploy
+        NODEDB_TYPE = args.nodedb_type
 
         if PROTOCOL == "xahau" and not IMPORT_KEY:
             IMPORT_KEY: str = (
@@ -543,6 +579,7 @@ def main():
         print(f"    - Build Version: {BUILD_VERSION}")
         print(f"    - IPFS Server: {IPFS_SERVER}")
         print(f"    - Docker Deploy: {DOCKER_DEPLOY}")
+        print(f"    - Node DB: {NODEDB_TYPE}")
 
         if BUILD_TYPE == "image":
             create_standalone_image(
@@ -555,6 +592,7 @@ def main():
                 BUILD_SERVER,
                 BUILD_VERSION,
                 IPFS_SERVER,
+                NODEDB_TYPE,
             )
         else:
             create_standalone_binary(
@@ -567,6 +605,7 @@ def main():
                 BUILD_SERVER,
                 BUILD_VERSION,
                 IPFS_SERVER,
+                NODEDB_TYPE,
             )
 
         if DOCKER_DEPLOY:
