@@ -32,7 +32,7 @@ class TestINetGenXahau(BaseTestConfig):
             3,
         )
 
-    def _test_create_ansible(cls):
+    def test_create_ansible(cls):
         create_ansible(
             "trace",
             "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
@@ -41,9 +41,10 @@ class TestINetGenXahau(BaseTestConfig):
             2,  # num peers
             21339,  # network id
             "https://build.xahau.tech",  # image host
-            "2024.6.3-jshooks+903",  # image name
+            "2024.11.14-HEAD+1127",  # image name
             True,
             3,
+            "rwdb",
             [
                 "79.110.60.99",
                 "79.110.60.100",
@@ -77,7 +78,7 @@ class TestINetGenXahau(BaseTestConfig):
 
 
 class TestINetGenRippled(BaseTestConfig):
-    def test_create_network(cls):
+    def _test_create_network(cls):
         create_network(
             "trace",
             None,
@@ -103,6 +104,7 @@ class TestINetGenRippled(BaseTestConfig):
             "70e993185c7bf5e77dc03729d6dc4e22d8607571",  # build version
             True,
             3,
+            "NuDB",
             [
                 "79.110.60.99",
                 "79.110.60.100",

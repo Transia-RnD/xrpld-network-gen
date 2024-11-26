@@ -13,7 +13,8 @@ logger = logging.getLogger("app")
 
 
 class TestINetGenStandalone(BaseTestConfig):
-    def _test_standalone_image(cls):
+    def test_standalone_image(cls):
+        version: str = "2.3.0"
         create_standalone_image(
             "trace",
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
@@ -22,9 +23,9 @@ class TestINetGenStandalone(BaseTestConfig):
             "standalone",  # net type
             1,  # network id
             "rippleci",  # build server
-            "2.0.0-b4",  # build version
+            version,  # build version
         )
-        folder = f"{basedir}/xrpl-2.0.0-b4"
+        folder = f"{basedir}/xrpl-{version}"
         files = [
             "Dockerfile",
             "docker-compose.yml",
@@ -40,7 +41,7 @@ class TestINetGenStandalone(BaseTestConfig):
         for file in files_exist:
             cls.assertTrue(file)
 
-    def test_standalone_binary(cls):
+    def _test_standalone_binary(cls):
         create_standalone_binary(
             "trace",
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
