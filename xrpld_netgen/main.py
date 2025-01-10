@@ -534,7 +534,7 @@ def create_local_folder(
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
-    if protocol == "xahaud":
+    if protocol == "xahau":
         content: str = get_feature_lines_from_path(
             "../src/ripple/protocol/impl/Feature.cpp"
         )
