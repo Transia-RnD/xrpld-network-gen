@@ -55,6 +55,7 @@ from xrpld_netgen.utils.misc import (
     run_start,
     run_stop,
     run_logs,
+    run_local_logs,
     run_command,
 )
 
@@ -72,7 +73,8 @@ def main():
 
     # LOGS
     # logs:hooks
-    subparsers.add_parser("logs:hooks", help="Log Hooks")
+    subparsers.add_parser("logs:local", help="Logs Standalone")
+    subparsers.add_parser("logs:standalone", help="Logs Standalone")
 
     # LOCAL
     # start:local
@@ -342,7 +344,10 @@ def main():
     args = parser.parse_args()
 
     # LOGS
-    if args.command == "logs:hooks":
+    if args.command == "logs:local":
+        return run_local_logs()
+
+    if args.command == "logs:standalone":
         return run_logs()
 
     if args.command == "stop":

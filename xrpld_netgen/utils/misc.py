@@ -126,6 +126,20 @@ def run_logs():
         return
 
 
+def run_local_logs():
+    try:
+        os.system("clear")
+        print()
+        print(
+            f"{bcolors.GREEN}Starting live log monitor, edit with {bcolors.PURPLE}CTRL + C{bcolors.END}"
+        )
+        print()
+        log_command = f"tail -f config/debug.log 2>&1 | grep -E --color=always 'HookTrace|HookError|Publishing ledger [0-9]+'"
+        os.system(log_command)
+    except subprocess.CalledProcessError:
+        return
+
+
 def check_deps(cmd: List[str]) -> None:
     try:
         print(bcolors.BLUE + "Checking dependencies: \n")

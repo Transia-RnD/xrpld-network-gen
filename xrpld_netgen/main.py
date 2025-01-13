@@ -191,8 +191,8 @@ def create_xrpl_standalone_folder(
         ],
         "volumes": [
             f"{pwd_str}/{protocol}/config:/etc/opt/ripple",
-            f"{pwd_str}/{protocol}/log:/var/log/rippled",
-            f"{pwd_str}/{protocol}/lib:/var/lib/rippled",
+            f"{pwd_str}/{protocol}/log:/opt/ripple/log",
+            f"{pwd_str}/{protocol}/lib:/opt/ripple/lib",
         ],
         "networks": ["standalone-network"],
     }
@@ -387,8 +387,8 @@ def create_xahau_standalone_folder(
         ],
         "volumes": [
             f"{pwd_str}/{protocol}/config:/etc/opt/ripple",
-            f"{pwd_str}/{protocol}/log:/var/log/rippled",
-            f"{pwd_str}/{protocol}/lib:/var/lib/rippled",
+            f"{pwd_str}/{protocol}/log:/opt/ripple/log",
+            f"{pwd_str}/{protocol}/lib:/opt/ripple/lib",
         ],
         "networks": ["standalone-network"],
     }
@@ -534,7 +534,8 @@ def create_local_folder(
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
-    if protocol == "xahaud":
+    features_json: Dict[str, Any] = {}
+    if protocol == "xahau":
         content: str = get_feature_lines_from_path(
             "../src/ripple/protocol/impl/Feature.cpp"
         )
@@ -544,6 +545,10 @@ def create_local_folder(
             "../include/xrpl/protocol/detail/features.macro"
         )
         features_json: Dict[str, Any] = parse_rippled_amendments(content)
+
+    if not features_json:
+        print(f"{bcolors.RED}❌ No features found{bcolors.END}")
+        return
 
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
