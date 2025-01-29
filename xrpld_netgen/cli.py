@@ -12,19 +12,19 @@
 # xrpld-netgen update:version --node --version xrpld-2023.11.10-dev+549
 # enable:amendment
 # xrpld-netgen enable:amendment --peer 1 --amendment "name"
-# start
-# xrpld-netgen start --name xrpld-2023.11.10-dev+549
-# stop
-# xrpld-netgen stop --name xrpld-2023.11.10-dev+549
+# up
+# xrpld-netgen up --name xrpld-2023.11.10-dev+549
+# down
+# xrpld-netgen down --name xrpld-2023.11.10-dev+549
 # remove
 # xrpld-netgen remove --name xrpld-2023.11.10-dev+549
 
 
 # LOCAL
-# start:local
-# xrpld-netgen start:local --protocol "xahau"
-# stop:local
-# xrpld-netgen stop:local --protocol "xahau"
+# up:local
+# xrpld-netgen up:local --protocol "xahau"
+# down:local
+# xrpld-netgen down:local --protocol "xahau"
 
 
 # STANDALONE
@@ -61,7 +61,7 @@ from xrpld_netgen.utils.misc import (
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-XAHAU_RELEASE: str = "2024.10.15-release+1020"
+XAHAU_RELEASE: str = "2024.11.18-release+1141"
 XRPL_RELEASE: str = "2.3.0"
 
 
@@ -77,8 +77,8 @@ def main():
     subparsers.add_parser("logs:standalone", help="Logs Standalone")
 
     # LOCAL
-    # start:local
-    parser_sl = subparsers.add_parser("start:local", help="Start Local Network")
+    # up:local
+    parser_sl = subparsers.add_parser("up:local", help="Start Local Network")
     parser_sl.add_argument(
         "--log_level",
         required=False,
@@ -116,8 +116,8 @@ def main():
         choices=["Memory", "NuDB"],
         default="NuDB",
     )
-    # stop:local
-    # parser_spl = subparsers.add_parser("stop:local", help="Stop Local Network")
+    # down:local
+    # parser_spl = subparsers.add_parser("down:local", help="Stop Local Network")
 
     # NETWORK
 
@@ -238,11 +238,11 @@ def main():
         choices=["validator", "peer"],
     )
 
-    # start
-    parser_st = subparsers.add_parser("start", help="Start Network")
+    # up
+    parser_st = subparsers.add_parser("up", help="Start Network")
     parser_st.add_argument("--name", required=True, help="The name of the network")
-    # stop
-    parser_sp = subparsers.add_parser("stop", help="Stop Network")
+    # down
+    parser_sp = subparsers.add_parser("down", help="Stop Network")
     parser_sp.add_argument("--name", required=True, help="The name of the network")
 
     # remove
@@ -350,7 +350,7 @@ def main():
     if args.command == "logs:standalone":
         return run_logs()
 
-    if args.command == "stop":
+    if args.command == "down":
         NAME = args.name
         print(f"{bcolors.BLUE}Stopping Network: {NAME}{bcolors.END}")
         return run_stop(f"{basedir}/{NAME}/stop.sh")
@@ -388,7 +388,7 @@ def main():
         return run_stop([f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/stop.sh"])
 
     # MANAGE NETWORK/STANDALONE
-    if args.command == "start":
+    if args.command == "up":
         NAME = args.name
         print(f"{bcolors.BLUE}Starting Network: {NAME}{bcolors.END}")
         return run_start(
@@ -417,7 +417,7 @@ def main():
     remove_containers("docker rm xrpl")
 
     # LOCAL
-    if args.command == "start:local":
+    if args.command == "up:local":
         LOG_LEVEL = args.log_level
         PUBLIC_KEY = args.public_key
         IMPORT_KEY = args.import_key
@@ -447,7 +447,7 @@ def main():
             NODEDB_TYPE,
         )
 
-    if args.command == "stop:local":
+    if args.command == "down:local":
         print(f"{bcolors.BLUE}Stopping Local Network{bcolors.END}")
         run_stop(["./stop.sh"])
 

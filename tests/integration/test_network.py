@@ -41,7 +41,7 @@ class TestINetGenXahau(BaseTestConfig):
             2,  # num peers
             21339,  # network id
             "https://build.xahau.tech",  # image host
-            "2024.11.14-HEAD+1127",  # image name
+            "2024.12.2-HEAD+1182",  # image name
             True,
             3,
             "rwdb",

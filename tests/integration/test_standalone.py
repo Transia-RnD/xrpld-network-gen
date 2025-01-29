@@ -13,7 +13,7 @@ logger = logging.getLogger("app")
 
 
 class TestINetGenStandalone(BaseTestConfig):
-    def test_standalone_image(cls):
+    def _test_standalone_image(cls):
         version: str = "2.3.0"
         create_standalone_image(
             "trace",
@@ -41,7 +41,7 @@ class TestINetGenStandalone(BaseTestConfig):
         for file in files_exist:
             cls.assertTrue(file)
 
-    def _test_standalone_binary(cls):
+    def test_standalone_binary(cls):
         create_standalone_binary(
             "trace",
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
@@ -67,3 +67,5 @@ class TestINetGenStandalone(BaseTestConfig):
         cls.assertTrue(folder_exists)
         for file in files_exist:
             cls.assertTrue(file)
+
+        print(ee)
