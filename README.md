@@ -6,8 +6,8 @@ The XRPLD Network Generator CLI is a command-line interface tool designed to fac
 
 ### Current Versions
 
-- Ripple: `1.12.0`
-- Xahau: `2024.1.25-release+738`
+- Ripple: `2.3.0`
+- Xahau: `2024.11.18-release+1141`
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ The CLI provides several commands to manage XRPLD networks and standalone ledger
 
 ### Create a new Network
 
-To start a network or standalone ledger, use the `start` command followed by the name of the network or standalone ledger.
+To create a network or standalone ledger, use the `create:network` command followed by the name of the network or standalone ledger.
 
 ```bash
 xrpld-netgen create:network --protocol [PROTOCOL] --build_version [BUILD_VERSION] --validators [NUM_VALIDATORS]
@@ -50,18 +50,18 @@ xrpld-netgen create:network --protocol [PROTOCOL] --build_version [BUILD_VERSION
 
 ### Start a Network or Standalone Ledger
 
-To start a network or standalone ledger, use the `start` command followed by the name of the network or standalone ledger.
+To start a network or standalone ledger, use the `up` command followed by the name of the network or standalone ledger.
 
 ```bash
-xrpld-netgen start --name [PROTOCOL] + [BUILD_VERSION]
+xrpld-netgen up --name [PROTOCOL] + [BUILD_VERSION]
 ```
 
 ### Stop a Network or Standalone Ledger
 
-To stop a running network or standalone ledger, use the `stop` command followed by the name of the network or standalone ledger.
+To stop a running network or standalone ledger, use the `down` command followed by the name of the network or standalone ledger.
 
 ```bash
-xrpld-netgen stop --name [PROTOCOL] + [BUILD_VERSION]
+xrpld-netgen down --name [PROTOCOL] + [BUILD_VERSION]
 ```
 
 ### Remove a Network or Standalone Ledger
