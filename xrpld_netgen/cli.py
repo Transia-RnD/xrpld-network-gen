@@ -61,8 +61,8 @@ from xrpld_netgen.utils.misc import (
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-XAHAU_RELEASE: str = "2024.11.18-release+1141"
-XRPL_RELEASE: str = "2.3.0"
+XAHAU_RELEASE: str = "2025.5.1-release+1762"
+XRPL_RELEASE: str = "2.4.0"
 
 
 def main():

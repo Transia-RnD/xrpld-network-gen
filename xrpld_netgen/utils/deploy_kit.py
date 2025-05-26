@@ -77,6 +77,7 @@ def create_dockerfile(
     include_genesis: bool = False,
     quorum: int = None,
     standalone: str = None,
+    data_port: int = 12345,
 ) -> str:
     dockerfile = f"""
     FROM {image_name} as base
@@ -106,8 +107,9 @@ def create_dockerfile(
     ENV WS_PUBLIC={ws_public_port}
     ENV WS_ADMIN={ws_admin_port}
     ENV PEER={peer_port}
+    ENV DATA={data_port}
 
-    EXPOSE $RPC_PUBLIC $RPC_ADMIN $WS_PUBLIC $WS_ADMIN $PEER $PEER/udp
+    EXPOSE $RPC_PUBLIC $RPC_ADMIN $WS_PUBLIC $WS_ADMIN $PEER $PEER/udp $DATA $DATA/udp
         """
 
     dockerfile += f"""
@@ -202,3 +204,116 @@ def update_dockerfile(build_version: str, save_path: str) -> None:
                 file.write(line)
 
     print(f"Dockerfile has been updated with the new rippled version: {build_version}")
+
+
+def build_stop_sh(
+    basedir: str,
+    protocol: str,
+    name: str,
+    num_validators: int,
+    num_peers: int,
+    standalone: bool = False,
+    local: bool = False,
+) -> str:
+    stop_sh_content = "#! /bin/bash\n"
+    if num_validators > 0 and num_peers > 0:
+        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
+
+    for i in range(1, num_validators + 1):
+        stop_sh_content += f"rm -r vnode{i}/lib\n"
+        stop_sh_content += f"rm -r vnode{i}/log\n"
+
+    for i in range(1, num_peers + 1):
+        stop_sh_content += f"rm -r pnode{i}/lib\n"
+        stop_sh_content += f"rm -r pnode{i}/log\n"
+
+    if standalone:
+        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
+        stop_sh_content += f"rm -r {protocol}/config\n"
+        stop_sh_content += f"rm -r {protocol}/lib\n"
+        stop_sh_content += f"rm -r {protocol}/log\n"
+        stop_sh_content += f"rm -r {protocol}\n"
+
+    if local:
+        stop_sh_content = (
+            "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
+        )
+        stop_sh_content += "rm -r db\n"
+        stop_sh_content += "rm -r debug.log\n"
+
+    return stop_sh_content
+
+
+def build_start_sh(
+    basedir: str,
+    protocol: str,
+    name: str,
+):
+    return f"""\
+#! /bin/bash
+docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml up --build --force-recreate -d
+"""
+
+
+def build_local_start_sh(
+    net_type: str,
+):
+    return f"""\
+#! /bin/bash
+docker compose -f docker-compose.yml up --build --force-recreate -d
+./rippled {'-a' if net_type == 'standalone' else ''} --conf config/rippled.cfg --ledgerfile config/genesis.json
+"""
+
+
+def build_network_start_sh(
+    name: str,
+    num_validators: int,
+    num_peers: int,
+):
+    start_sh_content = "#! /bin/bash \n"
+    for i in range(1, num_validators + 1):
+        start_sh_content += f"cp rippled.{name} vnode{i}/rippled.{name}\n"
+
+    for i in range(1, num_peers + 1):
+        start_sh_content += f"cp rippled.{name} pnode{i}/rippled.{name}\n"
+    start_sh_content += (
+        f"docker compose -f docker-compose.yml up --build --force-recreate -d"
+    )
+    return start_sh_content
+
+
+def build_network_stop_sh(
+    name: str,
+    num_validators: int,
+    num_peers: int,
+) -> str:
+    stop_sh_content = "#! /bin/bash\n"
+    stop_sh_content += "REMOVE_FLAG=false \n"
+    stop_sh_content += """
+for arg in "$@"; do
+  if [ "$arg" == "--remove" ]; then
+    REMOVE_FLAG=true
+    break
+  fi
+done
+"""
+    stop_sh_content += "\n"
+    stop_sh_content += 'if [ "$REMOVE_FLAG" = true ]; then \n'
+    if num_validators > 0 and num_peers > 0:
+        stop_sh_content += f"docker compose -f docker-compose.yml down --remove-orphans\n"  # noqa: E501
+
+    for i in range(1, num_validators + 1):
+        stop_sh_content += f"rm -r vnode{i}/lib\n"
+        stop_sh_content += f"rm -r vnode{i}/log\n"
+        stop_sh_content += f"rm -r vnode{i}/rippled.{name}\n"
+
+    for i in range(1, num_peers + 1):
+        stop_sh_content += f"rm -r pnode{i}/lib\n"
+        stop_sh_content += f"rm -r pnode{i}/log\n"
+        stop_sh_content += f"rm -r pnode{i}/rippled.{name}\n"
+
+    stop_sh_content += "else \n"
+    if num_validators > 0 and num_peers > 0:
+        stop_sh_content += f"docker compose -f docker-compose.yml down\n"  # noqa: E501
+    stop_sh_content += "fi \n"
+    return stop_sh_content

@@ -50,9 +50,9 @@ class TestINetGenStandalone(BaseTestConfig):
             "standalone",  # net type
             21337,  # network id
             "https://build.xahau.tech",  # build server
-            "2024.9.11-release+985",  # build version
+            "2025.2.6-release+1299",  # build version
         )
-        folder = f"{basedir}/xahau-2024.9.11-release+985"
+        folder = f"{basedir}/xahau-2025.2.6-release+1299"
         files = [
             "Dockerfile",
             "docker-compose.yml",

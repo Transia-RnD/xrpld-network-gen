@@ -250,15 +250,15 @@ def parse_image_name(image_name: str) -> str:
 
 def get_node_db_path(db_type: str, type: str = "local") -> str:
     if db_type == "NuDB" and type == "local":
-        return "db/nudb"
+        return "db"
     if db_type == "NuDB" and type == "standalone":
-        return "/opt/ripple/lib/db/nudb"
+        return "/opt/ripple/lib/db"
     if db_type == "NuDB" and type == "network":
-        return "/var/lib/rippled/db/nudb"
+        return "/var/lib/rippled/db"
     if db_type == "Memory":
         return "./"
     if db_type == "rwdb" and type == "network":
-        return "/var/lib/rippled/db/nudb"
+        return "/var/lib/rippled/db"
 
 
 def get_relational_db(db_type: str) -> str:

@@ -67,12 +67,16 @@ def generate_rippled_cfg(
     maximum_txn_per_account: int = 100000,
     minimum_last_ledger_buffer: int = 2,
     zero_basefee_transaction_feelevel: int = 256000,
-    workers: int = 6,
-    io_workers: int = 2,
-    prefetch_workers: int = 4,
+    workers: int = 10,
+    io_workers: int = 10,
+    prefetch_workers: int = 10,
     send_queue_limit: int = 65535,
 ):
     try:
+        account_reserve = 1000000
+        owner_reserve = 200000
+        reference_fee = 10
+
         node_config_path: str = build_path + "/config"
 
         cfg_out: str = ""
@@ -316,6 +320,12 @@ def generate_rippled_cfg(
             cfg_out += "[amendments]" + "\n"
             for k, v in amendments_dict.items():
                 cfg_out += f"{v}" + " " + f"{k}" + "\n"
+
+        cfg_out += "\n"
+        cfg_out += "[voting]" + "\n"
+        cfg_out += f"account_reserve = {account_reserve}" + "\n"
+        cfg_out += f"owner_reserve = {owner_reserve}" + "\n"
+        cfg_out += f"reference_fee = {reference_fee}" + "\n"
 
         validators_out: str = ""
         if genesis:

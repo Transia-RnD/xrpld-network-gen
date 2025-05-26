@@ -16,6 +16,8 @@ from xrpld_netgen.network import (
 
 logger = logging.getLogger("app")
 
+# 2025.4.18-release+1718
+
 
 class TestINetGenXahau(BaseTestConfig):
     def _test_create_xahau_network(cls):
@@ -23,28 +25,28 @@ class TestINetGenXahau(BaseTestConfig):
             "trace",
             "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
             "xahau",  # protocol
-            6,  # num validators
-            2,  # num peers
+            7,  # num validators
+            1,  # num peers
             21336,  # network id
             "https://build.xahau.tech",  # image host
-            "2024.6.3-jshooks+903",  # image name
+            "2025.2.6-release+1299",  # image name
             True,
             3,
         )
 
-    def test_create_ansible(cls):
+    def _test_create_ansible(cls):
         create_ansible(
-            "trace",
+            "info",
             "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
             "xahau",  # protocol
             6,  # num validators
             2,  # num peers
             21339,  # network id
             "https://build.xahau.tech",  # image host
-            "2024.12.2-HEAD+1182",  # image name
+            "2025.2.6-release+1299",  # image name
             True,
             3,
-            "rwdb",
+            "NuDB",
             [
                 "79.110.60.99",
                 "79.110.60.100",
@@ -61,20 +63,24 @@ class TestINetGenXahau(BaseTestConfig):
 
     def _test_update_node(cls):
         update_node_binary(
-            "2023.12.29-release+689-cluster",  # network name
+            "2025.2.6-release+1299-cluster",  # network name
             "1",  # node id
-            "validator",  # node type
+            "peer",  # node type: validator or peer
             "https://build.xahau.tech",  # build server
-            "2024.1.25-release+738",  # build version
+            "2025.4.18-release+1718",  # build version
         )
 
     def _test_enable_amendment(cls):
-        enable_node_amendment(
-            "2023.11.10-dev+549-cluster",  # network name
-            "fixXahauV2",  # amendment name
-            "5",  # node id
-            "validator",  # node type
-        )
+        network_name = "2025.2.6-release+1299-cluster"
+        amendment_name = "Touch"
+        validator_list = ["2", "3", "4", "5", "6", "7"]
+        for id in validator_list:
+            enable_node_amendment(
+                network_name,  # network name
+                amendment_name,  # amendment name
+                id,  # node id
+                "validator",  # node type
+            )
 
 
 class TestINetGenRippled(BaseTestConfig):
@@ -83,25 +89,26 @@ class TestINetGenRippled(BaseTestConfig):
             "trace",
             None,
             "xrpl",  # protocol
-            6,  # num validators
-            2,  # num peers
-            21336,  # network id
-            "https://github.com/mvadari/rippled/tree/simulate",  # build server
-            "01e568318811ff8bb667fe420e021a087fda1ee3",  # build version
+            3,  # num validators
+            1,  # num peers
+            24340,  # network id
+            "https://github.com/Transia-RnD/rippled/tree/options",  # build server
+            "d0120767e048ffc42ddd217f7118a6b49e79cab3",  # build version
             True,
             3,
+            "NuDB",
         )
 
-    def _test_create_ansible(cls):
+    def test_create_ansible(cls):
         create_ansible(
-            "trace",
+            "error",
             None,
             "xrpl",  # protocol
             6,  # num validators
             2,  # num peers
             21336,  # network id
-            "https://github.com/Transia-RnD/rippled/tree/feature-batch",  # build server
-            "70e993185c7bf5e77dc03729d6dc4e22d8607571",  # build version
+            "https://github.com/Transia-RnD/rippled/tree/feature-batch-db",  # build server
+            "835ce7c432045f569150e326c160b3a853d08888",  # build version
             True,
             3,
             "NuDB",

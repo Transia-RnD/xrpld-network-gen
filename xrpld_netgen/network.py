@@ -16,6 +16,8 @@ from xrpld_netgen.utils.deploy_kit import (
     update_dockerfile,
     DockerVars,
     create_ansible_vars_file,
+    build_network_stop_sh,
+    build_network_start_sh,
 )
 from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
@@ -39,6 +41,7 @@ from xrpld_netgen.utils.misc import (
 from xrpld_netgen.libs.rippled import (
     update_amendments,
     parse_rippled_amendments,
+    parse_xahaud_amendments,
     get_feature_lines_from_content,
 )
 
@@ -157,7 +160,10 @@ def create_node_folders(
         # genesis (enable all features)
         if enable_all:
             lines: List[str] = get_feature_lines_from_content(feature_content)
-            features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+            if protocol == "xahau":
+                features_json: Dict[str, Any] = parse_xahaud_amendments(lines)
+            if protocol == "xrpl":
+                features_json: Dict[str, Any] = parse_rippled_amendments(lines)
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -171,12 +177,6 @@ def create_node_folders(
         )
 
         print(f"✅ {bcolors.CYAN}Updated validator: {i} features")
-
-        shutil.copyfile(
-            f"{basedir}/{name}-cluster/rippled.{name}",
-            f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
-        )
-        os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
 
         dockerfile: str = create_dockerfile(
             True,
@@ -218,9 +218,9 @@ def create_node_folders(
                 f"{peer}:{peer}",
             ],
             "volumes": [
-                f"{pwd_str}/{name}-cluster/vnode{i}/config:/opt/ripple/config",
-                f"{pwd_str}/{name}-cluster/vnode{i}/log:/opt/ripple/log",
-                f"{pwd_str}/{name}-cluster/vnode{i}/lib:/opt/ripple/lib",
+                f"./vnode{i}/config:/opt/ripple/config",
+                f"./vnode{i}/log:/opt/ripple/log",
+                f"./vnode{i}/lib:/opt/ripple/lib",
             ],
             "networks": [f"{name}-network"],
         }
@@ -268,7 +268,10 @@ def create_node_folders(
 
         # genesis (enable all features)
         lines: List[str] = get_feature_lines_from_content(feature_content)
-        features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+        if protocol == "xahau":
+            features_json: Dict[str, Any] = parse_xahaud_amendments(lines)
+        if protocol == "xrpl":
+            features_json: Dict[str, Any] = parse_rippled_amendments(lines)
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -282,12 +285,6 @@ def create_node_folders(
         )
 
         print(f"✅ {bcolors.CYAN}Updated peer: {i} features")
-
-        shutil.copyfile(
-            f"{basedir}/{name}-cluster/rippled.{name}",
-            f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
-        )
-        os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
 
         dockerfile: str = create_dockerfile(
             True,
@@ -313,7 +310,6 @@ def create_node_folders(
 
         print(f"✅ {bcolors.CYAN}Built peer: {i} docker container...")
 
-        pwd_str: str = basedir
         services[f"pnode{i}"] = {
             "build": {
                 "context": f"pnode{i}",
@@ -329,63 +325,14 @@ def create_node_folders(
                 f"{peer}:{peer}",
             ],
             "volumes": [
-                f"{pwd_str}/{name}-cluster/pnode{i}/config:/opt/ripple/config",
-                f"{pwd_str}/{name}-cluster/pnode{i}/log:/opt/ripple/log",
-                f"{pwd_str}/{name}-cluster/pnode{i}/lib:/opt/ripple/lib",
+                f"./pnode{i}/config:/opt/ripple/config",
+                f"./pnode{i}/log:/opt/ripple/log",
+                f"./pnode{i}/lib:/opt/ripple/lib",
             ],
             "networks": [f"{name}-network"],
         }
 
     return manifests
-
-
-def update_stop_sh(
-    protocol: str,
-    name: str,
-    num_validators: int,
-    num_peers: int,
-    standalone: bool = False,
-    local: bool = False,
-) -> str:
-    stop_sh_content = "#! /bin/bash\n"
-    stop_sh_content += "REMOVE_FLAG=false \n"
-    stop_sh_content += """
-for arg in "$@"; do
-  if [ "$arg" == "--remove" ]; then
-    REMOVE_FLAG=true
-    break
-  fi
-done
-"""
-    stop_sh_content += "\n"
-    stop_sh_content += 'if [ "$REMOVE_FLAG" = true ]; then \n'
-    if num_validators > 0 and num_peers > 0:
-        stop_sh_content += f"docker compose -f {basedir}/{name}-cluster/docker-compose.yml down --remove-orphans\n"  # noqa: E501
-
-    for i in range(1, num_validators + 1):
-        stop_sh_content += f"rm -r {basedir}/{name}-cluster/vnode{i}/lib\n"
-        stop_sh_content += f"rm -r {basedir}/{name}-cluster/vnode{i}/log\n"
-
-    for i in range(1, num_peers + 1):
-        stop_sh_content += f"rm -r {basedir}/{name}-cluster/pnode{i}/lib\n"
-        stop_sh_content += f"rm -r {basedir}/{name}-cluster/pnode{i}/log\n"
-
-    if standalone:
-        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
-        stop_sh_content += f"rm -r {protocol}/config\n"
-        stop_sh_content += f"rm -r {protocol}/lib\n"
-        stop_sh_content += f"rm -r {protocol}/log\n"
-        stop_sh_content += f"rm -r {protocol}\n"
-
-    if local:
-        stop_sh_content = (
-            "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
-        )
-        stop_sh_content += "rm -r db\n"
-        stop_sh_content += "rm -r debug.log\n"
-
-    stop_sh_content += "fi \n"
-    return stop_sh_content
 
 
 def create_network(
@@ -425,7 +372,10 @@ def create_network(
             repo = "rippled"
             copy_file(f"./rippled", f"{basedir}/{name}-cluster/rippled.{name}")
             content: str = download_file_at_commit_or_tag(
-                owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
+                owner,
+                repo,
+                build_version,
+                "include/xrpl/protocol/detail/features.macro",
             )
             image: str = "ubuntu:jammy"
         else:
@@ -437,7 +387,6 @@ def create_network(
                 owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
             )
             image: str = f"{build_server}/{build_version}"
-
     client = PublisherClient()
     client.create_keys()
     keys = client.get_keys()
@@ -491,12 +440,13 @@ def create_network(
 
     write_file(
         f"{basedir}/{name}-cluster/start.sh",
-        f"""\
-#! /bin/bash
-docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force-recreate -d
-""",  # noqa: E501
+        build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
     )
-    stop_sh_content: str = update_stop_sh(protocol, name, num_validators, num_peers)
+    stop_sh_content: str = build_network_stop_sh(
+        name,
+        num_validators,
+        num_peers,
+    )
     write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
 
     os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
@@ -510,6 +460,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
 
     os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
     os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
+    os.chmod(f"{basedir}/{name}-cluster/rippled.{name}", 0o755)
 
 
 def update_node_binary(
@@ -527,6 +478,8 @@ def update_node_binary(
         f"{basedir}/{name}/rippled.{new_version}",
         f"{basedir}/{name}/{node_dir}/rippled.{new_version}",
     )
+    # remove the db
+    run_command(f"{basedir}/{name}", f"rm -r {node_dir}/lib")
     os.chmod(f"{basedir}/{name}/{node_dir}/rippled.{new_version}", 0o755)
     update_dockerfile(new_version, f"{basedir}/{name}/{node_dir}/Dockerfile")
     run_command(
@@ -599,7 +552,10 @@ def create_ansible(
             repo = "rippled"
             copy_file(f"./rippled", f"{basedir}/{name}-cluster/rippled.{name}")
             content: str = download_file_at_commit_or_tag(
-                owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
+                owner,
+                repo,
+                build_version,
+                "include/xrpl/protocol/detail/features.macro",
             )
             image: str = "ubuntu:jammy"
         else:
@@ -611,7 +567,6 @@ def create_ansible(
                 owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
             )
             image: str = f"{build_server}/{build_version}"
-
     client = PublisherClient()
     client.create_keys()
     keys = client.get_keys()
@@ -664,12 +619,9 @@ def create_ansible(
 
     write_file(
         f"{basedir}/{name}-cluster/start.sh",
-        f"""\
-#! /bin/bash
-docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force-recreate -d
-""",  # noqa: E501
+        build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
     )
-    stop_sh_content: str = update_stop_sh(protocol, name, num_validators, num_peers)
+    stop_sh_content: str = build_network_stop_sh(name, num_validators, num_peers)
     write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
 
     os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
@@ -683,6 +635,7 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
 
     os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
     os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
+    os.chmod(f"{basedir}/{name}-cluster/rippled.{name}", 0o755)
 
     os.makedirs(f"{basedir}/{name}-cluster/ansible", exist_ok=True)
     os.makedirs(f"{basedir}/{name}-cluster/ansible/host_vars", exist_ok=True)
@@ -728,12 +681,20 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
             )
 
         run_command(
+            f"{basedir}/{name}-cluster",
+            f"cp rippled.{name} {basedir}/{name}-cluster/vnode1",
+        )
+        run_command(
             f"{basedir}/{name}-cluster/vnode1",
-            f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster:{image_name} .",  # noqa: E501
+            f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster:{image_name} .",
         )
         run_command(
             f"{basedir}/{name}-cluster/vnode1",
             f"docker push transia/cluster:{image_name}",
+        )
+        run_command(
+            f"{basedir}/{name}-cluster/vnode1",
+            f"rm -r rippled.{name}",
         )
         if k[:5] == "pnode":
             index: int = int(k[5:])

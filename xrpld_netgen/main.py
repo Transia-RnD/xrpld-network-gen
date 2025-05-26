@@ -8,7 +8,13 @@ import json
 from typing import List, Any, Dict
 
 from xrpld_netgen.rippled_cfg import gen_config, RippledBuild
-from xrpld_netgen.utils.deploy_kit import create_dockerfile, download_binary
+from xrpld_netgen.utils.deploy_kit import (
+    create_dockerfile,
+    download_binary,
+    build_stop_sh,
+    build_start_sh,
+    build_local_start_sh,
+)
 from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
     download_file_at_commit_or_tag,
@@ -46,43 +52,6 @@ deploykit_path: str = ""
 
 
 services: Dict[str, Dict] = {}
-
-
-def update_stop_sh(
-    protocol: str,
-    name: str,
-    num_validators: int,
-    num_peers: int,
-    standalone: bool = False,
-    local: bool = False,
-) -> str:
-    stop_sh_content = "#! /bin/bash\n"
-    if num_validators > 0 and num_peers > 0:
-        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
-
-    for i in range(1, num_validators + 1):
-        stop_sh_content += f"rm -r vnode{i}/lib\n"
-        stop_sh_content += f"rm -r vnode{i}/log\n"
-
-    for i in range(1, num_peers + 1):
-        stop_sh_content += f"rm -r pnode{i}/lib\n"
-        stop_sh_content += f"rm -r pnode{i}/log\n"
-
-    if standalone:
-        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
-        stop_sh_content += f"rm -r {protocol}/config\n"
-        stop_sh_content += f"rm -r {protocol}/lib\n"
-        stop_sh_content += f"rm -r {protocol}/log\n"
-        stop_sh_content += f"rm -r {protocol}\n"
-
-    if local:
-        stop_sh_content = (
-            "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
-        )
-        stop_sh_content += "rm -r db\n"
-        stop_sh_content += "rm -r debug.log\n"
-
-    return stop_sh_content
 
 
 def create_xrpl_standalone_folder(
@@ -269,13 +238,10 @@ def create_standalone_image(
 
     write_file(
         f"{basedir}/{protocol}-{name}/start.sh",
-        f"""\
-#! /bin/bash
-docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml up --build --force-recreate -d
-""",  # noqa: E501
+        build_start_sh(basedir, protocol, name),  # noqa: E501
     )
     os.chmod(f"{basedir}/{protocol}-{name}/start.sh", 0o755)
-    stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, True)
+    stop_sh_content: str = build_stop_sh(basedir, protocol, name, 0, 0, True)
     write_file(f"{basedir}/{protocol}-{name}/stop.sh", stop_sh_content)
     os.chmod(f"{basedir}/{protocol}-{name}/stop.sh", 0o755)
 
@@ -469,13 +435,10 @@ def create_standalone_binary(
 
     write_file(
         f"{basedir}/{protocol}-{name}/start.sh",
-        f"""\
-#! /bin/bash
-docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml up --build --force-recreate -d
-""",  # noqa: E501
+        build_start_sh(basedir, protocol, name),  # noqa: E501
     )
     os.chmod(f"{basedir}/{protocol}-{name}/start.sh", 0o755)
-    stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, True)
+    stop_sh_content: str = build_stop_sh(basedir, protocol, name, 0, 0, True)
     write_file(f"{basedir}/{protocol}-{name}/stop.sh", stop_sh_content)
     os.chmod(f"{basedir}/{protocol}-{name}/stop.sh", 0o755)
 
@@ -601,14 +564,10 @@ def start_local(
 
     write_file(
         "start.sh",
-        f"""\
-#! /bin/bash
-docker compose -f docker-compose.yml up --build --force-recreate -d
-./rippled {'-a' if net_type == 'standalone' else ''} --conf config/rippled.cfg --ledgerfile config/genesis.json
-""",  # noqa: E501
+        build_local_start_sh(net_type),  # noqa: E501
     )
     os.chmod("start.sh", 0o755)
-    stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, False, True)
+    stop_sh_content: str = build_stop_sh(basedir, protocol, name, 0, 0, False, True)
     write_file("stop.sh", stop_sh_content)
     os.chmod("stop.sh", 0o755)
     import sys
