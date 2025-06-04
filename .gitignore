@@ -83,7 +83,7 @@ rippled.batch.v0
 xrpl-*
 
 # networks
-2025.2.6-release+1299-cluster
+2025*
 feature-batch-cluster
 feature-batch-db-cluster
 notifications-cluster

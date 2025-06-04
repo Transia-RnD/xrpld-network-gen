@@ -673,8 +673,14 @@ def create_ansible(
                     "/opt/ripple/config:/opt/ripple/config",
                     "/opt/ripple/log:/opt/ripple/log",
                     "/opt/ripple/lib:/opt/ripple/lib",
+                    "/var/lib/rippled/db:/var/lib/rippled/db",
                 ],
-                ["/opt/ripple/config", "/opt/ripple/log", "/opt/ripple/lib"],
+                [
+                    "/opt/ripple/config",
+                    "/opt/ripple/log",
+                    "/opt/ripple/lib",
+                    "/var/lib/rippled/db",
+                ],
             )
             create_ansible_vars_file(
                 f"{basedir}/{name}-cluster/ansible/host_vars", vips[index - 1], vars
@@ -720,8 +726,14 @@ def create_ansible(
                     "/opt/ripple/config:/opt/ripple/config",
                     "/opt/ripple/log:/opt/ripple/log",
                     "/opt/ripple/lib:/opt/ripple/lib",
+                    "/var/lib/rippled/db:/var/lib/rippled/db",
                 ],
-                ["/opt/ripple/config", "/opt/ripple/log", "/opt/ripple/lib"],
+                [
+                    "/opt/ripple/config",
+                    "/opt/ripple/log",
+                    "/opt/ripple/lib",
+                    "/var/lib/rippled/db",
+                ],
             )
             create_ansible_vars_file(
                 f"{basedir}/{name}-cluster/ansible/host_vars", pips[index - 1], vars

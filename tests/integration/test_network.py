@@ -27,26 +27,27 @@ class TestINetGenXahau(BaseTestConfig):
             "xahau",  # protocol
             7,  # num validators
             1,  # num peers
-            21336,  # network id
+            21465,  # network id
             "https://build.xahau.tech",  # image host
-            "2025.2.6-release+1299",  # image name
+            "2025.5.1-release+1762",  # image name
             True,
             3,
+            "rwdb",  # database type
         )
 
-    def _test_create_ansible(cls):
+    def test_create_ansible(cls):
         create_ansible(
             "info",
             "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
             "xahau",  # protocol
             6,  # num validators
             2,  # num peers
-            21339,  # network id
+            21465,  # network id
             "https://build.xahau.tech",  # image host
-            "2025.2.6-release+1299",  # image name
+            "2025.5.1-release+1762",  # image name
             True,
             3,
-            "NuDB",
+            "rwdb",
             [
                 "79.110.60.99",
                 "79.110.60.100",
@@ -91,7 +92,7 @@ class TestINetGenRippled(BaseTestConfig):
             "xrpl",  # protocol
             3,  # num validators
             1,  # num peers
-            24340,  # network id
+            21465,  # network id
             "https://github.com/Transia-RnD/rippled/tree/options",  # build server
             "d0120767e048ffc42ddd217f7118a6b49e79cab3",  # build version
             True,
@@ -99,14 +100,14 @@ class TestINetGenRippled(BaseTestConfig):
             "NuDB",
         )
 
-    def test_create_ansible(cls):
+    def _test_create_ansible(cls):
         create_ansible(
             "error",
             None,
             "xrpl",  # protocol
             6,  # num validators
             2,  # num peers
-            21336,  # network id
+            21465,  # network id
             "https://github.com/Transia-RnD/rippled/tree/feature-batch-db",  # build server
             "835ce7c432045f569150e326c160b3a853d08888",  # build version
             True,
