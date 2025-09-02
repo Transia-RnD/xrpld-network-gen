@@ -84,8 +84,17 @@ xrpl-*
 
 # networks
 2025*
+feature-p256-cluster
 feature-batch-cluster
 feature-batch-db-cluster
 notifications-cluster
+firewall-v1-cluster
 options-cluster
+dangell-relay-cluster
 axiology
+develop-cluster
+bootcamp-cluster
+rippled.fork
+rippled.p256
+rippled.unknown
+rippled.unknown.1

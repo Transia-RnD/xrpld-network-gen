@@ -35,9 +35,9 @@ class TestINetGenXahau(BaseTestConfig):
             "rwdb",  # database type
         )
 
-    def test_create_ansible(cls):
+    def _test_create_ansible(cls):
         create_ansible(
-            "info",
+            "error",
             "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
             "xahau",  # protocol
             6,  # num validators
@@ -100,16 +100,18 @@ class TestINetGenRippled(BaseTestConfig):
             "NuDB",
         )
 
-    def _test_create_ansible(cls):
+    def test_create_ansible(cls):
+        # https://github.com/Transia-RnD/rippled/tree/develop
+        # 9874d47d7fbfe81e4cd78afd5b60ec33124ee2e9
         create_ansible(
-            "error",
+            "warn",
             None,
             "xrpl",  # protocol
             6,  # num validators
             2,  # num peers
             21465,  # network id
-            "https://github.com/Transia-RnD/rippled/tree/feature-batch-db",  # build server
-            "835ce7c432045f569150e326c160b3a853d08888",  # build version
+            "https://github.com/Transia-RnD/rippled/tree/firewall-v1",  # build server
+            "3686ac3f3046a55fc6a6dbdb311b3eb52b88f217",  # build version
             True,
             3,
             "NuDB",

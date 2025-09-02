@@ -368,6 +368,7 @@ def create_network(
             name: str = build_server.split(f"https://github.com/{owner}/rippled/tree/")[
                 -1
             ]
+            name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
             repo = "rippled"
             copy_file(f"./rippled", f"{basedir}/{name}-cluster/rippled.{name}")
@@ -544,12 +545,13 @@ def create_ansible(
 
     if protocol == "xrpl":
         if build_server.startswith("https://github.com/"):
-            name: str = build_server.split(
-                "https://github.com/Transia-RnD/rippled/tree/"
-            )[-1]
+            repo: str = "rippled"
+            owner: str = build_server.split("https://github.com/")[1].split("/")[0]
+            name: str = build_server.split(f"https://github.com/{owner}/rippled/tree/")[
+                -1
+            ]
+            name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-            owner = "Transia-RnD"
-            repo = "rippled"
             copy_file(f"./rippled", f"{basedir}/{name}-cluster/rippled.{name}")
             content: str = download_file_at_commit_or_tag(
                 owner,
