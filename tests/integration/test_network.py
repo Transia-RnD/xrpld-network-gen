@@ -110,8 +110,8 @@ class TestINetGenRippled(BaseTestConfig):
             6,  # num validators
             2,  # num peers
             21465,  # network id
-            "https://github.com/Transia-RnD/rippled/tree/firewall-v1",  # build server
-            "3686ac3f3046a55fc6a6dbdb311b3eb52b88f217",  # build version
+            "https://github.com/XRPLF/rippled/tree/dangell/smart-contracts",  # build server
+            "0039fdb83fb379ee00c2e84e80fa5cd39e52ba7f",  # build version
             True,
             3,
             "NuDB",
