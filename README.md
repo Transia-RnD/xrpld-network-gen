@@ -2,7 +2,28 @@
 
 ## Overview
 
-The XRPLD Network Generator CLI is a command-line interface tool designed to facilitate the creation, management, and interaction with XRPLD networks and standalone ledgers. This tool allows users to easily start, stop, remove, and update XRPLD nodes, as well as enable amendments on the network.
+The XRPLD Network Generator CLI is a command-line interface tool designed to facilitate the creation, management, and interaction with XRPLD networks and standalone ledgers.
+
+### What Does This Tool Do?
+
+This tool creates **local Docker-based XRPLD networks** for testing and development purposes. Instead of spending hours building rippled from source inside Docker containers (which is slow), this tool:
+
+1. Uses pre-built rippled binaries (downloaded or built locally on your Mac)
+2. Creates a multi-node network with validators and peer nodes
+3. Generates all necessary configuration files, validator keys, and UNL (Unique Node List)
+4. Provides a docker-compose setup for easy network management
+5. Includes a network explorer UI for monitoring your local network
+
+This dramatically speeds up local development - you can build rippled natively on your Mac (which is fast), then deploy it to a Docker network in seconds.
+
+### Key Features
+
+- Create multi-validator networks with custom configurations
+- Start, stop, and remove networks with simple commands
+- Update individual nodes to different versions
+- Enable/disable amendments on specific nodes
+- Support for both XRPL and Xahau protocols
+- Use locally built binaries instead of building in Docker
 
 ### Current Versions
 

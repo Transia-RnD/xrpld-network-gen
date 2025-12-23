@@ -7,13 +7,13 @@ from dataclasses import dataclass
 
 
 @dataclass
-class RippledBuild:
+class XrpldBuild:
     name: str
     path: str
     data: str
 
 
-def generate_rippled_cfg(
+def generate_xrpld_cfg(
     build_path: str,
     node_index: int,
     network: int,
@@ -350,11 +350,9 @@ def generate_rippled_cfg(
                 validators_out += "    " + vk + "\n"
 
         return [
-            RippledBuild("cfg", f"{node_config_path}/rippled.cfg", cfg_out),
-            RippledBuild("vl", f"{node_config_path}/validators.txt", validators_out),
-            RippledBuild(
-                "docker", f"{node_config_path}/validators.txt", validators_out
-            ),
+            XrpldBuild("cfg", f"{node_config_path}/xrpld.cfg", cfg_out),
+            XrpldBuild("vl", f"{node_config_path}/validators.txt", validators_out),
+            XrpldBuild("docker", f"{node_config_path}/validators.txt", validators_out),
         ]
 
     except Exception as e:
@@ -433,14 +431,14 @@ def gen_config(
     ivl_keys: List[str],
     ips_urls: List[str] = [],
     ips_fixed_urls: List[str] = [],
-) -> List[RippledBuild]:
-    configs: List[RippledBuild] = generate_rippled_cfg(
+) -> List[XrpldBuild]:
+    configs: List[XrpldBuild] = generate_xrpld_cfg(
         # App
         build_path="/",
         node_index=index,
         network=name,
         network_id=network_id,
-        # Rippled
+        # Xrpld
         is_rpc_public=True,
         rpc_public_port=rpc_public,
         is_rpc_admin=True,

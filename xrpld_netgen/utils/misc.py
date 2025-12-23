@@ -126,15 +126,74 @@ def run_logs():
         return
 
 
-def run_local_logs():
+def run_local_logs(node: str = None):
     try:
         os.system("clear")
         print()
-        print(
-            f"{bcolors.GREEN}Starting live log monitor, edit with {bcolors.PURPLE}CTRL + C{bcolors.END}"
-        )
+
+        # Determine the log path based on whether this is a network node or standalone
+        if node:
+            # For network nodes (vnode1, pnode1, etc.)
+            # Try multiple potential locations
+            potential_paths = [
+                f"{node}/log/debug.log",  # Current directory
+                f"./{node}/log/debug.log",  # Explicit current directory
+            ]
+
+            # Also check common cluster directory patterns
+            cwd = os.getcwd()
+            if "xrpld-network-gen" in cwd:
+                basedir = os.path.abspath(os.path.dirname(__file__))
+                cluster_dirs = []
+                # Look in xrpld_netgen directory for cluster folders
+                parent_dir = os.path.dirname(os.path.dirname(basedir))
+                for item in os.listdir(parent_dir):
+                    item_path = os.path.join(parent_dir, item)
+                    if os.path.isdir(item_path) and os.path.exists(os.path.join(item_path, node)):
+                        potential_paths.append(os.path.join(item_path, f"{node}/log/debug.log"))
+
+            # Also search in common build directories
+            if os.path.exists("build"):
+                for item in os.listdir("build"):
+                    item_path = os.path.join("build", item)
+                    if os.path.isdir(item_path) and "cluster" in item:
+                        potential_paths.append(os.path.join(item_path, f"{node}/log/debug.log"))
+
+            log_path = None
+            for path in potential_paths:
+                if os.path.exists(path):
+                    log_path = path
+                    break
+
+            if not log_path:
+                print(f"{bcolors.RED}Error: Node '{node}' not found or log file doesn't exist{bcolors.END}")
+                print()
+                print(f"{bcolors.BLUE}Searched in:{bcolors.END}")
+                for path in potential_paths[:3]:  # Show first 3 paths
+                    print(f"  - {path}")
+                print()
+                print(f"{bcolors.BLUE}Tip: Run this command from your cluster directory (e.g., local-xrpl-cluster){bcolors.END}")
+                print()
+                return
+
+            print(
+                f"{bcolors.GREEN}Starting live log monitor for {bcolors.PURPLE}{node}{bcolors.GREEN}, exit with {bcolors.PURPLE}CTRL + C{bcolors.END}"
+            )
+        else:
+            # Default to standalone config path
+            log_path = "config/debug.log"
+            if not os.path.exists(log_path):
+                print(f"{bcolors.RED}Error: Log file not found at {log_path}{bcolors.END}")
+                print()
+                print(f"{bcolors.BLUE}For local networks, please specify a node with --node (e.g., --node vnode1){bcolors.END}")
+                print()
+                return
+            print(
+                f"{bcolors.GREEN}Starting live log monitor, exit with {bcolors.PURPLE}CTRL + C{bcolors.END}"
+            )
+
         print()
-        log_command = f"tail -f config/debug.log 2>&1 | grep -E --color=always 'HookTrace|HookError|Publishing ledger [0-9]+'"
+        log_command = f"tail -f {log_path} 2>&1 | grep -E --color=always 'HookTrace|HookError|Publishing ledger [0-9]+'"
         os.system(log_command)
     except subprocess.CalledProcessError:
         return
@@ -233,7 +292,7 @@ def download_json(url: str, destination_dir: str) -> Dict[str, Any]:
 
 
 def save_local_config(cfg_path: str, cfg_out: str, validators_out: str) -> None:
-    with open(f"{cfg_path}/rippled.cfg", "w") as text_file:
+    with open(f"{cfg_path}/xrpld.cfg", "w") as text_file:
         text_file.write(cfg_out)
 
     with open(f"{cfg_path}/validators.txt", "w") as text_file:
@@ -254,11 +313,11 @@ def get_node_db_path(db_type: str, type: str = "local") -> str:
     if db_type == "NuDB" and type == "standalone":
         return "/opt/ripple/lib/db"
     if db_type == "NuDB" and type == "network":
-        return "/var/lib/rippled/db"
+        return "/var/lib/xrpld/db"
     if db_type == "Memory":
         return "./"
     if db_type == "rwdb" and type == "network":
-        return "/var/lib/rippled/db"
+        return "/var/lib/xrpld/db"
 
 
 def get_relational_db(db_type: str) -> str:

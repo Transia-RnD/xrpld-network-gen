@@ -7,7 +7,7 @@ import shutil
 import json
 from typing import List, Any, Dict
 
-from xrpld_netgen.rippled_cfg import gen_config, RippledBuild
+from xrpld_netgen.xrpld_cfg import gen_config, XrpldBuild
 from xrpld_netgen.utils.deploy_kit import (
     create_dockerfile,
     download_binary,
@@ -28,9 +28,9 @@ from xrpld_netgen.utils.misc import (
     get_node_db_path,
     get_relational_db,
 )
-from xrpld_netgen.libs.rippled import (
+from xrpld_netgen.libs.xrpld import (
     update_amendments,
-    parse_rippled_amendments,
+    parse_xrpld_amendments,
     parse_xahaud_amendments,
     get_feature_lines_from_content,
     get_feature_lines_from_path,
@@ -80,7 +80,7 @@ def create_xrpl_standalone_folder(
     if ivl_key:
         vl_config["import_vl_keys"] = [ivl_key]
 
-    configs: List[RippledBuild] = gen_config(
+    configs: List[XrpldBuild] = gen_config(
         False,
         protocol,
         name,
@@ -111,8 +111,7 @@ def create_xrpl_standalone_folder(
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
-    lines: List[str] = get_feature_lines_from_content(feature_content)
-    features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+    features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
     print(json.dumps(features_json, indent=4))
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
@@ -183,10 +182,11 @@ def create_standalone_image(
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
     owner = "XRPLF"
     repo = "rippled"
-    content: str = download_file_at_commit_or_tag(
+    content_bytes = download_file_at_commit_or_tag(
         owner, repo, build_name, "include/xrpl/protocol/detail/features.macro"
     )
-    image: str = f"{build_system}/rippled:{build_name}"
+    content = get_feature_lines_from_content(content_bytes)
+    image: str = f"{build_system}/xrpld:{build_name}"
     create_xrpl_standalone_folder(
         False,
         name,
@@ -272,7 +272,7 @@ def create_xahau_standalone_folder(
     if ivl_key:
         vl_config["import_vl_keys"] = [ivl_key]
 
-    configs: List[RippledBuild] = gen_config(
+    configs: List[XrpldBuild] = gen_config(
         False,
         protocol,
         name,
@@ -303,8 +303,7 @@ def create_xahau_standalone_folder(
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
-    lines: List[str] = get_feature_lines_from_content(feature_content)
-    features_json: Dict[str, Any] = parse_xahaud_amendments(lines)
+    features_json: Dict[str, Any] = parse_xahaud_amendments(feature_content)
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
         f"{basedir}/{protocol}-{name}/genesis.json",
@@ -378,11 +377,12 @@ def create_standalone_binary(
     owner = "Xahau"
     repo = "xahaud"
     commit_hash = get_commit_hash_from_server_version(build_server, build_version)
-    content: str = download_file_at_commit_or_tag(
+    content_bytes = download_file_at_commit_or_tag(
         owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
     )
+    content = get_feature_lines_from_content(content_bytes)
     url: str = f"{build_server}/{build_version}"
-    download_binary(url, f"{basedir}/{protocol}-{name}/rippled.{name}")
+    download_binary(url, f"{basedir}/{protocol}-{name}/xrpld.{name}")
     image: str = "ubuntu:jammy"
     create_xahau_standalone_folder(
         True,
@@ -466,7 +466,7 @@ def create_local_folder(
     if ivl_key:
         vl_config["import_vl_keys"] = [ivl_key]
 
-    configs: List[RippledBuild] = gen_config(
+    configs: List[XrpldBuild] = gen_config(
         False,
         protocol,
         name,
@@ -507,7 +507,7 @@ def create_local_folder(
         content: str = get_feature_lines_from_path(
             "../include/xrpl/protocol/detail/features.macro"
         )
-        features_json: Dict[str, Any] = parse_rippled_amendments(content)
+        features_json: Dict[str, Any] = parse_xrpld_amendments(content)
 
     if not features_json:
         print(f"{bcolors.RED}❌ No features found{bcolors.END}")

@@ -44,6 +44,7 @@ from xrpld_netgen.main import (
 )
 from xrpld_netgen.network import (
     create_network,
+    create_local_network,
     update_node_binary,
     enable_node_amendment,
 )
@@ -72,8 +73,15 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
 
     # LOGS
-    # logs:hooks
-    subparsers.add_parser("logs:local", help="Logs Standalone")
+    # logs:local
+    parser_ll = subparsers.add_parser("logs:local", help="Logs Local Network")
+    parser_ll.add_argument(
+        "--node",
+        required=False,
+        help="The node to view logs for (e.g., vnode1, vnode2, pnode1)",
+        default=None,
+    )
+    # logs:standalone
     subparsers.add_parser("logs:standalone", help="Logs Standalone")
 
     # LOCAL
@@ -190,6 +198,19 @@ def main():
         help="The node db for the network",
         choices=["Memory", "NuDB"],
         default="NuDB",
+    )
+    parser_cn.add_argument(
+        "--local",
+        action="store_true",
+        required=False,
+        help="Create a local network without Docker (nodes run natively)",
+    )
+    parser_cn.add_argument(
+        "--binary_name",
+        type=str,
+        required=False,
+        help="The name of the xrpld binary for local networks (default: xrpld)",
+        default="xrpld",
     )
     # update:node
     parser_un = subparsers.add_parser("update:node", help="Update Node Version")
@@ -345,7 +366,8 @@ def main():
 
     # LOGS
     if args.command == "logs:local":
-        return run_local_logs()
+        NODE = args.node
+        return run_local_logs(NODE)
 
     if args.command == "logs:standalone":
         return run_logs()
@@ -463,22 +485,43 @@ def main():
         GENESIS = args.genesis
         QUORUM = args.quorum
         NODEDB_TYPE = args.nodedb_type
+        LOCAL = args.local
+        BINARY_NAME = args.binary_name
 
         import_vl_key: str = (
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
         )
 
-        if not BUILD_SERVER:
-            BUILD_SERVER: str = "https://build.xahau.tech"
+        # Set defaults for xahau
+        if PROTOCOL == "xahau":
+            if not BUILD_SERVER:
+                BUILD_SERVER = "https://build.xahau.tech"
+            if not BUILD_VERSION:
+                BUILD_VERSION = XAHAU_RELEASE
+            if not NETWORK_ID:
+                NETWORK_ID = 21339
 
-        if not BUILD_VERSION:
-            BUILD_VERSION: str = XAHAU_RELEASE
+        # Set defaults for xrpl
+        if PROTOCOL == "xrpl":
+            if LOCAL:
+                # For local networks, use GitHub URL
+                if not BUILD_SERVER:
+                    BUILD_SERVER = "https://github.com/XRPLF/xrpld/tree"
+            else:
+                # For Docker networks, use build server
+                if not BUILD_SERVER:
+                    BUILD_SERVER = "https://build.xahau.tech"
+            if not BUILD_VERSION:
+                BUILD_VERSION = XRPL_RELEASE
+            if not NETWORK_ID:
+                NETWORK_ID = 21337
 
         if not QUORUM:
             QUORUM = NUM_VALIDATORS - 1
 
+        network_type = "Local Network" if LOCAL else "Network"
         print(
-            f"{bcolors.BLUE}Creating Network with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Creating {network_type} with the following parameters:{bcolors.END}"
         )
         print(f"    - Log Level: {LOG_LEVEL}")
         print(f"    - Protocol: {PROTOCOL}")
@@ -490,20 +533,41 @@ def main():
         print(f"    - Genesis: {GENESIS}")
         print(f"    - Quorum: {QUORUM}")
         print(f"    - Node DB: {NODEDB_TYPE}")
+        if LOCAL:
+            print(f"    - Binary Name: {BINARY_NAME}")
+            print(f"    - Deployment: Local (native processes, no Docker for nodes)")
 
-        create_network(
-            LOG_LEVEL,
-            import_vl_key,
-            PROTOCOL,
-            NUM_VALIDATORS,
-            NUM_PEERS,
-            NETWORK_ID,
-            BUILD_SERVER,
-            BUILD_VERSION,
-            GENESIS,
-            QUORUM,
-            NODEDB_TYPE,
-        )
+        if LOCAL:
+            # Create local network without Docker
+            create_local_network(
+                LOG_LEVEL,
+                import_vl_key,
+                PROTOCOL,
+                NUM_VALIDATORS,
+                NUM_PEERS,
+                NETWORK_ID,
+                BUILD_SERVER,
+                BUILD_VERSION,
+                BINARY_NAME,
+                GENESIS,
+                QUORUM,
+                NODEDB_TYPE,
+            )
+        else:
+            # Create traditional Docker-based network
+            create_network(
+                LOG_LEVEL,
+                import_vl_key,
+                PROTOCOL,
+                NUM_VALIDATORS,
+                NUM_PEERS,
+                NETWORK_ID,
+                BUILD_SERVER,
+                BUILD_VERSION,
+                GENESIS,
+                QUORUM,
+                NODEDB_TYPE,
+            )
 
     if args.command == "update:node":
         NAME = args.name

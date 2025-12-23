@@ -31,7 +31,7 @@ def get_feature_lines_from_content(content: str):
     return content.decode("utf-8").splitlines()
 
 
-def parse_rippled_amendments(lines: Any):
+def parse_xrpld_amendments(lines: Any):
     amendments = {}
     for line in lines:
         if re.match(r"XRPL_FEATURE", line) or re.match(r"XRPL_FIX", line):

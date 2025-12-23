@@ -23,5 +23,5 @@ else
     standalone=""
 fi
 
-# Start rippled with or without ledgerfile and quorum
-exec /app/rippled $ledgerfile $quorum $standalone --conf /opt/ripple/config/rippled.cfg
+# Start xrpld with or without ledgerfile and quorum
+exec /app/xrpld $ledgerfile $quorum $standalone --conf /opt/ripple/config/xrpld.cfg
