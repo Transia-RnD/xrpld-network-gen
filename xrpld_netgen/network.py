@@ -53,14 +53,20 @@ from xrpld_publisher.validator import ValidatorClient
 
 load_dotenv()
 
-basedir = os.path.abspath(os.path.dirname(__file__))
+# Package directory for static resources (genesis files, default features, etc.)
+package_dir = os.path.abspath(os.path.dirname(__file__))
+# Use workspace directory for deployments
+workspace_dir = os.path.join(os.path.dirname(__file__), "..", "workspace")
+basedir = os.path.abspath(workspace_dir)
+# Create workspace directory if it doesn't exist
+os.makedirs(basedir, exist_ok=True)
 
 deploykit_path: str = ""
 
 
 def generate_validator_config(protocol: str, network: str):
     try:
-        config = read_json(f"{basedir}/deploykit/config.json")
+        config = read_json(f"{package_dir}/deploykit/config.json")
         return config[protocol][network]
     except Exception as e:
         print(e)
@@ -88,6 +94,10 @@ def create_node_folders(
     log_level: str = "warning",
     nodedb_type: str = "NuDB",
 ):
+    # Create cluster directory and keystore inside it
+    cluster_dir = f"{basedir}/{name}-cluster"
+    os.makedirs(cluster_dir, exist_ok=True)
+
     # Create directories for validator nodes
     ips_fixed: List[str] = []
     for i in range(1, num_validators + 1):
@@ -98,26 +108,35 @@ def create_node_folders(
     manifests: List[str] = []
     validators: List[str] = []
     tokens: List[str] = []
-    for i in range(1, num_validators + 1):
-        node_dir = f"vnode{i}"
-        # GENERATE VALIDATOR KEY
-        client = ValidatorClient(node_dir)
-        key_path = f"keystore/{node_dir}/key.json"
-        if not os.path.exists(key_path):
-            print(f"  Creating new keys for {node_dir}...")
-            client.create_keys()
-            client.set_domain(f"xahau.{node_dir}.transia.co")
-            client.create_token()
-        else:
-            print(f"  Using existing keys for {node_dir}")
-        keys = client.get_keys()
-        token = client.read_token()
-        manifest = client.read_manifest()
-        manifests.append(manifest)
-        validators.append(keys["public_key"])
-        tokens.append(token)
 
-    print(f"✅ {bcolors.CYAN}Validator keys ready")
+    # Save current directory and change to cluster directory for keystore creation
+    original_dir = os.getcwd()
+    os.chdir(cluster_dir)
+
+    try:
+        for i in range(1, num_validators + 1):
+            node_dir = f"vnode{i}"
+            # GENERATE VALIDATOR KEY
+            client = ValidatorClient(node_dir)
+            key_path = f"keystore/{node_dir}/key.json"
+            if not os.path.exists(key_path):
+                print(f"  Creating new keys for {node_dir}...")
+                client.create_keys()
+                client.set_domain(f"xahau.{node_dir}.transia.co")
+                client.create_token()
+            else:
+                print(f"  Using existing keys for {node_dir}")
+            keys = client.get_keys()
+            token = client.read_token()
+            manifest = client.read_manifest()
+            manifests.append(manifest)
+            validators.append(keys["public_key"])
+            tokens.append(token)
+
+        print(f"✅ {bcolors.CYAN}Validator keys ready")
+    finally:
+        # Change back to original directory
+        os.chdir(original_dir)
 
     for i in range(1, num_validators + 1):
         ips_dir = ips[i - 1] if ansible else f"vnode{i}"
@@ -169,7 +188,7 @@ def create_node_folders(
         elif protocol == "xrpl":
             features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
         else:
-            features_json: Any = read_json(f"{basedir}/default.{protocol}.features.json")
+            features_json: Any = read_json(f"{package_dir}/default.{protocol}.features.json")
 
         # Only enable all amendments in genesis if requested
         if not enable_all:
@@ -207,7 +226,7 @@ def create_node_folders(
             file.write(dockerfile)
 
         shutil.copyfile(
-            f"{basedir}/deploykit/network.entrypoint",
+            f"{package_dir}/deploykit/network.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
 
@@ -275,7 +294,7 @@ def create_node_folders(
         print(f"✅ {bcolors.CYAN}Created peer: {i} config")
 
         # default features
-        features_json: Any = read_json(f"{basedir}/default.xahau.features.json")
+        features_json: Any = read_json(f"{package_dir}/default.xahau.features.json")
 
         # genesis (enable all features)
         if protocol == "xahau":
@@ -314,7 +333,7 @@ def create_node_folders(
             file.write(dockerfile)
 
         shutil.copyfile(
-            f"{basedir}/deploykit/network.entrypoint",
+            f"{package_dir}/deploykit/network.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
 
@@ -376,9 +395,9 @@ def create_network(
     if protocol == "xrpl":
         if build_server.startswith("https://github.com/"):
             owner: str = build_server.split("https://github.com/")[1].split("/")[0]
-            name: str = build_server.split(f"https://github.com/{owner}/xrpld/tree/")[
-                -1
-            ]
+            # Extract branch name from URL (supports both rippled and xrpld repo names)
+            name: str = build_server.split(f"https://github.com/{owner}/")[1]
+            name = name.split("/tree/")[1] if "/tree/" in name else name
             name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
             repo = "rippled"
@@ -401,43 +420,49 @@ def create_network(
             )
             content = get_feature_lines_from_content(content_bytes)
             image: str = f"{build_server}/{build_version}"
-    client = PublisherClient()
-    vl_key_path = "keystore/vl/key.json"
-    vl_eph_path = "keystore/vl/eph.json"
-    vl_manifest_path = "keystore/vl/manifest.txt"
 
-    # Check if ALL VL files exist and are valid
-    should_regenerate = False
-    if os.path.exists(vl_key_path) and os.path.exists(vl_eph_path) and os.path.exists(vl_manifest_path):
-        try:
-            # Validate that keys are compatible (not Dilithium or other incompatible formats)
-            keys = client.get_keys()
-            eph_keys = client.get_ephkeys()
-            # Check key format - standard keys should be reasonable length
-            if keys and eph_keys:
-                pub_key_len = len(keys.get("publicKey", ""))
-                priv_key_len = len(keys.get("privateKey", ""))
-                # Standard secp256k1/Ed25519 keys are typically 66-68 chars for public, 64-66 for private
-                # Dilithium keys are 2000+ characters
-                if pub_key_len > 200 or priv_key_len > 200:
-                    print(f"  Detected incompatible VL keys (possibly post-quantum), regenerating...")
-                    should_regenerate = True
+    # Change to cluster directory for VL key creation
+    original_dir = os.getcwd()
+    os.chdir(f"{basedir}/{name}-cluster")
+
+    try:
+        client = PublisherClient()
+        vl_key_path = "keystore/vl/key.json"
+        vl_eph_path = "keystore/vl/eph.json"
+        vl_manifest_path = "keystore/vl/manifest.txt"
+
+        # Check if ALL VL files exist and are valid
+        should_regenerate = False
+        if os.path.exists(vl_key_path) and os.path.exists(vl_eph_path) and os.path.exists(vl_manifest_path):
+            try:
+                # Validate that keys are compatible (not Dilithium or other incompatible formats)
+                keys = client.get_keys()
+                eph_keys = client.get_ephkeys()
+                # Check key format - standard keys should be reasonable length
+                if keys and eph_keys:
+                    pub_key_len = len(keys.get("publicKey", ""))
+                    priv_key_len = len(keys.get("privateKey", ""))
+                    # Standard secp256k1/Ed25519 keys are typically 66-68 chars for public, 64-66 for private
+                    # Dilithium keys are 2000+ characters
+                    if pub_key_len > 200 or priv_key_len > 200:
+                        print(f"  Detected incompatible VL keys (possibly post-quantum), regenerating...")
+                        should_regenerate = True
+                    else:
+                        print(f"  Using existing VL keys")
                 else:
-                    print(f"  Using existing VL keys")
-            else:
+                    should_regenerate = True
+            except Exception as e:
+                print(f"  VL keys validation failed, regenerating...")
                 should_regenerate = True
-        except Exception as e:
-            print(f"  VL keys validation failed, regenerating...")
+        else:
             should_regenerate = True
-    else:
-        should_regenerate = True
 
-    if should_regenerate:
-        print(f"  Creating new VL keys...")
-        client.create_keys()
+        if should_regenerate:
+            print(f"  Creating new VL keys...")
+            client.create_keys()
 
-    keys = client.get_keys()
-    manifests: List[str] = create_node_folders(
+        keys = client.get_keys()
+        manifests: List[str] = create_node_folders(
         True,
         name,
         image,
@@ -454,56 +479,66 @@ def create_network(
         [],
         log_level,
         nodedb_type,
-    )
+        )
 
-    services["vl"] = {
-        "build": {
-            "context": "vl",
-            "dockerfile": "Dockerfile",
-        },
-        "container_name": "vl",
-        "ports": ["80:80"],
-        "networks": [f"{name}-network"],
-    }
+        services["vl"] = {
+            "build": {
+                "context": "vl",
+                "dockerfile": "Dockerfile",
+            },
+            "container_name": "vl",
+            "ports": ["80:80"],
+            "networks": [f"{name}-network"],
+            "healthcheck": {
+                "test": ["CMD", "curl", "-f", "http://localhost/vl.json"],
+                "interval": "5s",
+                "timeout": "3s",
+                "retries": 3,
+                "start_period": "10s",
+            },
+        }
 
-    services["network-explorer"] = {
-        "image": "transia/explorer:latest",
-        "container_name": "network-explorer",
-        "environment": [
-            "PORT=4000",
-            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6016}",
-        ],
-        "ports": ["4000:4000"],
-        "networks": [f"{name}-network"],
-    }
+        services["network-explorer"] = {
+            "image": "transia/explorer:latest",
+            "container_name": "network-explorer",
+            "environment": [
+                "PORT=4000",
+                f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6016}",
+            ],
+            "ports": ["4000:4000"],
+            "networks": [f"{name}-network"],
+        }
 
-    compose = {
-        "version": "3.9",
-        "services": services,
-        "networks": {f"{name}-network": {"driver": "bridge"}},
-    }
-    with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
-        yaml.dump(compose, f, default_flow_style=False)
+        compose = {
+            "version": "3.9",
+            "services": services,
+            "networks": {f"{name}-network": {"driver": "bridge"}},
+        }
+        with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
+            yaml.dump(compose, f, default_flow_style=False)
 
-    write_file(
-        f"{basedir}/{name}-cluster/start.sh",
-        build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
-    )
-    stop_sh_content: str = build_network_stop_sh(
-        name,
-        num_validators,
-        num_peers,
-    )
-    write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
+        write_file(
+            f"{basedir}/{name}-cluster/start.sh",
+            build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
+        )
+        stop_sh_content: str = build_network_stop_sh(
+            name,
+            num_validators,
+            num_peers,
+        )
+        write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
 
-    os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
-    for manifest in manifests:
-        client.add_validator(manifest)
-    client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
-    shutil.copyfile(
-        f"{basedir}/deploykit/nginx.dockerfile",
-        f"{basedir}/{name}-cluster/vl/Dockerfile",
-    )
+        os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
+        for manifest in manifests:
+            client.add_validator(manifest)
+        client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
+        shutil.copyfile(
+            f"{package_dir}/deploykit/nginx.dockerfile",
+            f"{basedir}/{name}-cluster/vl/Dockerfile",
+        )
+    finally:
+        # Change back to original directory
+        os.chdir(original_dir)
 
     os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
     os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
@@ -594,9 +629,9 @@ def create_ansible(
         if build_server.startswith("https://github.com/"):
             repo: str = "rippled"
             owner: str = build_server.split("https://github.com/")[1].split("/")[0]
-            name: str = build_server.split(f"https://github.com/{owner}/xrpld/tree/")[
-                -1
-            ]
+            # Extract branch name from URL (supports both rippled and xrpld repo names)
+            name: str = build_server.split(f"https://github.com/{owner}/")[1]
+            name = name.split("/tree/")[1] if "/tree/" in name else name
             name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
             copy_file(f"./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
@@ -618,43 +653,49 @@ def create_ansible(
             )
             content = get_feature_lines_from_content(content_bytes)
             image: str = f"{build_server}/{build_version}"
-    client = PublisherClient()
-    vl_key_path = "keystore/vl/key.json"
-    vl_eph_path = "keystore/vl/eph.json"
-    vl_manifest_path = "keystore/vl/manifest.txt"
 
-    # Check if ALL VL files exist and are valid
-    should_regenerate = False
-    if os.path.exists(vl_key_path) and os.path.exists(vl_eph_path) and os.path.exists(vl_manifest_path):
-        try:
-            # Validate that keys are compatible (not Dilithium or other incompatible formats)
-            keys = client.get_keys()
-            eph_keys = client.get_ephkeys()
-            # Check key format - standard keys should be reasonable length
-            if keys and eph_keys:
-                pub_key_len = len(keys.get("publicKey", ""))
-                priv_key_len = len(keys.get("privateKey", ""))
-                # Standard secp256k1/Ed25519 keys are typically 66-68 chars for public, 64-66 for private
-                # Dilithium keys are 2000+ characters
-                if pub_key_len > 200 or priv_key_len > 200:
-                    print(f"  Detected incompatible VL keys (possibly post-quantum), regenerating...")
-                    should_regenerate = True
+    # Change to cluster directory for VL key creation
+    original_dir = os.getcwd()
+    os.chdir(f"{basedir}/{name}-cluster")
+
+    try:
+        client = PublisherClient()
+        vl_key_path = "keystore/vl/key.json"
+        vl_eph_path = "keystore/vl/eph.json"
+        vl_manifest_path = "keystore/vl/manifest.txt"
+
+        # Check if ALL VL files exist and are valid
+        should_regenerate = False
+        if os.path.exists(vl_key_path) and os.path.exists(vl_eph_path) and os.path.exists(vl_manifest_path):
+            try:
+                # Validate that keys are compatible (not Dilithium or other incompatible formats)
+                keys = client.get_keys()
+                eph_keys = client.get_ephkeys()
+                # Check key format - standard keys should be reasonable length
+                if keys and eph_keys:
+                    pub_key_len = len(keys.get("publicKey", ""))
+                    priv_key_len = len(keys.get("privateKey", ""))
+                    # Standard secp256k1/Ed25519 keys are typically 66-68 chars for public, 64-66 for private
+                    # Dilithium keys are 2000+ characters
+                    if pub_key_len > 200 or priv_key_len > 200:
+                        print(f"  Detected incompatible VL keys (possibly post-quantum), regenerating...")
+                        should_regenerate = True
+                    else:
+                        print(f"  Using existing VL keys")
                 else:
-                    print(f"  Using existing VL keys")
-            else:
+                    should_regenerate = True
+            except Exception as e:
+                print(f"  VL keys validation failed, regenerating...")
                 should_regenerate = True
-        except Exception as e:
-            print(f"  VL keys validation failed, regenerating...")
+        else:
             should_regenerate = True
-    else:
-        should_regenerate = True
 
-    if should_regenerate:
-        print(f"  Creating new VL keys...")
-        client.create_keys()
+        if should_regenerate:
+            print(f"  Creating new VL keys...")
+            client.create_keys()
 
-    keys = client.get_keys()
-    manifests: List[str] = create_node_folders(
+        keys = client.get_keys()
+        manifests: List[str] = create_node_folders(
         True,
         name,
         image,
@@ -671,51 +712,61 @@ def create_ansible(
         vips,
         log_level,
         nodedb_type,
-    )
+        )
 
-    services["vl"] = {
-        "build": {
-            "context": "vl",
-            "dockerfile": "Dockerfile",
-        },
-        "container_name": "vl",
-        "ports": ["80:80"],
-        "networks": [f"{name}-network"],
-    }
+        services["vl"] = {
+            "build": {
+                "context": "vl",
+                "dockerfile": "Dockerfile",
+            },
+            "container_name": "vl",
+            "ports": ["80:80"],
+            "networks": [f"{name}-network"],
+            "healthcheck": {
+                "test": ["CMD", "curl", "-f", "http://localhost/vl.json"],
+                "interval": "5s",
+                "timeout": "3s",
+                "retries": 3,
+                "start_period": "10s",
+            },
+        }
 
-    services["network-explorer"] = {
-        "image": "transia/explorer-main:latest",
-        "container_name": "network-explorer",
-        "environment": [
-            "PORT=4000",
-        ],
-        "ports": ["4000:4000"],
-        "networks": [f"{name}-network"],
-    }
+        services["network-explorer"] = {
+            "image": "transia/explorer-main:latest",
+            "container_name": "network-explorer",
+            "environment": [
+                "PORT=4000",
+            ],
+            "ports": ["4000:4000"],
+            "networks": [f"{name}-network"],
+        }
 
-    compose = {
-        "version": "3.9",
-        "services": services,
-        "networks": {f"{name}-network": {"driver": "bridge"}},
-    }
-    with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
-        yaml.dump(compose, f, default_flow_style=False)
+        compose = {
+            "version": "3.9",
+            "services": services,
+            "networks": {f"{name}-network": {"driver": "bridge"}},
+        }
+        with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
+            yaml.dump(compose, f, default_flow_style=False)
 
-    write_file(
-        f"{basedir}/{name}-cluster/start.sh",
-        build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
-    )
-    stop_sh_content: str = build_network_stop_sh(name, num_validators, num_peers)
-    write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
+        write_file(
+            f"{basedir}/{name}-cluster/start.sh",
+            build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
+        )
+        stop_sh_content: str = build_network_stop_sh(name, num_validators, num_peers)
+        write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
 
-    os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
-    for manifest in manifests:
-        client.add_validator(manifest)
-    client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
-    shutil.copyfile(
-        f"{basedir}/deploykit/nginx.dockerfile",
-        f"{basedir}/{name}-cluster/vl/Dockerfile",
-    )
+        os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
+        for manifest in manifests:
+            client.add_validator(manifest)
+        client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
+        shutil.copyfile(
+            f"{package_dir}/deploykit/nginx.dockerfile",
+            f"{basedir}/{name}-cluster/vl/Dockerfile",
+        )
+    finally:
+        # Change back to original directory
+        os.chdir(original_dir)
 
     os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
     os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
@@ -725,7 +776,7 @@ def create_ansible(
     os.makedirs(f"{basedir}/{name}-cluster/ansible/host_vars", exist_ok=True)
 
     shutil.copytree(
-        f"{basedir}/deploykit/ansible",
+        f"{package_dir}/deploykit/ansible",
         f"{basedir}/{name}-cluster/ansible",
         dirs_exist_ok=True,
     )
@@ -874,35 +925,43 @@ def create_local_node_folders(
     Creates config folders for local multi-node network without Docker.
     Similar to create_node_folders but uses local paths instead of Docker paths.
     """
-    # Create directories for validator nodes
-    ips_fixed: List[str] = []
-    for i in range(1, num_validators + 1):
-        _, _, _, _, peer = generate_ports(i, "validator")
-        ips_fixed.append(f"127.0.0.1 {peer}")
+    # Change to cluster directory for keystore creation
+    original_dir = os.getcwd()
+    os.chdir(cluster_dir)
 
-    manifests: List[str] = []
-    validators: List[str] = []
-    tokens: List[str] = []
-    for i in range(1, num_validators + 1):
-        node_dir = f"vnode{i}"
-        # GENERATE VALIDATOR KEY
-        client = ValidatorClient(node_dir)
-        key_path = f"keystore/{node_dir}/key.json"
-        if not os.path.exists(key_path):
-            print(f"  Creating new keys for {node_dir}...")
-            client.create_keys()
-            client.set_domain(f"xahau.{node_dir}.transia.co")
-            client.create_token()
-        else:
-            print(f"  Using existing keys for {node_dir}")
-        keys = client.get_keys()
-        token = client.read_token()
-        manifest = client.read_manifest()
-        manifests.append(manifest)
-        validators.append(keys["public_key"])
-        tokens.append(token)
+    try:
+        # Create directories for validator nodes
+        ips_fixed: List[str] = []
+        for i in range(1, num_validators + 1):
+            _, _, _, _, peer = generate_ports(i, "validator")
+            ips_fixed.append(f"127.0.0.1 {peer}")
 
-    print(f"✅ {bcolors.CYAN}Validator keys ready")
+        manifests: List[str] = []
+        validators: List[str] = []
+        tokens: List[str] = []
+        for i in range(1, num_validators + 1):
+            node_dir = f"vnode{i}"
+            # GENERATE VALIDATOR KEY
+            client = ValidatorClient(node_dir)
+            key_path = f"keystore/{node_dir}/key.json"
+            if not os.path.exists(key_path):
+                print(f"  Creating new keys for {node_dir}...")
+                client.create_keys()
+                client.set_domain(f"xahau.{node_dir}.transia.co")
+                client.create_token()
+            else:
+                print(f"  Using existing keys for {node_dir}")
+            keys = client.get_keys()
+            token = client.read_token()
+            manifest = client.read_manifest()
+            manifests.append(manifest)
+            validators.append(keys["public_key"])
+            tokens.append(token)
+
+        print(f"✅ {bcolors.CYAN}Validator keys ready")
+    finally:
+        # Change back to original directory
+        os.chdir(original_dir)
 
     for i in range(1, num_validators + 1):
         node_dir = f"vnode{i}"
@@ -955,7 +1014,7 @@ def create_local_node_folders(
         elif protocol == "xrpl":
             features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
         else:
-            features_json: Any = read_json(f"{basedir}/default.{protocol}.features.json")
+            features_json: Any = read_json(f"{package_dir}/default.{protocol}.features.json")
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -1017,7 +1076,7 @@ def create_local_node_folders(
         elif protocol == "xrpl":
             features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
         else:
-            features_json: Any = read_json(f"{basedir}/default.{protocol}.features.json")
+            features_json: Any = read_json(f"{package_dir}/default.{protocol}.features.json")
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -1084,116 +1143,131 @@ def create_local_network(
             print(f"Please run this command from your build directory.{bcolors.END}")
             return
 
-    # Create validator list publisher keys
-    client = PublisherClient()
-    vl_key_path = "keystore/vl/key.json"
-    vl_eph_path = "keystore/vl/eph.json"
-    vl_manifest_path = "keystore/vl/manifest.txt"
+    # Change to cluster directory for key creation
+    original_dir = os.getcwd()
+    os.chdir(cluster_dir)
 
-    # Check if ALL VL files exist and are valid
-    should_regenerate = False
-    if os.path.exists(vl_key_path) and os.path.exists(vl_eph_path) and os.path.exists(vl_manifest_path):
-        try:
-            # Validate that keys are compatible (not Dilithium or other incompatible formats)
-            keys = client.get_keys()
-            eph_keys = client.get_ephkeys()
-            # Check key format - standard keys should be reasonable length
-            if keys and eph_keys:
-                pub_key_len = len(keys.get("publicKey", ""))
-                priv_key_len = len(keys.get("privateKey", ""))
-                # Standard secp256k1/Ed25519 keys are typically 66-68 chars for public, 64-66 for private
-                # Dilithium keys are 2000+ characters
-                if pub_key_len > 200 or priv_key_len > 200:
-                    print(f"  Detected incompatible VL keys (possibly post-quantum), regenerating...")
-                    should_regenerate = True
+    try:
+        # Create validator list publisher keys
+        client = PublisherClient()
+        vl_key_path = "keystore/vl/key.json"
+        vl_eph_path = "keystore/vl/eph.json"
+        vl_manifest_path = "keystore/vl/manifest.txt"
+
+        # Check if ALL VL files exist and are valid
+        should_regenerate = False
+        if os.path.exists(vl_key_path) and os.path.exists(vl_eph_path) and os.path.exists(vl_manifest_path):
+            try:
+                # Validate that keys are compatible (not Dilithium or other incompatible formats)
+                keys = client.get_keys()
+                eph_keys = client.get_ephkeys()
+                # Check key format - standard keys should be reasonable length
+                if keys and eph_keys:
+                    pub_key_len = len(keys.get("publicKey", ""))
+                    priv_key_len = len(keys.get("privateKey", ""))
+                    # Standard secp256k1/Ed25519 keys are typically 66-68 chars for public, 64-66 for private
+                    # Dilithium keys are 2000+ characters
+                    if pub_key_len > 200 or priv_key_len > 200:
+                        print(f"  Detected incompatible VL keys (possibly post-quantum), regenerating...")
+                        should_regenerate = True
+                    else:
+                        print(f"  Using existing VL keys")
                 else:
-                    print(f"  Using existing VL keys")
-            else:
+                    should_regenerate = True
+            except Exception as e:
+                print(f"  VL keys validation failed, regenerating...")
                 should_regenerate = True
-        except Exception as e:
-            print(f"  VL keys validation failed, regenerating...")
+        else:
             should_regenerate = True
-    else:
-        should_regenerate = True
 
-    if should_regenerate:
-        print(f"  Creating new VL keys...")
-        client.create_keys()
+        if should_regenerate:
+            print(f"  Creating new VL keys...")
+            client.create_keys()
 
-    keys = client.get_keys()
+        keys = client.get_keys()
 
-    # Create node configs without Docker
-    manifests: List[str] = create_local_node_folders(
-        name,
-        cluster_dir,
-        content,
-        num_validators,
-        num_peers,
-        network_id,
-        genesis,
-        quorum,
-        keys["publicKey"],
-        import_key,
-        protocol,
-        log_level,
-        nodedb_type,
-    )
+        # Create node configs without Docker
+        manifests: List[str] = create_local_node_folders(
+            name,
+            cluster_dir,
+            content,
+            num_validators,
+            num_peers,
+            network_id,
+            genesis,
+            quorum,
+            keys["publicKey"],
+            import_key,
+            protocol,
+            log_level,
+            nodedb_type,
+        )
 
-    # Create docker-compose.yml for Explorer and VL services only
-    services: Dict[str, Dict] = {}
+        # Create docker-compose.yml for Explorer and VL services only
+        services: Dict[str, Dict] = {}
 
-    services["vl"] = {
-        "build": {
-            "context": "vl",
-            "dockerfile": "Dockerfile",
-        },
-        "container_name": "vl",
-        "ports": ["80:80"],
-        "networks": [f"{name}-network"],
-    }
+        services["vl"] = {
+            "build": {
+                "context": "vl",
+                "dockerfile": "Dockerfile",
+            },
+            "container_name": "vl",
+            "ports": ["80:80"],
+            "networks": [f"{name}-network"],
+            "healthcheck": {
+                "test": ["CMD", "curl", "-f", "http://localhost/vl.json"],
+                "interval": "5s",
+                "timeout": "3s",
+                "retries": 3,
+                "start_period": "10s",
+            },
+        }
 
-    services["network-explorer"] = {
-        "image": "transia/explorer:latest",
-        "container_name": "network-explorer",
-        "environment": [
-            "PORT=4000",
-            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6016}",
-        ],
-        "ports": ["4000:4000"],
-        "networks": [f"{name}-network"],
-    }
+        services["network-explorer"] = {
+            "image": "transia/explorer:latest",
+            "container_name": "network-explorer",
+            "environment": [
+                "PORT=4000",
+                f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6016}",
+            ],
+            "ports": ["4000:4000"],
+            "networks": [f"{name}-network"],
+        }
 
-    compose = {
-        "version": "3.9",
-        "services": services,
-        "networks": {f"{name}-network": {"driver": "bridge"}},
-    }
-    with open(f"{cluster_dir}/docker-compose.yml", "w") as f:
-        yaml.dump(compose, f, default_flow_style=False)
+        compose = {
+            "version": "3.9",
+            "services": services,
+            "networks": {f"{name}-network": {"driver": "bridge"}},
+        }
+        with open(f"{cluster_dir}/docker-compose.yml", "w") as f:
+            yaml.dump(compose, f, default_flow_style=False)
 
-    # Generate start.sh for local execution
-    write_file(
-        f"{cluster_dir}/start.sh",
-        build_local_network_start_sh(name, num_validators, num_peers, binary_name),
-    )
+        # Generate start.sh for local execution
+        write_file(
+            f"{cluster_dir}/start.sh",
+            build_local_network_start_sh(name, num_validators, num_peers, binary_name),
+        )
 
-    # Generate stop.sh
-    stop_sh_content: str = build_local_network_stop_sh(
-        name,
-        num_validators,
-        num_peers,
-    )
-    write_file(f"{cluster_dir}/stop.sh", stop_sh_content)
+        # Generate stop.sh
+        stop_sh_content: str = build_local_network_stop_sh(
+            name,
+            num_validators,
+            num_peers,
+        )
+        write_file(f"{cluster_dir}/stop.sh", stop_sh_content)
 
-    # Create VL (validator list) folder and files
-    os.makedirs(f"{cluster_dir}/vl", exist_ok=True)
-    for manifest in manifests:
-        client.add_validator(manifest)
-    client.sign_unl(f"{cluster_dir}/vl/vl.json")
-    shutil.copyfile(
-        f"{basedir}/deploykit/nginx.dockerfile",
-        f"{cluster_dir}/vl/Dockerfile",
-    )
+        # Create VL (validator list) folder and files
+        os.makedirs(f"{cluster_dir}/vl", exist_ok=True)
+        for manifest in manifests:
+            client.add_validator(manifest)
+        client.sign_unl(f"{cluster_dir}/vl/vl.json")
+        shutil.copyfile(
+            f"{package_dir}/deploykit/nginx.dockerfile",
+            f"{cluster_dir}/vl/Dockerfile",
+        )
+    finally:
+        # Change back to original directory
+        os.chdir(original_dir)
 
     # Make scripts executable
     os.chmod(f"{cluster_dir}/start.sh", 0o755)

@@ -36,12 +36,18 @@ from xrpld_netgen.libs.xrpld import (
     get_feature_lines_from_path,
 )
 
-basedir = os.path.abspath(os.path.dirname(__file__))
+# Package directory for static resources (deploykit, genesis files, default features, etc.)
+package_dir = os.path.abspath(os.path.dirname(__file__))
+# Use workspace directory for deployments
+workspace_dir = os.path.join(os.path.dirname(__file__), "..", "workspace")
+basedir = os.path.abspath(workspace_dir)
+# Create workspace directory if it doesn't exist
+os.makedirs(basedir, exist_ok=True)
 
 
 def generate_validator_config(protocol: str, network: str) -> str:
     try:
-        config = read_json(f"{basedir}/deploykit/config.json")
+        config = read_json(f"{package_dir}/deploykit/config.json")
         return config[protocol][network]
     except Exception as e:
         print(e)
@@ -138,7 +144,7 @@ def create_xrpl_standalone_folder(
         file.write(dockerfile)
 
     shutil.copyfile(
-        f"{basedir}/deploykit/{protocol}.entrypoint",
+        f"{package_dir}/deploykit/{protocol}.entrypoint",
         f"{basedir}/{protocol}-{name}/entrypoint",
     )
     print(f"✅ {bcolors.CYAN}Building docker container...")
@@ -331,7 +337,7 @@ def create_xahau_standalone_folder(
         file.write(dockerfile)
 
     shutil.copyfile(
-        f"{basedir}/deploykit/{protocol}.entrypoint",
+        f"{package_dir}/deploykit/{protocol}.entrypoint",
         f"{basedir}/{protocol}-{name}/entrypoint",
     )
     print(f"✅ {bcolors.CYAN}Building docker container...")

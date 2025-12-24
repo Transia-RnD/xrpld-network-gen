@@ -85,7 +85,7 @@ class TestINetGenXahau(BaseTestConfig):
 
 
 class TestINetGenXrpld(BaseTestConfig):
-    def test_create_network(cls):
+    def _test_create_network(cls):
         create_network(
             "trace",
             None,
@@ -93,15 +93,15 @@ class TestINetGenXrpld(BaseTestConfig):
             3,  # num validators
             1,  # num peers
             21465,  # network id
-            "https://github.com/Transia-RnD/rippled/tree/dilithium-full",  # build server
-            "cc5d2ae913404a864e6ff0d6fe110f4dc8457d6f",  # build version
+            "https://github.com/Transia-RnD/rippled/tree/alphanet-develop",  # build server
+            "f5d78179c9d1fbaf8bff8b77a052e263df90faa1",  # build version
             True,
             3,
             "NuDB",
         )
         print(ee)
 
-    def _test_create_ansible(cls):
+    def test_create_ansible(cls):
         # https://github.com/Transia-RnD/rippled/tree/develop
         # 9874d47d7fbfe81e4cd78afd5b60ec33124ee2e9
         create_ansible(
@@ -111,8 +111,8 @@ class TestINetGenXrpld(BaseTestConfig):
             6,  # num validators
             2,  # num peers
             21465,  # network id
-            "https://github.com/XRPLF/rippled/tree/dangell/smart-contracts",  # build server
-            "620415e0bec21389cbd58cebb683e36456f6d71e",  # build version
+            "https://github.com/Transia-RnD/rippled/tree/alphanet-develop",  # build server
+            "f5d78179c9d1fbaf8bff8b77a052e263df90faa1",  # build version
             True,
             3,
             "NuDB",
