@@ -93,6 +93,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Start Docker daemon
+        run: |
+          sudo systemctl start docker
+          sudo systemctl enable docker
+          docker info
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
