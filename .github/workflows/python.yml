@@ -136,7 +136,16 @@ jobs:
         run: |
           poetry run xrpld-netgen || true
           
-      - name: Test CLI command
+      - name: Test CLI command for xrpl
         run: |
           poetry run xrpld-netgen up:standalone --protocol xrpl
+          sleep 5
+          docker logs xrpl
+          docker ps | grep xrpl
+
+      - name: Test CLI command for xahau
+        run: |
           poetry run xrpld-netgen up:standalone --protocol xahau
+          sleep 5
+          docker logs xahau
+          docker ps | grep xahau
