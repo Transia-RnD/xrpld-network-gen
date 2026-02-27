@@ -188,7 +188,9 @@ def create_node_folders(
         elif protocol == "xrpl":
             features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
         else:
-            features_json: Any = read_json(f"{package_dir}/default.{protocol}.features.json")
+            features_json: Any = read_json(
+                f"{package_dir}/default.{protocol}.features.json"
+            )
 
         # Only enable all amendments in genesis if requested
         if not enable_all:
@@ -232,7 +234,6 @@ def create_node_folders(
 
         print(f"✅ {bcolors.CYAN}Built validator: {i} docker container...")
 
-        pwd_str: str = basedir
         services[f"vnode{i}"] = {
             "build": {
                 "context": f"vnode{i}",
@@ -401,7 +402,7 @@ def create_network(
             name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
             repo = "rippled"
-            copy_file(f"./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
+            copy_file("./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
             content_bytes = download_file_at_commit_or_tag(
                 owner,
                 repo,
@@ -433,52 +434,63 @@ def create_network(
 
         # Check if ALL VL files exist and are valid
         should_regenerate = False
-        if os.path.exists(vl_key_path) and os.path.exists(vl_eph_path) and os.path.exists(vl_manifest_path):
+        if (
+            os.path.exists(vl_key_path)
+            and os.path.exists(vl_eph_path)
+            and os.path.exists(vl_manifest_path)
+        ):
             try:
-                # Validate that keys are compatible (not Dilithium or other incompatible formats)
+                # Validate that keys are compatible
+                # (not Dilithium or other incompatible formats)
                 keys = client.get_keys()
                 eph_keys = client.get_ephkeys()
                 # Check key format - standard keys should be reasonable length
                 if keys and eph_keys:
                     pub_key_len = len(keys.get("publicKey", ""))
                     priv_key_len = len(keys.get("privateKey", ""))
-                    # Standard secp256k1/Ed25519 keys are typically 66-68 chars for public, 64-66 for private
+                    # Standard secp256k1/Ed25519 keys are
+                    # typically 66-68 chars for public,
+                    # 64-66 for private
                     # Dilithium keys are 2000+ characters
                     if pub_key_len > 200 or priv_key_len > 200:
-                        print(f"  Detected incompatible VL keys (possibly post-quantum), regenerating...")
+                        print(
+                            "  Detected incompatible VL keys "
+                            "(possibly post-quantum), "
+                            "regenerating..."
+                        )
                         should_regenerate = True
                     else:
-                        print(f"  Using existing VL keys")
+                        print("  Using existing VL keys")
                 else:
                     should_regenerate = True
-            except Exception as e:
-                print(f"  VL keys validation failed, regenerating...")
+            except Exception:
+                print("  VL keys validation failed, regenerating...")
                 should_regenerate = True
         else:
             should_regenerate = True
 
         if should_regenerate:
-            print(f"  Creating new VL keys...")
+            print("  Creating new VL keys...")
             client.create_keys()
 
         keys = client.get_keys()
         manifests: List[str] = create_node_folders(
-        True,
-        name,
-        image,
-        content,
-        num_validators,
-        num_peers,
-        network_id,
-        genesis,
-        quorum,
-        keys["publicKey"],
-        import_key,
-        protocol,
-        False,
-        [],
-        log_level,
-        nodedb_type,
+            True,
+            name,
+            image,
+            content,
+            num_validators,
+            num_peers,
+            network_id,
+            genesis,
+            quorum,
+            keys["publicKey"],
+            import_key,
+            protocol,
+            False,
+            [],
+            log_level,
+            nodedb_type,
         )
 
         services["vl"] = {
@@ -634,7 +646,7 @@ def create_ansible(
             name = name.split("/tree/")[1] if "/tree/" in name else name
             name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-            copy_file(f"./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
+            copy_file("./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
             content_bytes = download_file_at_commit_or_tag(
                 owner,
                 repo,
@@ -666,52 +678,63 @@ def create_ansible(
 
         # Check if ALL VL files exist and are valid
         should_regenerate = False
-        if os.path.exists(vl_key_path) and os.path.exists(vl_eph_path) and os.path.exists(vl_manifest_path):
+        if (
+            os.path.exists(vl_key_path)
+            and os.path.exists(vl_eph_path)
+            and os.path.exists(vl_manifest_path)
+        ):
             try:
-                # Validate that keys are compatible (not Dilithium or other incompatible formats)
+                # Validate that keys are compatible
+                # (not Dilithium or other incompatible formats)
                 keys = client.get_keys()
                 eph_keys = client.get_ephkeys()
                 # Check key format - standard keys should be reasonable length
                 if keys and eph_keys:
                     pub_key_len = len(keys.get("publicKey", ""))
                     priv_key_len = len(keys.get("privateKey", ""))
-                    # Standard secp256k1/Ed25519 keys are typically 66-68 chars for public, 64-66 for private
+                    # Standard secp256k1/Ed25519 keys are
+                    # typically 66-68 chars for public,
+                    # 64-66 for private
                     # Dilithium keys are 2000+ characters
                     if pub_key_len > 200 or priv_key_len > 200:
-                        print(f"  Detected incompatible VL keys (possibly post-quantum), regenerating...")
+                        print(
+                            "  Detected incompatible VL keys "
+                            "(possibly post-quantum), "
+                            "regenerating..."
+                        )
                         should_regenerate = True
                     else:
-                        print(f"  Using existing VL keys")
+                        print("  Using existing VL keys")
                 else:
                     should_regenerate = True
-            except Exception as e:
-                print(f"  VL keys validation failed, regenerating...")
+            except Exception:
+                print("  VL keys validation failed, regenerating...")
                 should_regenerate = True
         else:
             should_regenerate = True
 
         if should_regenerate:
-            print(f"  Creating new VL keys...")
+            print("  Creating new VL keys...")
             client.create_keys()
 
         keys = client.get_keys()
         manifests: List[str] = create_node_folders(
-        True,
-        name,
-        image,
-        content,
-        num_validators,
-        num_peers,
-        network_id,
-        genesis,
-        quorum,
-        keys["publicKey"],
-        import_key,
-        protocol,
-        True,
-        vips,
-        log_level,
-        nodedb_type,
+            True,
+            name,
+            image,
+            content,
+            num_validators,
+            num_peers,
+            network_id,
+            genesis,
+            quorum,
+            keys["publicKey"],
+            import_key,
+            protocol,
+            True,
+            vips,
+            log_level,
+            nodedb_type,
         )
 
         services["vl"] = {
@@ -827,7 +850,8 @@ def create_ansible(
         )
         run_command(
             f"{basedir}/{name}-cluster/vnode1",
-            f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster:{image_name} .",
+            "docker build -f Dockerfile --platform linux/x86_64"
+            f" --tag transia/cluster:{image_name} .",
         )
         run_command(
             f"{basedir}/{name}-cluster/vnode1",
@@ -1014,7 +1038,9 @@ def create_local_node_folders(
         elif protocol == "xrpl":
             features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
         else:
-            features_json: Any = read_json(f"{package_dir}/default.{protocol}.features.json")
+            features_json: Any = read_json(
+                f"{package_dir}/default.{protocol}.features.json"
+            )
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -1076,7 +1102,9 @@ def create_local_node_folders(
         elif protocol == "xrpl":
             features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
         else:
-            features_json: Any = read_json(f"{package_dir}/default.{protocol}.features.json")
+            features_json: Any = read_json(
+                f"{package_dir}/default.{protocol}.features.json"
+            )
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -1112,8 +1140,8 @@ def create_local_network(
     Creates a local multi-node network configuration that runs natively without Docker.
     Only Explorer and VL services run in Docker.
 
-    The user should run this command from their build directory (e.g., xrpld-quantum/build)
-    where the xrpld binary is located.
+    The user should run this command from their build directory
+    (e.g., xrpld-quantum/build) where the xrpld binary is located.
     """
     # Use a simple name for local networks
     name: str = f"local-{protocol}"
@@ -1156,32 +1184,43 @@ def create_local_network(
 
         # Check if ALL VL files exist and are valid
         should_regenerate = False
-        if os.path.exists(vl_key_path) and os.path.exists(vl_eph_path) and os.path.exists(vl_manifest_path):
+        if (
+            os.path.exists(vl_key_path)
+            and os.path.exists(vl_eph_path)
+            and os.path.exists(vl_manifest_path)
+        ):
             try:
-                # Validate that keys are compatible (not Dilithium or other incompatible formats)
+                # Validate that keys are compatible
+                # (not Dilithium or other incompatible formats)
                 keys = client.get_keys()
                 eph_keys = client.get_ephkeys()
                 # Check key format - standard keys should be reasonable length
                 if keys and eph_keys:
                     pub_key_len = len(keys.get("publicKey", ""))
                     priv_key_len = len(keys.get("privateKey", ""))
-                    # Standard secp256k1/Ed25519 keys are typically 66-68 chars for public, 64-66 for private
+                    # Standard secp256k1/Ed25519 keys are
+                    # typically 66-68 chars for public,
+                    # 64-66 for private
                     # Dilithium keys are 2000+ characters
                     if pub_key_len > 200 or priv_key_len > 200:
-                        print(f"  Detected incompatible VL keys (possibly post-quantum), regenerating...")
+                        print(
+                            "  Detected incompatible VL keys "
+                            "(possibly post-quantum), "
+                            "regenerating..."
+                        )
                         should_regenerate = True
                     else:
-                        print(f"  Using existing VL keys")
+                        print("  Using existing VL keys")
                 else:
                     should_regenerate = True
-            except Exception as e:
-                print(f"  VL keys validation failed, regenerating...")
+            except Exception:
+                print("  VL keys validation failed, regenerating...")
                 should_regenerate = True
         else:
             should_regenerate = True
 
         if should_regenerate:
-            print(f"  Creating new VL keys...")
+            print("  Creating new VL keys...")
             client.create_keys()
 
         keys = client.get_keys()
@@ -1277,10 +1316,16 @@ def create_local_network(
     print(f"{bcolors.CYAN}Location: {cluster_dir}{bcolors.END}")
     print(f"\n{bcolors.PURPLE}To start the network:{bcolors.END}")
     print(f"  cd {name}-cluster")
-    print(f"  ./start.sh")
-    print(f"\n{bcolors.PURPLE}Each node will open in its own Terminal window for easy monitoring.{bcolors.END}")
+    print("  ./start.sh")
+    print(
+        f"\n{bcolors.PURPLE}Each node will open in its own"
+        f" Terminal window for easy monitoring.{bcolors.END}"
+    )
     print(f"\n{bcolors.PURPLE}To stop the network:{bcolors.END}")
     print(f"  cd {name}-cluster")
-    print(f"  ./stop.sh")
-    print(f"  ./stop.sh --remove  # To also clean up data")
-    print(f"\n{bcolors.PURPLE}Note: The binary will be copied from ../{binary_name}{bcolors.END}")
+    print("  ./stop.sh")
+    print("  ./stop.sh --remove  # To also clean up data")
+    print(
+        f"\n{bcolors.PURPLE}Note: The binary will be copied"
+        f" from ../{binary_name}{bcolors.END}"
+    )
