@@ -39,4 +39,4 @@ else
 fi
 
 # Start xrpld with or without ledgerfile and quorum
-exec /opt/ripple/bin/xrpld $ledgerfile $quorum $standalone --conf /etc/opt/ripple/xrpld.cfg
+exec /opt/xrpld/bin/xrpld $ledgerfile $quorum $standalone --conf /etc/opt/ripple/xrpld.cfg
