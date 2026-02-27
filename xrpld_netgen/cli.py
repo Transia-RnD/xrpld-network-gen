@@ -66,7 +66,7 @@ basedir = os.path.abspath(workspace_dir)
 os.makedirs(basedir, exist_ok=True)
 
 XAHAU_RELEASE: str = "2025.7.9-release+1951"
-XRPL_RELEASE: str = "2.6.1"
+XRPL_RELEASE: str = "3.1.1"
 
 
 def main():
