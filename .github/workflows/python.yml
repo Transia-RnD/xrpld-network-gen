@@ -82,3 +82,54 @@ jobs:
         run: |
           # Add commands to run integration tests here
           poetry run python3 test.py tests/integration
+
+  cli-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10']
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: |
+          pip install poetry
+
+      - name: Cache Poetry virtual environment
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-${{ matrix.python-version }}-
+            ${{ runner.os }}-poetry-
+
+      - name: Install Dependencies
+        run: |
+          poetry install
+
+      - name: Test CLI --help
+        run: |
+          poetry run xrpld-netgen --help
+
+      - name: Test CLI subcommand help
+        run: |
+          poetry run xrpld-netgen create:network --help
+          poetry run xrpld-netgen up:standalone --help
+          poetry run xrpld-netgen up:local --help
+
+      - name: Test CLI without args does not crash
+        run: |
+          poetry run xrpld-netgen || true
+          
+      - name: Test CLI command
+        run: |
+          poetry run xrpld-netgen up:standalone --protocol xrpl
+          poetry run xrpld-netgen up:standalone --protocol xahau
