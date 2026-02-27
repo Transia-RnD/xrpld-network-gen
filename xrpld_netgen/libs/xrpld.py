@@ -31,48 +31,28 @@ def get_feature_lines_from_content(content: str):
     return content.decode("utf-8").splitlines()
 
 
-def parse_xrpld_amendments(lines: Any):
+def parse_amendments(lines: Any):
     amendments = {}
     for line in lines:
-        if re.match(r"XRPL_FEATURE", line) or re.match(r"XRPL_FIX", line):
-            amendment_name: str = ""
-            if re.match(r"XRPL_FIX", line):
-                amendment_name = re.search("XRPL_FIX\)?.*?\((.*?),", line).group(1) or 0
-                amendment_name = f"fix{amendment_name}"
-            if re.match(r"XRPL_FEATURE", line):
-                amendment_name = re.search("XRPL_FEATURE\((.*?),", line).group(1) or 0
-            supported = re.findall(r"Supported::(.*),", line)
-            default_vote = re.findall(r"DefaultVote::(.*),", line)
-            amendments[amendment_name] = {
-                "supported": parse(supported[0] if supported else "no"),
-                "default_vote": parse(default_vote[0] if default_vote else "no"),
-            }
-    return {
-        k: hashlib.sha512(k.encode("utf-8")).digest().hex().upper()[:64]
-        for (k, v) in amendments.items()
-        if v["supported"] == True
-    }
+        amendment_name: str = ""
+        if re.match(r"XRPL_FIX", line):
+            amendment_name = re.search(r"XRPL_FIX\)?.*?\((.*?),", line).group(1) or 0
+            amendment_name = f"fix{amendment_name}"
+        elif re.match(r"XRPL_FEATURE", line):
+            amendment_name = re.search(r"XRPL_FEATURE\((.*?),", line).group(1) or 0
+        elif re.match(r"REGISTER_FIX", line):
+            amendment_name = re.search(r"REGISTER_FIX\)?.*?\((.*?),", line).group(1) or 0
+        elif re.match(r"REGISTER_FEATURE", line):
+            amendment_name = re.search(r"REGISTER_FEATURE\((.*?),", line).group(1) or 0
+        else:
+            continue
 
-
-def parse_xahaud_amendments(lines: Any):
-    amendments = {}
-    for line in lines:
-        if re.match(r"REGISTER_FEATURE", line) or re.match(r"REGISTER_FIX", line):
-            amendment_name: str = ""
-            if re.match(r"REGISTER_FIX", line):
-                amendment_name = (
-                    re.search("REGISTER_FIX\)?.*?\((.*?),", line).group(1) or 0
-                )
-            if re.match(r"REGISTER_FEATURE", line):
-                amendment_name = (
-                    re.search("REGISTER_FEATURE\((.*?),", line).group(1) or 0
-                )
-            supported = re.findall(r"Supported::(.*),", line)
-            default_vote = re.findall(r"DefaultVote::(.*),", line)
-            amendments[amendment_name] = {
-                "supported": parse(supported[0] if supported else "no"),
-                "default_vote": parse(default_vote[0] if default_vote else "no"),
-            }
+        supported = re.findall(r"Supported::(.*),", line)
+        default_vote = re.findall(r"DefaultVote::(.*),", line)
+        amendments[amendment_name] = {
+            "supported": parse(supported[0] if supported else "no"),
+            "default_vote": parse(default_vote[0] if default_vote else "no"),
+        }
     return {
         k: hashlib.sha512(k.encode("utf-8")).digest().hex().upper()[:64]
         for (k, v) in amendments.items()
