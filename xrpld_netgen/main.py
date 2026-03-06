@@ -30,8 +30,7 @@ from xrpld_netgen.utils.misc import (
 )
 from xrpld_netgen.libs.xrpld import (
     update_amendments,
-    parse_xrpld_amendments,
-    parse_xahaud_amendments,
+    parse_amendments,
     get_feature_lines_from_content,
     get_feature_lines_from_path,
 )
@@ -118,7 +117,7 @@ def create_xrpl_standalone_folder(
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
-    features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
+    features_json: Dict[str, Any] = parse_amendments(feature_content)
     print(json.dumps(features_json, indent=4))
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
@@ -310,7 +309,7 @@ def create_xahau_standalone_folder(
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
-    features_json: Dict[str, Any] = parse_xahaud_amendments(feature_content)
+    features_json: Dict[str, Any] = parse_amendments(feature_content)
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
         f"{basedir}/{protocol}-{name}/genesis.json",
@@ -385,7 +384,7 @@ def create_standalone_binary(
     repo = "xahaud"
     commit_hash = get_commit_hash_from_server_version(build_server, build_version)
     content_bytes = download_file_at_commit_or_tag(
-        owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
+        owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
     )
     content = get_feature_lines_from_content(content_bytes)
     url: str = f"{build_server}/{build_version}"
@@ -506,15 +505,16 @@ def create_local_folder(
 
     features_json: Dict[str, Any] = {}
     if protocol == "xahau":
-        content: str = get_feature_lines_from_path(
-            "../src/ripple/protocol/impl/Feature.cpp"
-        )
-        features_json: Dict[str, Any] = parse_xahaud_amendments(content)
+        cpp_path = "../src/ripple/protocol/impl/Feature.cpp"
+        macro_path = "../include/xrpl/protocol/detail/features.macro"
+        path = cpp_path if os.path.exists(cpp_path) else macro_path
+        content: str = get_feature_lines_from_path(cpp_path)
+        features_json: Dict[str, Any] = parse_amendments(content)
     if protocol == "xrpl":
         content: str = get_feature_lines_from_path(
             "../include/xrpl/protocol/detail/features.macro"
         )
-        features_json: Dict[str, Any] = parse_xrpld_amendments(content)
+        features_json: Dict[str, Any] = parse_amendments(content)
 
     if not features_json:
         print(f"{bcolors.RED}❌ No features found{bcolors.END}")

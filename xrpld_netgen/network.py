@@ -42,8 +42,7 @@ from xrpld_netgen.utils.misc import (
 
 from xrpld_netgen.libs.xrpld import (
     update_amendments,
-    parse_xrpld_amendments,
-    parse_xahaud_amendments,
+    parse_amendments,
     get_feature_lines_from_content,
     get_feature_lines_from_path,
 )
@@ -183,14 +182,8 @@ def create_node_folders(
 
         # For local networks, always use features from local source (matches the binary)
         # feature_content is already a list of lines from get_feature_lines_from_path
-        if protocol == "xahau":
-            features_json: Dict[str, Any] = parse_xahaud_amendments(feature_content)
-        elif protocol == "xrpl":
-            features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
-        else:
-            features_json: Any = read_json(
-                f"{package_dir}/default.{protocol}.features.json"
-            )
+        if protocol in ("xahau", "xrpl"):
+            features_json: Dict[str, Any] = parse_amendments(feature_content)
 
         # Only enable all amendments in genesis if requested
         if not enable_all:
@@ -298,10 +291,8 @@ def create_node_folders(
         features_json: Any = read_json(f"{package_dir}/default.xahau.features.json")
 
         # genesis (enable all features)
-        if protocol == "xahau":
-            features_json: Dict[str, Any] = parse_xahaud_amendments(feature_content)
-        if protocol == "xrpl":
-            features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
+        if protocol in ("xahau", "xrpl"):
+            features_json: Dict[str, Any] = parse_amendments(feature_content)
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -386,7 +377,7 @@ def create_network(
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
         content_bytes = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
+            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
@@ -630,7 +621,7 @@ def create_ansible(
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
         content_bytes = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
+            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
@@ -1033,14 +1024,8 @@ def create_local_node_folders(
         # For local networks, always use features from local source (matches the binary)
         # feature_content is already a list of lines from get_feature_lines_from_path
         # Local networks always enable all amendments in genesis
-        if protocol == "xahau":
-            features_json: Dict[str, Any] = parse_xahaud_amendments(feature_content)
-        elif protocol == "xrpl":
-            features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
-        else:
-            features_json: Any = read_json(
-                f"{package_dir}/default.{protocol}.features.json"
-            )
+        if protocol in ("xahau", "xrpl"):
+            features_json: Dict[str, Any] = parse_amendments(feature_content)
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -1097,10 +1082,8 @@ def create_local_node_folders(
         # For local networks, always use features from local source (matches the binary)
         # feature_content is already a list of lines from get_feature_lines_from_path
         # Local networks always enable all amendments in genesis
-        if protocol == "xahau":
-            features_json: Dict[str, Any] = parse_xahaud_amendments(feature_content)
-        elif protocol == "xrpl":
-            features_json: Dict[str, Any] = parse_xrpld_amendments(feature_content)
+        if protocol in ("xahau", "xrpl"):
+            features_json: Dict[str, Any] = parse_amendments(feature_content)
         else:
             features_json: Any = read_json(
                 f"{package_dir}/default.{protocol}.features.json"
@@ -1154,10 +1137,13 @@ def create_local_network(
     if protocol == "xahau":
         # Look for xahau features file in parent directory (build/../src/...)
         local_path = "../src/ripple/protocol/impl/Feature.cpp"
+        macro_path = "../include/xrpl/protocol/detail/features.macro"
         if os.path.exists(local_path):
             content = get_feature_lines_from_path(local_path)
+        elif os.path.exists(macro_path):
+            content = get_feature_lines_from_path(macro_path)
         else:
-            print(f"{bcolors.RED}Error: Cannot find features file at {local_path}")
+            print(f"{bcolors.RED}Error: Cannot find features file at {local_path} or {macro_path}")
             print(f"Please run this command from your build directory.{bcolors.END}")
             return
 

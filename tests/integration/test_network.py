@@ -20,7 +20,7 @@ logger = logging.getLogger("app")
 
 
 class TestINetGenXahau(BaseTestConfig):
-    def _test_create_xahau_network(cls):
+    def _test_create_xahau_network_feature_cpp(cls):
         create_network(
             "trace",
             "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
@@ -30,6 +30,21 @@ class TestINetGenXahau(BaseTestConfig):
             21465,  # network id
             "https://build.xahau.tech",  # image host
             "2025.5.1-release+1762",  # image name
+            True,
+            3,
+            "rwdb",  # database type
+        )
+
+    def _test_create_xahau_network_feature_macro(cls):
+        create_network(
+            "trace",
+            "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
+            "xahau",  # protocol
+            7,  # num validators
+            1,  # num peers
+            21465,  # network id
+            "https://build.xahau.tech",  # image host
+            "2026.2.25-dev+2906",  # image name
             True,
             3,
             "rwdb",  # database type
