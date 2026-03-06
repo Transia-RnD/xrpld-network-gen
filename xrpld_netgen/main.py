@@ -472,6 +472,8 @@ def create_local_folder(
     if ivl_key:
         vl_config["import_vl_keys"] = [ivl_key]
 
+    db_path: str = "db"
+    log_path: str = "debug.log"
     configs: List[XrpldBuild] = gen_config(
         False,
         protocol,
@@ -488,8 +490,8 @@ def create_local_folder(
         nodedb_type,
         get_node_db_path(nodedb_type, "local"),
         get_relational_db(nodedb_type),
-        "db",
-        "debug.log",
+        db_path,
+        log_path,
         log_level,
         None,
         [],
@@ -500,6 +502,7 @@ def create_local_folder(
         vl_config["ips_fixed"],
     )
     os.makedirs(cfg_path, exist_ok=True)
+    os.makedirs(db_path, exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 

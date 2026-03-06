@@ -54,9 +54,8 @@ load_dotenv()
 
 # Package directory for static resources (genesis files, default features, etc.)
 package_dir = os.path.abspath(os.path.dirname(__file__))
-# Use workspace directory for deployments
-workspace_dir = os.path.join(os.path.dirname(__file__), "..", "workspace")
-basedir = os.path.abspath(workspace_dir)
+# Create network files in workspace relative to where the command is run
+basedir = os.path.abspath(os.path.join(os.getcwd(), "workspace"))
 # Create workspace directory if it doesn't exist
 os.makedirs(basedir, exist_ok=True)
 
