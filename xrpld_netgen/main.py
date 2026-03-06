@@ -7,8 +7,14 @@ import shutil
 import json
 from typing import List, Any, Dict
 
-from xrpld_netgen.rippled_cfg import gen_config, RippledBuild
-from xrpld_netgen.utils.deploy_kit import create_dockerfile, download_binary
+from xrpld_netgen.xrpld_cfg import gen_config, XrpldBuild
+from xrpld_netgen.utils.deploy_kit import (
+    create_dockerfile,
+    download_binary,
+    build_stop_sh,
+    build_start_sh,
+    build_local_start_sh,
+)
 from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
     download_file_at_commit_or_tag,
@@ -19,20 +25,29 @@ from xrpld_netgen.utils.misc import (
     bcolors,
     write_file,
     read_json,
+    get_node_db_path,
+    get_relational_db,
 )
-from xrpld_netgen.libs.rippled import (
+from xrpld_netgen.libs.xrpld import (
     update_amendments,
-    parse_rippled_amendments,
+    parse_amendments,
     get_feature_lines_from_content,
     get_feature_lines_from_path,
 )
 
-basedir = os.path.abspath(os.path.dirname(__file__))
+# Package directory for static resources (deploykit, genesis files,
+# default features, etc.)
+package_dir = os.path.abspath(os.path.dirname(__file__))
+# Use workspace directory for deployments
+workspace_dir = os.path.join(os.path.dirname(__file__), "..", "workspace")
+basedir = os.path.abspath(workspace_dir)
+# Create workspace directory if it doesn't exist
+os.makedirs(basedir, exist_ok=True)
 
 
 def generate_validator_config(protocol: str, network: str) -> str:
     try:
-        config = read_json(f"{basedir}/deploykit/config.json")
+        config = read_json(f"{package_dir}/deploykit/config.json")
         return config[protocol][network]
     except Exception as e:
         print(e)
@@ -45,44 +60,7 @@ deploykit_path: str = ""
 services: Dict[str, Dict] = {}
 
 
-def update_stop_sh(
-    protocol: str,
-    name: str,
-    num_validators: int,
-    num_peers: int,
-    standalone: bool = False,
-    local: bool = False,
-) -> str:
-    stop_sh_content = "#! /bin/bash\n"
-    if num_validators > 0 and num_peers > 0:
-        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
-
-    for i in range(1, num_validators + 1):
-        stop_sh_content += f"rm -r vnode{i}/lib\n"
-        stop_sh_content += f"rm -r vnode{i}/log\n"
-
-    for i in range(1, num_peers + 1):
-        stop_sh_content += f"rm -r pnode{i}/lib\n"
-        stop_sh_content += f"rm -r pnode{i}/log\n"
-
-    if standalone:
-        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
-        stop_sh_content += f"rm -r {protocol}/config\n"
-        stop_sh_content += f"rm -r {protocol}/lib\n"
-        stop_sh_content += f"rm -r {protocol}/log\n"
-        stop_sh_content += f"rm -r {protocol}\n"
-
-    if local:
-        stop_sh_content = (
-            "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
-        )
-        stop_sh_content += "rm -r db\n"
-        stop_sh_content += "rm -r debug.log\n"
-
-    return stop_sh_content
-
-
-def create_standalone_folder(
+def create_xrpl_standalone_folder(
     binary: bool,
     name: str,
     image: str,
@@ -92,7 +70,8 @@ def create_standalone_folder(
     ivl_key: str,
     protocol: str,
     net_type: str,
-    log_level: str,
+    log_level: str = "trace",
+    nodedb_type: str = "NuDB",
 ):
     cfg_path = f"{basedir}/{protocol}-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
@@ -107,7 +86,7 @@ def create_standalone_folder(
     if ivl_key:
         vl_config["import_vl_keys"] = [ivl_key]
 
-    configs: List[RippledBuild] = gen_config(
+    configs: List[XrpldBuild] = gen_config(
         False,
         protocol,
         name,
@@ -120,11 +99,14 @@ def create_standalone_folder(
         peer,
         "huge",
         10000,
-        "/var/lib/rippled/db/nudb",
-        "/var/lib/rippled/db",
-        "/var/log/rippled/debug.log",
+        nodedb_type,
+        get_node_db_path(nodedb_type, "standalone"),
+        get_relational_db(nodedb_type),
+        "/opt/ripple/lib/db",
+        "/opt/ripple/log/debug.log",
         log_level,
         None,
+        [],
         vl_config["validator_list_sites"],
         vl_config["validator_list_keys"],
         vl_config["import_vl_keys"] if protocol == "xahau" else [],
@@ -135,8 +117,8 @@ def create_standalone_folder(
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
-    lines: List[str] = get_feature_lines_from_content(feature_content)
-    features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+    features_json: Dict[str, Any] = parse_amendments(feature_content)
+    print(json.dumps(features_json, indent=4))
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
         f"{basedir}/{protocol}-{name}/genesis.json",
@@ -145,6 +127,7 @@ def create_standalone_folder(
     print(f"✅ {bcolors.CYAN}Updating features")
 
     dockerfile: str = create_dockerfile(
+        False,
         binary,
         name,
         image,
@@ -161,7 +144,7 @@ def create_standalone_folder(
         file.write(dockerfile)
 
     shutil.copyfile(
-        f"{basedir}/deploykit/{protocol}.entrypoint",
+        f"{package_dir}/deploykit/{protocol}.entrypoint",
         f"{basedir}/{protocol}-{name}/entrypoint",
     )
     print(f"✅ {bcolors.CYAN}Building docker container...")
@@ -182,8 +165,8 @@ def create_standalone_folder(
         ],
         "volumes": [
             f"{pwd_str}/{protocol}/config:/etc/opt/ripple",
-            f"{pwd_str}/{protocol}/log:/var/log/rippled",
-            f"{pwd_str}/{protocol}/lib:/var/lib/rippled",
+            f"{pwd_str}/{protocol}/log:/opt/ripple/log",
+            f"{pwd_str}/{protocol}/lib:/opt/ripple/lib",
         ],
         "networks": ["standalone-network"],
     }
@@ -199,16 +182,18 @@ def create_standalone_image(
     build_system: str,
     build_name: str,
     add_ipfs: bool = False,
+    nodedb_type: str = "NuDB",
 ) -> None:
     name: str = build_name
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
     owner = "XRPLF"
     repo = "rippled"
-    content: str = download_file_at_commit_or_tag(
-        owner, repo, build_name, "src/ripple/protocol/impl/Feature.cpp"
+    content_bytes = download_file_at_commit_or_tag(
+        owner, repo, build_name, "include/xrpl/protocol/detail/features.macro"
     )
-    image: str = f"{build_system}/rippled:{build_name}"
-    create_standalone_folder(
+    content = get_feature_lines_from_content(content_bytes)
+    image: str = f"{build_system}/xrpld:{build_name}"
+    create_xrpl_standalone_folder(
         False,
         name,
         image,
@@ -219,6 +204,7 @@ def create_standalone_image(
         protocol,
         net_type,
         log_level,
+        nodedb_type,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",
@@ -258,18 +244,15 @@ def create_standalone_image(
 
     write_file(
         f"{basedir}/{protocol}-{name}/start.sh",
-        f"""\
-#! /bin/bash
-docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml up --build --force-recreate -d
-""",  # noqa: E501
+        build_start_sh(basedir, protocol, name),  # noqa: E501
     )
     os.chmod(f"{basedir}/{protocol}-{name}/start.sh", 0o755)
-    stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, True)
+    stop_sh_content: str = build_stop_sh(basedir, protocol, name, 0, 0, True)
     write_file(f"{basedir}/{protocol}-{name}/stop.sh", stop_sh_content)
     os.chmod(f"{basedir}/{protocol}-{name}/stop.sh", 0o755)
 
 
-def create_binary_folder(
+def create_xahau_standalone_folder(
     binary: bool,
     name: str,
     image: str,
@@ -279,7 +262,8 @@ def create_binary_folder(
     ivl_key: str,
     protocol: str,
     net_type: str,
-    log_level: str,
+    log_level: str = "trace",
+    nodedb_type: str = "NuDB",
 ):
     cfg_path = f"{basedir}/{protocol}-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
@@ -294,7 +278,7 @@ def create_binary_folder(
     if ivl_key:
         vl_config["import_vl_keys"] = [ivl_key]
 
-    configs: List[RippledBuild] = gen_config(
+    configs: List[XrpldBuild] = gen_config(
         False,
         protocol,
         name,
@@ -307,11 +291,14 @@ def create_binary_folder(
         peer,
         "huge",
         10000,
-        "/var/lib/rippled/db/nudb",
-        "/var/lib/rippled/db",
-        "/var/log/rippled/debug.log",
+        nodedb_type,
+        get_node_db_path(nodedb_type, "standalone"),
+        get_relational_db(nodedb_type),
+        "/opt/ripple/lib/db",
+        "/opt/ripple/log/debug.log",
         log_level,
         None,
+        [],
         vl_config["validator_list_sites"],
         vl_config["validator_list_keys"],
         vl_config["import_vl_keys"] if protocol == "xahau" else [],
@@ -322,8 +309,7 @@ def create_binary_folder(
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
-    lines: List[str] = get_feature_lines_from_content(feature_content)
-    features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+    features_json: Dict[str, Any] = parse_amendments(feature_content)
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
         f"{basedir}/{protocol}-{name}/genesis.json",
@@ -334,6 +320,7 @@ def create_binary_folder(
     #     print(f"{bcolors.GREEN}feature: {bcolors.BLUE}{k}")
 
     dockerfile: str = create_dockerfile(
+        False,
         binary,
         name,
         image,
@@ -350,7 +337,7 @@ def create_binary_folder(
         file.write(dockerfile)
 
     shutil.copyfile(
-        f"{basedir}/deploykit/{protocol}.entrypoint",
+        f"{package_dir}/deploykit/{protocol}.entrypoint",
         f"{basedir}/{protocol}-{name}/entrypoint",
     )
     print(f"✅ {bcolors.CYAN}Building docker container...")
@@ -371,8 +358,8 @@ def create_binary_folder(
         ],
         "volumes": [
             f"{pwd_str}/{protocol}/config:/etc/opt/ripple",
-            f"{pwd_str}/{protocol}/log:/var/log/rippled",
-            f"{pwd_str}/{protocol}/lib:/var/lib/rippled",
+            f"{pwd_str}/{protocol}/log:/opt/ripple/log",
+            f"{pwd_str}/{protocol}/lib:/opt/ripple/lib",
         ],
         "networks": ["standalone-network"],
     }
@@ -388,6 +375,7 @@ def create_standalone_binary(
     build_server: str,
     build_version: str,
     add_ipfs: bool = False,
+    nodedb_type: str = "NuDB",
 ) -> None:
     name: str = build_version
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
@@ -395,13 +383,14 @@ def create_standalone_binary(
     owner = "Xahau"
     repo = "xahaud"
     commit_hash = get_commit_hash_from_server_version(build_server, build_version)
-    content: str = download_file_at_commit_or_tag(
-        owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
+    content_bytes = download_file_at_commit_or_tag(
+        owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
     )
+    content = get_feature_lines_from_content(content_bytes)
     url: str = f"{build_server}/{build_version}"
-    download_binary(url, f"{basedir}/{protocol}-{name}/rippled.{name}")
+    download_binary(url, f"{basedir}/{protocol}-{name}/xrpld.{name}")
     image: str = "ubuntu:jammy"
-    create_binary_folder(
+    create_xahau_standalone_folder(
         True,
         name,
         image,
@@ -412,6 +401,7 @@ def create_standalone_binary(
         protocol,
         net_type,
         log_level,
+        nodedb_type,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",
@@ -451,13 +441,10 @@ def create_standalone_binary(
 
     write_file(
         f"{basedir}/{protocol}-{name}/start.sh",
-        f"""\
-#! /bin/bash
-docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml up --build --force-recreate -d
-""",  # noqa: E501
+        build_start_sh(basedir, protocol, name),  # noqa: E501
     )
     os.chmod(f"{basedir}/{protocol}-{name}/start.sh", 0o755)
-    stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, True)
+    stop_sh_content: str = build_stop_sh(basedir, protocol, name, 0, 0, True)
     write_file(f"{basedir}/{protocol}-{name}/stop.sh", stop_sh_content)
     os.chmod(f"{basedir}/{protocol}-{name}/stop.sh", 0o755)
 
@@ -469,7 +456,8 @@ def create_local_folder(
     ivl_key: str,
     protocol: str,
     net_type: str,
-    log_level: str,
+    log_level: str = "trace",
+    nodedb_type: str = "NuDB",
 ):
     cfg_path = "config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
@@ -484,7 +472,9 @@ def create_local_folder(
     if ivl_key:
         vl_config["import_vl_keys"] = [ivl_key]
 
-    configs: List[RippledBuild] = gen_config(
+    db_path: str = "db"
+    log_path: str = "debug.log"
+    configs: List[XrpldBuild] = gen_config(
         False,
         protocol,
         name,
@@ -497,11 +487,14 @@ def create_local_folder(
         peer,
         "huge",
         10000,
-        "db/nudb",
-        "db",
-        "debug.log",
+        nodedb_type,
+        get_node_db_path(nodedb_type, "local"),
+        get_relational_db(nodedb_type),
+        db_path,
+        log_path,
         log_level,
         None,
+        [],
         vl_config["validator_list_sites"],
         vl_config["validator_list_keys"],
         vl_config["import_vl_keys"] if protocol == "xahau" else [],
@@ -509,18 +502,27 @@ def create_local_folder(
         vl_config["ips_fixed"],
     )
     os.makedirs(cfg_path, exist_ok=True)
+    os.makedirs(db_path, exist_ok=True)
     save_local_config(cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
+    features_json: Dict[str, Any] = {}
     if protocol == "xahau":
-        content: str = get_feature_lines_from_path(
-            "../src/ripple/protocol/impl/Feature.cpp"
-        )
+        cpp_path = "../src/ripple/protocol/impl/Feature.cpp"
+        macro_path = "../include/xrpl/protocol/detail/features.macro"
+        path = cpp_path if os.path.exists(cpp_path) else macro_path
+        content: str = get_feature_lines_from_path(cpp_path)
+        features_json: Dict[str, Any] = parse_amendments(content)
     if protocol == "xrpl":
         content: str = get_feature_lines_from_path(
-            "../src/libxrpl/protocol/Feature.cpp"
+            "../include/xrpl/protocol/detail/features.macro"
         )
-    features_json: Dict[str, Any] = parse_rippled_amendments(content)
+        features_json: Dict[str, Any] = parse_amendments(content)
+
+    if not features_json:
+        print(f"{bcolors.RED}❌ No features found{bcolors.END}")
+        return
+
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
         f"{cfg_path}/genesis.json",
@@ -536,6 +538,7 @@ def start_local(
     protocol: str,
     net_type: str,
     network_id: int,
+    nodedb_type: str,
 ) -> None:
     name: str = "local"
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
@@ -547,6 +550,7 @@ def start_local(
         protocol,
         net_type,
         log_level,
+        nodedb_type,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",
@@ -570,14 +574,10 @@ def start_local(
 
     write_file(
         "start.sh",
-        f"""\
-#! /bin/bash
-docker compose -f docker-compose.yml up --build --force-recreate -d
-./rippled {'-a' if net_type == 'standalone' else ''} --conf config/rippled.cfg --ledgerfile config/genesis.json
-""",  # noqa: E501
+        build_local_start_sh(net_type),  # noqa: E501
     )
     os.chmod("start.sh", 0o755)
-    stop_sh_content: str = update_stop_sh(protocol, name, 0, 0, False, True)
+    stop_sh_content: str = build_stop_sh(basedir, protocol, name, 0, 0, False, True)
     write_file("stop.sh", stop_sh_content)
     os.chmod("stop.sh", 0o755)
     import sys
@@ -592,7 +592,8 @@ docker compose -f docker-compose.yml up --build --force-recreate -d
         )
         if result.returncode == 0:
             print(
-                f"{bcolors.CYAN}{protocol.capitalize()} local running at: {bcolors.PURPLE}6006 {bcolors.END}"
+                f"{bcolors.CYAN}{protocol.capitalize()} local running at: "
+                f"{bcolors.PURPLE}6006 {bcolors.END}"
             )
             print(f"{bcolors.CYAN}Explorer running / starting container{bcolors.END}")
             print(f"Listening at: {bcolors.PURPLE}http://localhost:4000{bcolors.END}")
@@ -601,6 +602,7 @@ docker compose -f docker-compose.yml up --build --force-recreate -d
             sys.exit(1)
     except subprocess.CalledProcessError:
         print(
-            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. Is the docker daemon running?{bcolors.END}"
+            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. "
+            f"Is the docker daemon running?{bcolors.END}"
         )
         sys.exit(1)

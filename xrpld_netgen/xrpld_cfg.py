@@ -7,13 +7,13 @@ from dataclasses import dataclass
 
 
 @dataclass
-class RippledBuild:
+class XrpldBuild:
     name: str
     path: str
     data: str
 
 
-def generate_rippled_cfg(
+def generate_xrpld_cfg(
     build_path: str,
     node_index: int,
     network: int,
@@ -34,7 +34,9 @@ def generate_rippled_cfg(
     crt_path: str,
     size_node: str,
     num_ledgers: str,
-    nudb_path: str,
+    nodedb_type: str,
+    nodedb_path: str,
+    relational_db: str,
     db_path: str,
     debug_path: str,
     log_level: str,
@@ -65,12 +67,16 @@ def generate_rippled_cfg(
     maximum_txn_per_account: int = 100000,
     minimum_last_ledger_buffer: int = 2,
     zero_basefee_transaction_feelevel: int = 256000,
-    workers: int = 6,
-    io_workers: int = 2,
-    prefetch_workers: int = 4,
+    workers: int = 10,
+    io_workers: int = 10,
+    prefetch_workers: int = 10,
     send_queue_limit: int = 65535,
 ):
     try:
+        account_reserve = 1000000
+        owner_reserve = 200000
+        reference_fee = 10
+
         node_config_path: str = build_path + "/config"
 
         cfg_out: str = ""
@@ -155,12 +161,17 @@ def generate_rippled_cfg(
         cfg_out += "\n"
 
         cfg_out += "[node_db]" + "\n"
-        cfg_out += "type=NuDB" + "\n"
-        cfg_out += f"path={nudb_path}" + "\n"
+        cfg_out += f"type={nodedb_type}" + "\n"
+        cfg_out += f"path={nodedb_path}" + "\n"
         if num_ledgers:
             cfg_out += "advisory_delete=0" + "\n"
             cfg_out += f"online_delete={num_ledgers}" + "\n"
         cfg_out += "\n"
+
+        if relational_db:
+            cfg_out += "[relational_db]" + "\n"
+            cfg_out += f"{relational_db}" + "\n"
+            cfg_out += "\n"
 
         fee_account_reserve: int = 5000000
         cfg_out += "[fee_account_reserve]" + "\n"
@@ -310,6 +321,12 @@ def generate_rippled_cfg(
             for k, v in amendments_dict.items():
                 cfg_out += f"{v}" + " " + f"{k}" + "\n"
 
+        cfg_out += "\n"
+        cfg_out += "[voting]" + "\n"
+        cfg_out += f"account_reserve = {account_reserve}" + "\n"
+        cfg_out += f"owner_reserve = {owner_reserve}" + "\n"
+        cfg_out += f"reference_fee = {reference_fee}" + "\n"
+
         validators_out: str = ""
         if genesis:
             validators_out += "[validators]" + "\n"
@@ -333,11 +350,9 @@ def generate_rippled_cfg(
                 validators_out += "    " + vk + "\n"
 
         return [
-            RippledBuild("cfg", f"{node_config_path}/rippled.cfg", cfg_out),
-            RippledBuild("vl", f"{node_config_path}/validators.txt", validators_out),
-            RippledBuild(
-                "docker", f"{node_config_path}/validators.txt", validators_out
-            ),
+            XrpldBuild("cfg", f"{node_config_path}/xrpld.cfg", cfg_out),
+            XrpldBuild("vl", f"{node_config_path}/validators.txt", validators_out),
+            XrpldBuild("docker", f"{node_config_path}/validators.txt", validators_out),
         ]
 
     except Exception as e:
@@ -361,7 +376,9 @@ def generate_rippled_cfg(
         print(key_path)
         print(crt_path)
         print(size_node)
-        print(nudb_path)
+        print(nodedb_type)
+        print(nodedb_path)
+        print(relational_db)
         print(db_path)
         print(num_ledgers)
         print(debug_path)
@@ -401,7 +418,9 @@ def gen_config(
     peer: int,
     size_node: str,
     num_ledgers: int,
-    nudb_path: str,
+    nodedb_type: str,
+    nodedb_path: str,
+    relational_db: str,
     db_path: str,
     debug_path: str,
     log_level: str,
@@ -412,14 +431,14 @@ def gen_config(
     ivl_keys: List[str],
     ips_urls: List[str] = [],
     ips_fixed_urls: List[str] = [],
-) -> List[RippledBuild]:
-    configs: List[RippledBuild] = generate_rippled_cfg(
+) -> List[XrpldBuild]:
+    configs: List[XrpldBuild] = generate_xrpld_cfg(
         # App
         build_path="/",
         node_index=index,
         network=name,
         network_id=network_id,
-        # Rippled
+        # Xrpld
         is_rpc_public=True,
         rpc_public_port=rpc_public,
         is_rpc_admin=True,
@@ -437,7 +456,9 @@ def gen_config(
         crt_path=None,
         size_node=size_node,
         num_ledgers=num_ledgers,
-        nudb_path=nudb_path,
+        nodedb_type=nodedb_type,
+        nodedb_path=nodedb_path,
+        relational_db=relational_db,
         db_path=db_path,
         debug_path=debug_path,
         log_level=log_level,

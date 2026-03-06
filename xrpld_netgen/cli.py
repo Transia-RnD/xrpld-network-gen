@@ -12,19 +12,19 @@
 # xrpld-netgen update:version --node --version xrpld-2023.11.10-dev+549
 # enable:amendment
 # xrpld-netgen enable:amendment --peer 1 --amendment "name"
-# start
-# xrpld-netgen start --name xrpld-2023.11.10-dev+549
-# stop
-# xrpld-netgen stop --name xrpld-2023.11.10-dev+549
+# up
+# xrpld-netgen up --name xrpld-2023.11.10-dev+549
+# down
+# xrpld-netgen down --name xrpld-2023.11.10-dev+549
 # remove
 # xrpld-netgen remove --name xrpld-2023.11.10-dev+549
 
 
 # LOCAL
-# start:local
-# xrpld-netgen start:local --protocol "xahau"
-# stop:local
-# xrpld-netgen stop:local --protocol "xahau"
+# up:local
+# xrpld-netgen up:local --protocol "xahau"
+# down:local
+# xrpld-netgen down:local --protocol "xahau"
 
 
 # STANDALONE
@@ -35,6 +35,7 @@
 
 
 import os
+import shutil
 import argparse
 from xrpld_netgen.main import (
     create_standalone_binary,
@@ -43,6 +44,7 @@ from xrpld_netgen.main import (
 )
 from xrpld_netgen.network import (
     create_network,
+    create_local_network,
     update_node_binary,
     enable_node_amendment,
 )
@@ -54,12 +56,17 @@ from xrpld_netgen.utils.misc import (
     run_start,
     run_stop,
     run_logs,
+    run_local_logs,
+    run_command,
 )
 
-basedir = os.path.abspath(os.path.dirname(__file__))
+package_dir = os.path.abspath(os.path.dirname(__file__))
+workspace_dir = os.path.join(os.path.dirname(__file__), "..", "workspace")
+basedir = os.path.abspath(workspace_dir)
+os.makedirs(basedir, exist_ok=True)
 
-XAHAU_RELEASE: str = "2024.4.21-release+858"
-XRPL_RELEASE: str = "2.0.0-b4"
+XAHAU_RELEASE: str = "2025.7.9-release+1951"
+XRPL_RELEASE: str = "3.1.1"
 
 
 def main():
@@ -69,12 +76,20 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
 
     # LOGS
-    # logs:hooks
-    subparsers.add_parser("logs:hooks", help="Log Hooks")
+    # logs:local
+    parser_ll = subparsers.add_parser("logs:local", help="Logs Local Network")
+    parser_ll.add_argument(
+        "--node",
+        required=False,
+        help="The node to view logs for (e.g., vnode1, vnode2, pnode1)",
+        default=None,
+    )
+    # logs:standalone
+    subparsers.add_parser("logs:standalone", help="Logs Standalone")
 
     # LOCAL
-    # start:local
-    parser_sl = subparsers.add_parser("start:local", help="Start Local Network")
+    # up:local
+    parser_sl = subparsers.add_parser("up:local", help="Start Local Network")
     parser_sl.add_argument(
         "--log_level",
         required=False,
@@ -104,8 +119,16 @@ def main():
     parser_sl.add_argument(
         "--network_id", type=int, required=False, help="The network id", default=21339
     )
-    # stop:local
-    # parser_spl = subparsers.add_parser("stop:local", help="Stop Local Network")
+    parser_sl.add_argument(
+        "--nodedb_type",
+        type=str,
+        required=False,
+        help="The node db",
+        choices=["Memory", "NuDB"],
+        default="NuDB",
+    )
+    # down:local
+    # parser_spl = subparsers.add_parser("down:local", help="Stop Local Network")
 
     # NETWORK
 
@@ -171,6 +194,27 @@ def main():
         required=False,
         help="The quorum required for the network",
     )
+    parser_cn.add_argument(
+        "--nodedb_type",
+        type=str,
+        required=False,
+        help="The node db for the network",
+        choices=["Memory", "NuDB"],
+        default="NuDB",
+    )
+    parser_cn.add_argument(
+        "--local",
+        action="store_true",
+        required=False,
+        help="Create a local network without Docker (nodes run natively)",
+    )
+    parser_cn.add_argument(
+        "--binary_name",
+        type=str,
+        required=False,
+        help="The name of the xrpld binary for local networks (default: xrpld)",
+        default="xrpld",
+    )
     # update:node
     parser_un = subparsers.add_parser("update:node", help="Update Node Version")
     parser_un.add_argument(
@@ -218,11 +262,11 @@ def main():
         choices=["validator", "peer"],
     )
 
-    # start
-    parser_st = subparsers.add_parser("start", help="Start Network")
+    # up
+    parser_st = subparsers.add_parser("up", help="Start Network")
     parser_st.add_argument("--name", required=True, help="The name of the network")
-    # stop
-    parser_sp = subparsers.add_parser("stop", help="Stop Network")
+    # down
+    parser_sp = subparsers.add_parser("down", help="Stop Network")
     parser_sp.add_argument("--name", required=True, help="The name of the network")
 
     # remove
@@ -293,6 +337,17 @@ def main():
     parser_us.add_argument(
         "--ipfs", type=bool, required=False, help="Add an IPFS server", default=False
     )
+    parser_us.add_argument(
+        "--deploy", type=bool, required=False, help="Deploy to Docker", default=False
+    )
+    parser_us.add_argument(
+        "--nodedb_type",
+        type=str,
+        required=False,
+        help="The node db",
+        choices=["Memory", "NuDB"],
+        default="NuDB",
+    )
     # down:standalone
     parser_ds = subparsers.add_parser("down:standalone", help="Down Standalone")
     parser_ds.add_argument("--name", required=False, help="The name of the network")
@@ -313,10 +368,14 @@ def main():
     args = parser.parse_args()
 
     # LOGS
-    if args.command == "logs:hooks":
+    if args.command == "logs:local":
+        NODE = args.node
+        return run_local_logs(NODE)
+
+    if args.command == "logs:standalone":
         return run_logs()
 
-    if args.command == "stop":
+    if args.command == "down":
         NAME = args.name
         print(f"{bcolors.BLUE}Stopping Network: {NAME}{bcolors.END}")
         return run_stop(f"{basedir}/{NAME}/stop.sh")
@@ -330,7 +389,8 @@ def main():
     if args.command == "down:standalone":
         NAME = args.name
         print(
-            f"{bcolors.BLUE}Taking Down Standalone Network with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Taking Down Standalone Network "
+            f"with the following parameters:{bcolors.END}"
         )
 
         if NAME:
@@ -354,7 +414,7 @@ def main():
         return run_stop([f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/stop.sh"])
 
     # MANAGE NETWORK/STANDALONE
-    if args.command == "start":
+    if args.command == "up":
         NAME = args.name
         print(f"{bcolors.BLUE}Starting Network: {NAME}{bcolors.END}")
         return run_start(
@@ -365,14 +425,14 @@ def main():
         )
 
     print("")
-    print("   _  __ ____  ____  __    ____     _   __     __  ______          ")
-    print("  | |/ // __ \/ __ \/ /   / __ \   / | / /__  / /_/ ____/__  ____  ")
-    print("  |   // /_/ / /_/ / /   / / / /  /  |/ / _ \/ __/ / __/ _ \/ __ \ ")
-    print(" /   |/ _, _/ ____/ /___/ /_/ /  / /|  /  __/ /_/ /_/ /  __/ / / / ")
-    print("/_/|_/_/ |_/_/   /_____/_____/  /_/ |_/\___/\__/\____/\___/_/ /_/  ")
+    print("   _  __ ____  ____  __    ____     _   __     __  ______          ")  # noqa: W605, E501
+    print("  | |/ // __ \\/ __ \\/ /   / __ \\   / | / /__  / /_/ ____/__  ____  ")  # noqa: W605, E501
+    print("  |   // /_/ / /_/ / /   / / / /  /  |/ / _ \\/ __/ / __/ _ \\/ __ \\ ")  # noqa: W605, E501
+    print(" /   |/ _, _/ ____/ /___/ /_/ /  / /|  /  __/ /_/ /_/ /  __/ / / / ")  # noqa: W605, E501
+    print("/_/|_/_/ |_/_/   /_____/_____/  /_/ |_/\\___/\\__/\\____/\\___/_/ /_/  ")  # noqa: W605, E501
     print("")
 
-    check_deps([f"{basedir}/deploykit/prerequisites.sh"])
+    check_deps([f"{package_dir}/deploykit/prerequisites.sh"])
 
     print(f"{bcolors.BLUE}Removing existing containers: {bcolors.RED}")
     remove_containers("docker stop xahau")
@@ -383,16 +443,18 @@ def main():
     remove_containers("docker rm xrpl")
 
     # LOCAL
-    if args.command == "start:local":
+    if args.command == "up:local":
         LOG_LEVEL = args.log_level
         PUBLIC_KEY = args.public_key
         IMPORT_KEY = args.import_key
         PROTOCOL = args.protocol
         NETWORK_TYPE = args.network_type
         NETWORK_ID = args.network_id
+        NODEDB_TYPE = args.nodedb_type
 
         print(
-            f"{bcolors.BLUE}Starting Local Network with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Starting Local Network "
+            f"with the following parameters:{bcolors.END}"
         )
         print(f"    - Log Level: {LOG_LEVEL}")
         print(f"    - Public Key: {PUBLIC_KEY}")
@@ -400,12 +462,19 @@ def main():
         print(f"    - Protocol: {PROTOCOL}")
         print(f"    - Network Type: {NETWORK_TYPE}")
         print(f"    - Network ID: {NETWORK_ID}")
+        print(f"    - Node DB: {NODEDB_TYPE}")
 
         start_local(
-            LOG_LEVEL, PUBLIC_KEY, IMPORT_KEY, PROTOCOL, NETWORK_TYPE, NETWORK_ID
+            LOG_LEVEL,
+            PUBLIC_KEY,
+            IMPORT_KEY,
+            PROTOCOL,
+            NETWORK_TYPE,
+            NETWORK_ID,
+            NODEDB_TYPE,
         )
 
-    if args.command == "stop:local":
+    if args.command == "down:local":
         print(f"{bcolors.BLUE}Stopping Local Network{bcolors.END}")
         run_stop(["./stop.sh"])
 
@@ -420,22 +489,45 @@ def main():
         BUILD_VERSION = args.build_version
         GENESIS = args.genesis
         QUORUM = args.quorum
+        NODEDB_TYPE = args.nodedb_type
+        LOCAL = args.local
+        BINARY_NAME = args.binary_name
 
         import_vl_key: str = (
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
         )
 
-        if not BUILD_SERVER:
-            BUILD_SERVER: str = "https://build.xahau.tech"
+        # Set defaults for xahau
+        if PROTOCOL == "xahau":
+            if not BUILD_SERVER:
+                BUILD_SERVER = "https://build.xahau.tech"
+            if not BUILD_VERSION:
+                BUILD_VERSION = XAHAU_RELEASE
+            if not NETWORK_ID:
+                NETWORK_ID = 21339
 
-        if not BUILD_VERSION:
-            BUILD_VERSION: str = XAHAU_RELEASE
+        # Set defaults for xrpl
+        if PROTOCOL == "xrpl":
+            if LOCAL:
+                # For local networks, use GitHub URL
+                if not BUILD_SERVER:
+                    BUILD_SERVER = "https://github.com/XRPLF/xrpld/tree"
+            else:
+                # For Docker networks, use build server
+                if not BUILD_SERVER:
+                    BUILD_SERVER = "https://build.xahau.tech"
+            if not BUILD_VERSION:
+                BUILD_VERSION = XRPL_RELEASE
+            if not NETWORK_ID:
+                NETWORK_ID = 21337
 
         if not QUORUM:
             QUORUM = NUM_VALIDATORS - 1
 
+        network_type = "Local Network" if LOCAL else "Network"
         print(
-            f"{bcolors.BLUE}Creating Network with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Creating {network_type} "
+            f"with the following parameters:{bcolors.END}"
         )
         print(f"    - Log Level: {LOG_LEVEL}")
         print(f"    - Protocol: {PROTOCOL}")
@@ -446,19 +538,42 @@ def main():
         print(f"    - Build Version: {BUILD_VERSION}")
         print(f"    - Genesis: {GENESIS}")
         print(f"    - Quorum: {QUORUM}")
+        print(f"    - Node DB: {NODEDB_TYPE}")
+        if LOCAL:
+            print(f"    - Binary Name: {BINARY_NAME}")
+            print("    - Deployment: Local (native processes, no Docker for nodes)")
 
-        create_network(
-            LOG_LEVEL,
-            import_vl_key,
-            PROTOCOL,
-            NUM_VALIDATORS,
-            NUM_PEERS,
-            NETWORK_ID,
-            BUILD_SERVER,
-            BUILD_VERSION,
-            GENESIS,
-            QUORUM,
-        )
+        if LOCAL:
+            # Create local network without Docker
+            create_local_network(
+                LOG_LEVEL,
+                import_vl_key,
+                PROTOCOL,
+                NUM_VALIDATORS,
+                NUM_PEERS,
+                NETWORK_ID,
+                BUILD_SERVER,
+                BUILD_VERSION,
+                BINARY_NAME,
+                GENESIS,
+                QUORUM,
+                NODEDB_TYPE,
+            )
+        else:
+            # Create traditional Docker-based network
+            create_network(
+                LOG_LEVEL,
+                import_vl_key,
+                PROTOCOL,
+                NUM_VALIDATORS,
+                NUM_PEERS,
+                NETWORK_ID,
+                BUILD_SERVER,
+                BUILD_VERSION,
+                GENESIS,
+                QUORUM,
+                NODEDB_TYPE,
+            )
 
     if args.command == "update:node":
         NAME = args.name
@@ -467,7 +582,8 @@ def main():
         BUILD_SERVER = args.build_server
         BUILD_VERSION = args.build_version
         print(
-            f"{bcolors.BLUE}Updating Node Version with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Updating Node Version "
+            f"with the following parameters:{bcolors.END}"
         )
         print(f"    - Network Name: {NAME}")
         print(f"    - Node ID: {NODE_ID}")
@@ -482,7 +598,8 @@ def main():
         NODE_ID = args.node_id
         NODE_VERSION = args.node_version
         print(
-            f"{bcolors.BLUE}Enabling Amendment with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Enabling Amendment "
+            f"with the following parameters:{bcolors.END}"
         )
         print(f"    - Network Name: {NAME}")
         print(f"    - Amendment Name: {AMENDMENT_NAME}")
@@ -502,6 +619,8 @@ def main():
         BUILD_SERVER = args.server
         BUILD_VERSION = args.version
         IPFS_SERVER = args.ipfs
+        DOCKER_DEPLOY = args.deploy
+        NODEDB_TYPE = args.nodedb_type
 
         if PROTOCOL == "xahau" and not IMPORT_KEY:
             IMPORT_KEY: str = (
@@ -524,7 +643,8 @@ def main():
             BUILD_VERSION: str = XRPL_RELEASE
 
         print(
-            f"{bcolors.BLUE}Setting Up Standalone Network with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Setting Up Standalone Network "
+            f"with the following parameters:{bcolors.END}"
         )
         print(f"    - Log Level: {LOG_LEVEL}")
         print(f"    - Build Type: {BUILD_TYPE}")
@@ -536,6 +656,8 @@ def main():
         print(f"    - Build Server: {BUILD_SERVER}")
         print(f"    - Build Version: {BUILD_VERSION}")
         print(f"    - IPFS Server: {IPFS_SERVER}")
+        print(f"    - Docker Deploy: {DOCKER_DEPLOY}")
+        print(f"    - Node DB: {NODEDB_TYPE}")
 
         if BUILD_TYPE == "image":
             create_standalone_image(
@@ -548,6 +670,7 @@ def main():
                 BUILD_SERVER,
                 BUILD_VERSION,
                 IPFS_SERVER,
+                NODEDB_TYPE,
             )
         else:
             create_standalone_binary(
@@ -560,7 +683,27 @@ def main():
                 BUILD_SERVER,
                 BUILD_VERSION,
                 IPFS_SERVER,
+                NODEDB_TYPE,
             )
+
+        if DOCKER_DEPLOY:
+            if PROTOCOL == "xrpl":
+                raise Exception("Docker Deploy not supported for XRPL")
+
+            print(f"{bcolors.BLUE}Deploying to Docker{bcolors.END}")
+            shutil.copyfile(
+                f"{package_dir}/deploykit/deploy.xahau.dockerfile",
+                f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/deploy.xahau.dockerfile",
+            )
+            run_command(
+                f"{basedir}/{PROTOCOL}-{BUILD_VERSION}",
+                f"docker build --tag transia/xahau:{BUILD_VERSION} .",
+            )
+            run_command(
+                f"{basedir}/{PROTOCOL}-{BUILD_VERSION}",
+                f"docker push transia/xahau:{BUILD_VERSION}",
+            )
+            return
 
         run_start(
             [f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/start.sh"],

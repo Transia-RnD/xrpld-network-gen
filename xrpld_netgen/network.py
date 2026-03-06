@@ -8,7 +8,7 @@ import json
 from typing import List, Any, Dict
 from dotenv import load_dotenv
 
-from xrpld_netgen.rippled_cfg import gen_config, RippledBuild
+from xrpld_netgen.xrpld_cfg import gen_config, XrpldBuild
 from xrpld_netgen.utils.deploy_kit import (
     create_dockerfile,
     copy_file,
@@ -16,13 +16,16 @@ from xrpld_netgen.utils.deploy_kit import (
     update_dockerfile,
     DockerVars,
     create_ansible_vars_file,
+    build_network_stop_sh,
+    build_network_start_sh,
+    build_local_network_start_sh,
+    build_local_network_stop_sh,
 )
 from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
     download_file_at_commit_or_tag,
 )
 from xrpld_netgen.utils.misc import (
-    download_json,
     run_command,
     generate_ports,
     save_local_config,
@@ -33,12 +36,15 @@ from xrpld_netgen.utils.misc import (
     bcolors,
     write_file,
     read_json,
+    get_node_db_path,
+    get_relational_db,
 )
 
-from xrpld_netgen.libs.rippled import (
+from xrpld_netgen.libs.xrpld import (
     update_amendments,
-    parse_rippled_amendments,
+    parse_amendments,
     get_feature_lines_from_content,
+    get_feature_lines_from_path,
 )
 
 from xrpld_publisher.publisher import PublisherClient
@@ -46,14 +52,19 @@ from xrpld_publisher.validator import ValidatorClient
 
 load_dotenv()
 
-basedir = os.path.abspath(os.path.dirname(__file__))
+# Package directory for static resources (genesis files, default features, etc.)
+package_dir = os.path.abspath(os.path.dirname(__file__))
+# Create network files in workspace relative to where the command is run
+basedir = os.path.abspath(os.path.join(os.getcwd(), "workspace"))
+# Create workspace directory if it doesn't exist
+os.makedirs(basedir, exist_ok=True)
 
 deploykit_path: str = ""
 
 
 def generate_validator_config(protocol: str, network: str):
     try:
-        config = read_json(f"{basedir}/deploykit/config.json")
+        config = read_json(f"{package_dir}/deploykit/config.json")
         return config[protocol][network]
     except Exception as e:
         print(e)
@@ -79,7 +90,12 @@ def create_node_folders(
     ansible: bool = False,
     ips: List[str] = [],
     log_level: str = "warning",
+    nodedb_type: str = "NuDB",
 ):
+    # Create cluster directory and keystore inside it
+    cluster_dir = f"{basedir}/{name}-cluster"
+    os.makedirs(cluster_dir, exist_ok=True)
+
     # Create directories for validator nodes
     ips_fixed: List[str] = []
     for i in range(1, num_validators + 1):
@@ -90,21 +106,35 @@ def create_node_folders(
     manifests: List[str] = []
     validators: List[str] = []
     tokens: List[str] = []
-    for i in range(1, num_validators + 1):
-        node_dir = f"vnode{i}"
-        # GENERATE VALIDATOR KEY
-        client = ValidatorClient(node_dir)
-        client.create_keys()
-        client.set_domain(f"xahau.{node_dir}.transia.co")
-        client.create_token()
-        keys = client.get_keys()
-        token = client.read_token()
-        manifest = client.read_manifest()
-        manifests.append(manifest)
-        validators.append(keys["public_key"])
-        tokens.append(token)
 
-    print(f"✅ {bcolors.CYAN}Created validator keys")
+    # Save current directory and change to cluster directory for keystore creation
+    original_dir = os.getcwd()
+    os.chdir(cluster_dir)
+
+    try:
+        for i in range(1, num_validators + 1):
+            node_dir = f"vnode{i}"
+            # GENERATE VALIDATOR KEY
+            client = ValidatorClient(node_dir)
+            key_path = f"keystore/{node_dir}/key.json"
+            if not os.path.exists(key_path):
+                print(f"  Creating new keys for {node_dir}...")
+                client.create_keys()
+                client.set_domain(f"xahau.{node_dir}.transia.co")
+                client.create_token()
+            else:
+                print(f"  Using existing keys for {node_dir}")
+            keys = client.get_keys()
+            token = client.read_token()
+            manifest = client.read_manifest()
+            manifests.append(manifest)
+            validators.append(keys["public_key"])
+            tokens.append(token)
+
+        print(f"✅ {bcolors.CYAN}Validator keys ready")
+    finally:
+        # Change back to original directory
+        os.chdir(original_dir)
 
     for i in range(1, num_validators + 1):
         ips_dir = ips[i - 1] if ansible else f"vnode{i}"
@@ -115,7 +145,7 @@ def create_node_folders(
             i, "validator"
         )
         # GENERATE CONFIG
-        configs: List[RippledBuild] = gen_config(
+        configs: List[XrpldBuild] = gen_config(
             ansible,
             protocol,
             name,
@@ -128,9 +158,11 @@ def create_node_folders(
             peer,
             "huge",
             10000,
-            "/var/lib/rippled/db/nudb",
-            "/var/lib/rippled/db",
-            "/var/log/rippled/debug.log",
+            nodedb_type,
+            get_node_db_path(nodedb_type, "network"),
+            get_relational_db(nodedb_type),
+            "/opt/ripple/lib/db",
+            "/opt/ripple/log/debug.log",
             log_level,
             tokens[i - 1],
             [v for v in validators if v != validators[i - 1]],
@@ -147,13 +179,15 @@ def create_node_folders(
 
         print(f"✅ {bcolors.CYAN}Created validator: {i} config")
 
-        # default features
-        features_json: Any = read_json(f"{basedir}/default.{protocol}.features.json")
+        # For local networks, always use features from local source (matches the binary)
+        # feature_content is already a list of lines from get_feature_lines_from_path
+        if protocol in ("xahau", "xrpl"):
+            features_json: Dict[str, Any] = parse_amendments(feature_content)
 
-        # genesis (enable all features)
-        if enable_all:
-            lines: List[str] = get_feature_lines_from_content(feature_content)
-            features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+        # Only enable all amendments in genesis if requested
+        if not enable_all:
+            # Start with no amendments enabled (will vote for them naturally)
+            features_json = {}
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -168,13 +202,8 @@ def create_node_folders(
 
         print(f"✅ {bcolors.CYAN}Updated validator: {i} features")
 
-        shutil.copyfile(
-            f"{basedir}/{name}-cluster/rippled.{name}",
-            f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
-        )
-        os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
-
         dockerfile: str = create_dockerfile(
+            True,
             binary,
             name,
             image,
@@ -191,13 +220,12 @@ def create_node_folders(
             file.write(dockerfile)
 
         shutil.copyfile(
-            f"{basedir}/deploykit/{protocol}.entrypoint",
+            f"{package_dir}/deploykit/network.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
 
         print(f"✅ {bcolors.CYAN}Built validator: {i} docker container...")
 
-        pwd_str: str = basedir
         services[f"vnode{i}"] = {
             "build": {
                 "context": f"vnode{i}",
@@ -213,8 +241,9 @@ def create_node_folders(
                 f"{peer}:{peer}",
             ],
             "volumes": [
-                f"{pwd_str}/vnode{i}/log:/var/log/rippled",
-                f"{pwd_str}/vnode{i}/lib:/var/lib/rippled",
+                f"./vnode{i}/config:/opt/ripple/config",
+                f"./vnode{i}/log:/opt/ripple/log",
+                f"./vnode{i}/lib:/opt/ripple/lib",
             ],
             "networks": [f"{name}-network"],
         }
@@ -223,7 +252,7 @@ def create_node_folders(
         node_dir = f"pnode{i}"
         cfg_path = f"{basedir}/{name}-cluster/{node_dir}/config"
         rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(i, "peer")
-        configs: List[RippledBuild] = gen_config(
+        configs: List[XrpldBuild] = gen_config(
             ansible,
             protocol,
             name,
@@ -236,9 +265,11 @@ def create_node_folders(
             peer,
             "huge",
             None,
-            "/var/lib/rippled/db/nudb",
-            "/var/lib/rippled/db",
-            "/var/log/rippled/debug.log",
+            nodedb_type,
+            get_node_db_path(nodedb_type, "network"),
+            get_relational_db(nodedb_type),
+            "/opt/ripple/lib/db",
+            "/opt/ripple/log/debug.log",
             log_level,
             None,
             validators,
@@ -256,11 +287,11 @@ def create_node_folders(
         print(f"✅ {bcolors.CYAN}Created peer: {i} config")
 
         # default features
-        features_json: Any = read_json(f"{basedir}/default.xahau.features.json")
+        features_json: Any = read_json(f"{package_dir}/default.xahau.features.json")
 
         # genesis (enable all features)
-        lines: List[str] = get_feature_lines_from_content(feature_content)
-        features_json: Dict[str, Any] = parse_rippled_amendments(lines)
+        if protocol in ("xahau", "xrpl"):
+            features_json: Dict[str, Any] = parse_amendments(feature_content)
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
@@ -275,13 +306,8 @@ def create_node_folders(
 
         print(f"✅ {bcolors.CYAN}Updated peer: {i} features")
 
-        shutil.copyfile(
-            f"{basedir}/{name}-cluster/rippled.{name}",
-            f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}",
-        )
-        os.chmod(f"{basedir}/{name}-cluster/{node_dir}/rippled.{name}", 0o755)
-
         dockerfile: str = create_dockerfile(
+            True,
             binary,
             name,
             image,
@@ -298,13 +324,12 @@ def create_node_folders(
             file.write(dockerfile)
 
         shutil.copyfile(
-            f"{basedir}/deploykit/{protocol}.entrypoint",
+            f"{package_dir}/deploykit/network.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
 
         print(f"✅ {bcolors.CYAN}Built peer: {i} docker container...")
 
-        pwd_str: str = basedir
         services[f"pnode{i}"] = {
             "build": {
                 "context": f"pnode{i}",
@@ -320,62 +345,14 @@ def create_node_folders(
                 f"{peer}:{peer}",
             ],
             "volumes": [
-                f"{pwd_str}/pnode{i}/log:/var/log/rippled",
-                f"{pwd_str}/pnode{i}/lib:/var/lib/rippled",
+                f"./pnode{i}/config:/opt/ripple/config",
+                f"./pnode{i}/log:/opt/ripple/log",
+                f"./pnode{i}/lib:/opt/ripple/lib",
             ],
             "networks": [f"{name}-network"],
         }
 
     return manifests
-
-
-def update_stop_sh(
-    protocol: str,
-    name: str,
-    num_validators: int,
-    num_peers: int,
-    standalone: bool = False,
-    local: bool = False,
-) -> str:
-    stop_sh_content = "#! /bin/bash\n"
-    stop_sh_content += "REMOVE_FLAG=false \n"
-    stop_sh_content += """
-for arg in "$@"; do
-  if [ "$arg" == "--remove" ]; then
-    REMOVE_FLAG=true
-    break
-  fi
-done
-"""
-    stop_sh_content += "\n"
-    stop_sh_content += 'if [ "$REMOVE_FLAG" = true ]; then \n'
-    if num_validators > 0 and num_peers > 0:
-        stop_sh_content += f"docker compose -f {basedir}/{name}-cluster/docker-compose.yml down --remove-orphans\n"  # noqa: E501
-
-    for i in range(1, num_validators + 1):
-        stop_sh_content += f"rm -r {basedir}/{name}-cluster/vnode{i}/lib\n"
-        stop_sh_content += f"rm -r {basedir}/{name}-cluster/vnode{i}/log\n"
-
-    for i in range(1, num_peers + 1):
-        stop_sh_content += f"rm -r {basedir}/{name}-cluster/pnode{i}/lib\n"
-        stop_sh_content += f"rm -r {basedir}/{name}-cluster/pnode{i}/log\n"
-
-    if standalone:
-        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
-        stop_sh_content += f"rm -r {protocol}/config\n"
-        stop_sh_content += f"rm -r {protocol}/lib\n"
-        stop_sh_content += f"rm -r {protocol}/log\n"
-        stop_sh_content += f"rm -r {protocol}\n"
-
-    if local:
-        stop_sh_content = (
-            "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
-        )
-        stop_sh_content += "rm -r db\n"
-        stop_sh_content += "rm -r debug.log\n"
-
-    stop_sh_content += "fi \n"
-    return stop_sh_content
 
 
 def create_network(
@@ -389,6 +366,7 @@ def create_network(
     build_version: str,
     genesis: bool = False,
     quorum: int = None,
+    nodedb_type: str = "NuDB",
 ) -> None:
     if protocol == "xahau":
         name: str = build_version
@@ -397,107 +375,176 @@ def create_network(
         owner = "Xahau"
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
-        content: str = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
+        content_bytes = download_file_at_commit_or_tag(
+            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
         )
+        content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
-        download_binary(url, f"{basedir}/{name}-cluster/rippled.{build_version}")
+        download_binary(url, f"{basedir}/{name}-cluster/xrpld.{build_version}")
         image: str = "ubuntu:jammy"
 
     if protocol == "xrpl":
         if build_server.startswith("https://github.com/"):
-            name: str = build_server.split(
-                "https://github.com/Transia-RnD/rippled/tree/"
-            )[-1]
+            owner: str = build_server.split("https://github.com/")[1].split("/")[0]
+            # Extract branch name from URL (supports both rippled and xrpld repo names)
+            name: str = build_server.split(f"https://github.com/{owner}/")[1]
+            name = name.split("/tree/")[1] if "/tree/" in name else name
+            name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-            owner = "Transia-RnD"
             repo = "rippled"
-            copy_file(f"./rippled", f"{basedir}/{name}-cluster/rippled.{name}")
-            content: str = download_file_at_commit_or_tag(
-                owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
+            copy_file("./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
+            content_bytes = download_file_at_commit_or_tag(
+                owner,
+                repo,
+                build_version,
+                "include/xrpl/protocol/detail/features.macro",
             )
+            content = get_feature_lines_from_content(content_bytes)
             image: str = "ubuntu:jammy"
         else:
             name: str = build_version
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
             owner = "XRPLF"
             repo = "rippled"
-            content: str = download_file_at_commit_or_tag(
+            content_bytes = download_file_at_commit_or_tag(
                 owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
             )
+            content = get_feature_lines_from_content(content_bytes)
             image: str = f"{build_server}/{build_version}"
 
-    client = PublisherClient()
-    client.create_keys()
-    keys = client.get_keys()
-    manifests: List[str] = create_node_folders(
-        True,
-        name,
-        image,
-        content,
-        num_validators,
-        num_peers,
-        network_id,
-        genesis,
-        quorum,
-        keys["publicKey"],
-        import_key,
-        protocol,
-        False,
-        [],
-        log_level,
-    )
+    # Change to cluster directory for VL key creation
+    original_dir = os.getcwd()
+    os.chdir(f"{basedir}/{name}-cluster")
 
-    services["vl"] = {
-        "build": {
-            "context": "vl",
-            "dockerfile": "Dockerfile",
-        },
-        "container_name": "vl",
-        "ports": ["80:80"],
-        "networks": [f"{name}-network"],
-    }
+    try:
+        client = PublisherClient()
+        vl_key_path = "keystore/vl/key.json"
+        vl_eph_path = "keystore/vl/eph.json"
+        vl_manifest_path = "keystore/vl/manifest.txt"
 
-    services["network-explorer"] = {
-        "image": "transia/explorer-main:latest",
-        "container_name": "network-explorer",
-        "environment": [
-            "PORT=4000",
-            f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6006}",
-        ],
-        "ports": ["4000:4000"],
-        "networks": [f"{name}-network"],
-    }
+        # Check if ALL VL files exist and are valid
+        should_regenerate = False
+        if (
+            os.path.exists(vl_key_path)
+            and os.path.exists(vl_eph_path)
+            and os.path.exists(vl_manifest_path)
+        ):
+            try:
+                # Validate that keys are compatible
+                # (not Dilithium or other incompatible formats)
+                keys = client.get_keys()
+                eph_keys = client.get_ephkeys()
+                # Check key format - standard keys should be reasonable length
+                if keys and eph_keys:
+                    pub_key_len = len(keys.get("publicKey", ""))
+                    priv_key_len = len(keys.get("privateKey", ""))
+                    # Standard secp256k1/Ed25519 keys are
+                    # typically 66-68 chars for public,
+                    # 64-66 for private
+                    # Dilithium keys are 2000+ characters
+                    if pub_key_len > 200 or priv_key_len > 200:
+                        print(
+                            "  Detected incompatible VL keys "
+                            "(possibly post-quantum), "
+                            "regenerating..."
+                        )
+                        should_regenerate = True
+                    else:
+                        print("  Using existing VL keys")
+                else:
+                    should_regenerate = True
+            except Exception:
+                print("  VL keys validation failed, regenerating...")
+                should_regenerate = True
+        else:
+            should_regenerate = True
 
-    compose = {
-        "version": "3.9",
-        "services": services,
-        "networks": {f"{name}-network": {"driver": "bridge"}},
-    }
-    with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
-        yaml.dump(compose, f, default_flow_style=False)
+        if should_regenerate:
+            print("  Creating new VL keys...")
+            client.create_keys()
 
-    write_file(
-        f"{basedir}/{name}-cluster/start.sh",
-        f"""\
-#! /bin/bash
-docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force-recreate -d
-""",  # noqa: E501
-    )
-    stop_sh_content: str = update_stop_sh(protocol, name, num_validators, num_peers)
-    write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
+        keys = client.get_keys()
+        manifests: List[str] = create_node_folders(
+            True,
+            name,
+            image,
+            content,
+            num_validators,
+            num_peers,
+            network_id,
+            genesis,
+            quorum,
+            keys["publicKey"],
+            import_key,
+            protocol,
+            False,
+            [],
+            log_level,
+            nodedb_type,
+        )
 
-    os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
-    for manifest in manifests:
-        client.add_validator(manifest)
-    client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
-    shutil.copyfile(
-        f"{basedir}/deploykit/nginx.dockerfile",
-        f"{basedir}/{name}-cluster/vl/Dockerfile",
-    )
+        services["vl"] = {
+            "build": {
+                "context": "vl",
+                "dockerfile": "Dockerfile",
+            },
+            "container_name": "vl",
+            "ports": ["80:80"],
+            "networks": [f"{name}-network"],
+            "healthcheck": {
+                "test": ["CMD", "curl", "-f", "http://localhost/vl.json"],
+                "interval": "5s",
+                "timeout": "3s",
+                "retries": 3,
+                "start_period": "10s",
+            },
+        }
+
+        services["network-explorer"] = {
+            "image": "transia/explorer:latest",
+            "container_name": "network-explorer",
+            "environment": [
+                "PORT=4000",
+                f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6016}",
+            ],
+            "ports": ["4000:4000"],
+            "networks": [f"{name}-network"],
+        }
+
+        compose = {
+            "version": "3.9",
+            "services": services,
+            "networks": {f"{name}-network": {"driver": "bridge"}},
+        }
+        with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
+            yaml.dump(compose, f, default_flow_style=False)
+
+        write_file(
+            f"{basedir}/{name}-cluster/start.sh",
+            build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
+        )
+        stop_sh_content: str = build_network_stop_sh(
+            name,
+            num_validators,
+            num_peers,
+        )
+        write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
+
+        os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
+        for manifest in manifests:
+            client.add_validator(manifest)
+        client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
+        shutil.copyfile(
+            f"{package_dir}/deploykit/nginx.dockerfile",
+            f"{basedir}/{name}-cluster/vl/Dockerfile",
+        )
+    finally:
+        # Change back to original directory
+        os.chdir(original_dir)
 
     os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
     os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
+    os.chmod(f"{basedir}/{name}-cluster/xrpld.{name}", 0o755)
 
 
 def update_node_binary(
@@ -510,12 +557,14 @@ def update_node_binary(
     node_dir: str = f"{'v' if node_type == 'validator' else 'p'}node{node_id}"
     run_command(f"{basedir}/{name}", f"docker-compose stop {node_dir}")
     url: str = f"{build_server}/{new_version}"
-    download_binary(url, f"{basedir}/{name}/rippled.{new_version}")
+    download_binary(url, f"{basedir}/{name}/xrpld.{new_version}")
     shutil.copyfile(
-        f"{basedir}/{name}/rippled.{new_version}",
-        f"{basedir}/{name}/{node_dir}/rippled.{new_version}",
+        f"{basedir}/{name}/xrpld.{new_version}",
+        f"{basedir}/{name}/{node_dir}/xrpld.{new_version}",
     )
-    os.chmod(f"{basedir}/{name}/{node_dir}/rippled.{new_version}", 0o755)
+    # remove the db
+    run_command(f"{basedir}/{name}", f"rm -r {node_dir}/lib")
+    os.chmod(f"{basedir}/{name}/{node_dir}/xrpld.{new_version}", 0o755)
     update_dockerfile(new_version, f"{basedir}/{name}/{node_dir}/Dockerfile")
     run_command(
         f"{basedir}/{name}",
@@ -559,6 +608,7 @@ def create_ansible(
     build_version: str,
     genesis: bool = False,
     quorum: int = None,
+    nodedb_type: str = "NuDB",
     vips: List[str] = [],
     pips: List[str] = [],
 ) -> None:
@@ -569,88 +619,177 @@ def create_ansible(
         owner = "Xahau"
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
-        content: str = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp"
+        content_bytes = download_file_at_commit_or_tag(
+            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
         )
+        content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
-        download_binary(url, f"{basedir}/{name}-cluster/rippled.{build_version}")
+        download_binary(url, f"{basedir}/{name}-cluster/xrpld.{build_version}")
         image: str = "ubuntu:jammy"
 
-    client = PublisherClient()
-    client.create_keys()
-    keys = client.get_keys()
-    manifests: List[str] = create_node_folders(
-        True,
-        name,
-        image,
-        content,
-        num_validators,
-        num_peers,
-        network_id,
-        genesis,
-        quorum,
-        keys["publicKey"],
-        import_key,
-        protocol,
-        True,
-        vips,
-        log_level,
-    )
+    if protocol == "xrpl":
+        if build_server.startswith("https://github.com/"):
+            repo: str = "rippled"
+            owner: str = build_server.split("https://github.com/")[1].split("/")[0]
+            # Extract branch name from URL (supports both rippled and xrpld repo names)
+            name: str = build_server.split(f"https://github.com/{owner}/")[1]
+            name = name.split("/tree/")[1] if "/tree/" in name else name
+            name = name.replace("/", "-")
+            os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+            copy_file("./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
+            content_bytes = download_file_at_commit_or_tag(
+                owner,
+                repo,
+                build_version,
+                "include/xrpl/protocol/detail/features.macro",
+            )
+            content = get_feature_lines_from_content(content_bytes)
+            image: str = "ubuntu:jammy"
+        else:
+            name: str = build_version
+            os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+            owner = "XRPLF"
+            repo = "rippled"
+            content_bytes = download_file_at_commit_or_tag(
+                owner, repo, build_version, "src/libxrpl/protocol/Feature.cpp"
+            )
+            content = get_feature_lines_from_content(content_bytes)
+            image: str = f"{build_server}/{build_version}"
 
-    services["vl"] = {
-        "build": {
-            "context": "vl",
-            "dockerfile": "Dockerfile",
-        },
-        "container_name": "vl",
-        "ports": ["80:80"],
-        "networks": [f"{name}-network"],
-    }
+    # Change to cluster directory for VL key creation
+    original_dir = os.getcwd()
+    os.chdir(f"{basedir}/{name}-cluster")
 
-    services["network-explorer"] = {
-        "image": "transia/explorer-main:latest",
-        "container_name": "network-explorer",
-        "environment": [
-            "PORT=4000",
-        ],
-        "ports": ["4000:4000"],
-        "networks": [f"{name}-network"],
-    }
+    try:
+        client = PublisherClient()
+        vl_key_path = "keystore/vl/key.json"
+        vl_eph_path = "keystore/vl/eph.json"
+        vl_manifest_path = "keystore/vl/manifest.txt"
 
-    compose = {
-        "version": "3.9",
-        "services": services,
-        "networks": {f"{name}-network": {"driver": "bridge"}},
-    }
-    with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
-        yaml.dump(compose, f, default_flow_style=False)
+        # Check if ALL VL files exist and are valid
+        should_regenerate = False
+        if (
+            os.path.exists(vl_key_path)
+            and os.path.exists(vl_eph_path)
+            and os.path.exists(vl_manifest_path)
+        ):
+            try:
+                # Validate that keys are compatible
+                # (not Dilithium or other incompatible formats)
+                keys = client.get_keys()
+                eph_keys = client.get_ephkeys()
+                # Check key format - standard keys should be reasonable length
+                if keys and eph_keys:
+                    pub_key_len = len(keys.get("publicKey", ""))
+                    priv_key_len = len(keys.get("privateKey", ""))
+                    # Standard secp256k1/Ed25519 keys are
+                    # typically 66-68 chars for public,
+                    # 64-66 for private
+                    # Dilithium keys are 2000+ characters
+                    if pub_key_len > 200 or priv_key_len > 200:
+                        print(
+                            "  Detected incompatible VL keys "
+                            "(possibly post-quantum), "
+                            "regenerating..."
+                        )
+                        should_regenerate = True
+                    else:
+                        print("  Using existing VL keys")
+                else:
+                    should_regenerate = True
+            except Exception:
+                print("  VL keys validation failed, regenerating...")
+                should_regenerate = True
+        else:
+            should_regenerate = True
 
-    write_file(
-        f"{basedir}/{name}-cluster/start.sh",
-        f"""\
-#! /bin/bash
-docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force-recreate -d
-""",  # noqa: E501
-    )
-    stop_sh_content: str = update_stop_sh(protocol, name, num_validators, num_peers)
-    write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
+        if should_regenerate:
+            print("  Creating new VL keys...")
+            client.create_keys()
 
-    os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
-    for manifest in manifests:
-        client.add_validator(manifest)
-    client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
-    shutil.copyfile(
-        f"{basedir}/deploykit/nginx.dockerfile",
-        f"{basedir}/{name}-cluster/vl/Dockerfile",
-    )
+        keys = client.get_keys()
+        manifests: List[str] = create_node_folders(
+            True,
+            name,
+            image,
+            content,
+            num_validators,
+            num_peers,
+            network_id,
+            genesis,
+            quorum,
+            keys["publicKey"],
+            import_key,
+            protocol,
+            True,
+            vips,
+            log_level,
+            nodedb_type,
+        )
+
+        services["vl"] = {
+            "build": {
+                "context": "vl",
+                "dockerfile": "Dockerfile",
+            },
+            "container_name": "vl",
+            "ports": ["80:80"],
+            "networks": [f"{name}-network"],
+            "healthcheck": {
+                "test": ["CMD", "curl", "-f", "http://localhost/vl.json"],
+                "interval": "5s",
+                "timeout": "3s",
+                "retries": 3,
+                "start_period": "10s",
+            },
+        }
+
+        services["network-explorer"] = {
+            "image": "transia/explorer-main:latest",
+            "container_name": "network-explorer",
+            "environment": [
+                "PORT=4000",
+            ],
+            "ports": ["4000:4000"],
+            "networks": [f"{name}-network"],
+        }
+
+        compose = {
+            "version": "3.9",
+            "services": services,
+            "networks": {f"{name}-network": {"driver": "bridge"}},
+        }
+        with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
+            yaml.dump(compose, f, default_flow_style=False)
+
+        write_file(
+            f"{basedir}/{name}-cluster/start.sh",
+            build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
+        )
+        stop_sh_content: str = build_network_stop_sh(name, num_validators, num_peers)
+        write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
+
+        os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
+        for manifest in manifests:
+            client.add_validator(manifest)
+        client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
+        shutil.copyfile(
+            f"{package_dir}/deploykit/nginx.dockerfile",
+            f"{basedir}/{name}-cluster/vl/Dockerfile",
+        )
+    finally:
+        # Change back to original directory
+        os.chdir(original_dir)
 
     os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
     os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
+    os.chmod(f"{basedir}/{name}-cluster/xrpld.{name}", 0o755)
 
     os.makedirs(f"{basedir}/{name}-cluster/ansible", exist_ok=True)
     os.makedirs(f"{basedir}/{name}-cluster/ansible/host_vars", exist_ok=True)
+
     shutil.copytree(
-        f"{basedir}/deploykit/ansible",
+        f"{package_dir}/deploykit/ansible",
         f"{basedir}/{name}-cluster/ansible",
         dirs_exist_ok=True,
     )
@@ -663,56 +802,90 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
             c_name: str = v["container_name"]
             ports: List[str] = v["ports"]
             vars = DockerVars(
+                f"{basedir}/{name}-cluster/{c_name}/config/",
                 ssh_port,
+                [
+                    f'RPC_PUBLIC: {ports[0].split(":")[0]}',
+                    f'RPC_ADMIN: {ports[1].split(":")[0]}',
+                    f'WS_PUBLIC: {ports[2].split(":")[0]}',
+                    f'WS_ADMIN: {ports[3].split(":")[0]}',
+                    f'PEER: {ports[4].split(":")[0]}',
+                ],
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
-                f"transia/cluster-{c_name}:{image_name}",
+                f"transia/cluster:{image_name}",
+                "loadnet",
                 c_name,
                 ports,
                 [
-                    "/var/log/rippled:/var/log/rippled",
-                    "/var/lib/rippled:/var/lib/rippled",
+                    "/opt/ripple/config:/opt/ripple/config",
+                    "/opt/ripple/log:/opt/ripple/log",
+                    "/opt/ripple/lib:/opt/ripple/lib",
+                    "/var/lib/xrpld/db:/var/lib/xrpld/db",
                 ],
-                ["/var/log/rippled", "/var/lib/rippled"],
+                [
+                    "/opt/ripple/config",
+                    "/opt/ripple/log",
+                    "/opt/ripple/lib",
+                    "/var/lib/xrpld/db",
+                ],
             )
             create_ansible_vars_file(
                 f"{basedir}/{name}-cluster/ansible/host_vars", vips[index - 1], vars
             )
-            run_command(
-                f"{basedir}/{name}-cluster/{c_name}",
-                f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster-{c_name}:{image_name} .",  # noqa: E501
-            )
-            run_command(
-                f"{basedir}/{name}-cluster/{c_name}",
-                f"docker push transia/cluster-{c_name}:{image_name}",
-            )
+
+        run_command(
+            f"{basedir}/{name}-cluster",
+            f"cp xrpld.{name} {basedir}/{name}-cluster/vnode1",
+        )
+        run_command(
+            f"{basedir}/{name}-cluster/vnode1",
+            "docker build -f Dockerfile --platform linux/x86_64"
+            f" --tag transia/cluster:{image_name} .",
+        )
+        run_command(
+            f"{basedir}/{name}-cluster/vnode1",
+            f"docker push transia/cluster:{image_name}",
+        )
+        run_command(
+            f"{basedir}/{name}-cluster/vnode1",
+            f"rm -r xrpld.{name}",
+        )
         if k[:5] == "pnode":
             index: int = int(k[5:])
             c_name: str = v["container_name"]
             ports: List[str] = v["ports"]
             vars = DockerVars(
+                f"{basedir}/{name}-cluster/{c_name}/config/",
                 ssh_port,
+                [
+                    f'RPC_PUBLIC: {ports[0].split(":")[0]}',
+                    f'RPC_ADMIN: {ports[1].split(":")[0]}',
+                    f'WS_PUBLIC: {ports[2].split(":")[0]}',
+                    f'WS_ADMIN: {ports[3].split(":")[0]}',
+                    f'PEER: {ports[4].split(":")[0]}',
+                ],
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
-                f"transia/cluster-{c_name}:{image_name}",
+                f"transia/cluster:{image_name}",
+                "loadnet",
                 c_name,
                 ports,
                 [
-                    "/var/log/rippled:/var/log/rippled",
-                    "/var/lib/rippled:/var/lib/rippled",
+                    "/opt/ripple/config:/opt/ripple/config",
+                    "/opt/ripple/log:/opt/ripple/log",
+                    "/opt/ripple/lib:/opt/ripple/lib",
+                    "/var/lib/xrpld/db:/var/lib/xrpld/db",
                 ],
-                ["/var/log/rippled", "/var/lib/rippled"],
+                [
+                    "/opt/ripple/config",
+                    "/opt/ripple/log",
+                    "/opt/ripple/lib",
+                    "/var/lib/xrpld/db",
+                ],
             )
             create_ansible_vars_file(
                 f"{basedir}/{name}-cluster/ansible/host_vars", pips[index - 1], vars
-            )
-            run_command(
-                f"{basedir}/{name}-cluster/{c_name}",
-                f"docker build -f Dockerfile --platform linux/x86_64 --tag transia/cluster-{c_name}:{image_name} .",  # noqa: E501
-            )
-            run_command(
-                f"{basedir}/{name}-cluster/{c_name}",
-                f"docker push transia/cluster-{c_name}:{image_name}",
             )
     hosts_content: str = """
 # this is a basic file putting different hosts into categories
@@ -727,6 +900,11 @@ docker compose -f {basedir}/{name}-cluster/docker-compose.yml up --build --force
         hosts_content += f"{vip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{vip}.yml \n"  # noqa: E501
     for pip in pips:
         hosts_content += f"{pip} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{pip}.yml \n"  # noqa: E501
+
+    hosts_content += "\n"
+    hosts_content += "[peer]\n"
+    hosts_content += f"{pips[0]} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{pips[0]}.yml \n"  # noqa: E501
+
     write_file(f"{basedir}/{name}-cluster/ansible/hosts.txt", hosts_content)
 
 
@@ -740,3 +918,399 @@ def stop_network(name: str, remove: bool = False):
 def remove_network(name: str):
     stop_network(name, True)
     remove_directory(f"{basedir}/{name}")
+
+
+def create_local_node_folders(
+    name: str,
+    cluster_dir: str,
+    feature_content: str,
+    num_validators: int,
+    num_peers: int,
+    network_id: int,
+    enable_all: bool,
+    quorum: int,
+    vl_key: str,
+    ivl_key: str,
+    protocol: str,
+    log_level: str = "warning",
+    nodedb_type: str = "NuDB",
+):
+    """
+    Creates config folders for local multi-node network without Docker.
+    Similar to create_node_folders but uses local paths instead of Docker paths.
+    """
+    # Change to cluster directory for keystore creation
+    original_dir = os.getcwd()
+    os.chdir(cluster_dir)
+
+    try:
+        # Create directories for validator nodes
+        ips_fixed: List[str] = []
+        for i in range(1, num_validators + 1):
+            _, _, _, _, peer = generate_ports(i, "validator")
+            ips_fixed.append(f"127.0.0.1 {peer}")
+
+        manifests: List[str] = []
+        validators: List[str] = []
+        tokens: List[str] = []
+        for i in range(1, num_validators + 1):
+            node_dir = f"vnode{i}"
+            # GENERATE VALIDATOR KEY
+            client = ValidatorClient(node_dir)
+            key_path = f"keystore/{node_dir}/key.json"
+            if not os.path.exists(key_path):
+                print(f"  Creating new keys for {node_dir}...")
+                client.create_keys()
+                client.set_domain(f"xahau.{node_dir}.transia.co")
+                client.create_token()
+            else:
+                print(f"  Using existing keys for {node_dir}")
+            keys = client.get_keys()
+            token = client.read_token()
+            manifest = client.read_manifest()
+            manifests.append(manifest)
+            validators.append(keys["public_key"])
+            tokens.append(token)
+
+        print(f"✅ {bcolors.CYAN}Validator keys ready")
+    finally:
+        # Change back to original directory
+        os.chdir(original_dir)
+
+    for i in range(1, num_validators + 1):
+        node_dir = f"vnode{i}"
+        cfg_path = f"{cluster_dir}/{node_dir}/config"
+        # GENERATE PORTS
+        rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(
+            i, "validator"
+        )
+        # GENERATE CONFIG - Use local paths instead of Docker paths
+        configs: List[XrpldBuild] = gen_config(
+            False,  # not ansible
+            protocol,
+            name,
+            network_id,
+            i,
+            rpc_public,
+            rpc_admin,
+            ws_public,
+            ws_admin,
+            peer,
+            "huge",
+            10000,
+            nodedb_type,
+            get_node_db_path(nodedb_type, "local"),
+            get_relational_db(nodedb_type),
+            "lib/db",  # Local relative path
+            "../log/debug.log",  # Local relative path (relative to config dir)
+            log_level,
+            tokens[i - 1],
+            [v for v in validators if v != validators[i - 1]],
+            ["http://127.0.0.1/vl.json"],
+            [vl_key],
+            [ivl_key] if ivl_key else [],
+            [],
+            [ips for ips in ips_fixed if ips != f"127.0.0.1 {peer}"],
+        )
+
+        os.makedirs(f"{cluster_dir}/{node_dir}", exist_ok=True)
+        os.makedirs(f"{cluster_dir}/{node_dir}/config", exist_ok=True)
+        os.makedirs(f"{cluster_dir}/{node_dir}/log", exist_ok=True)
+        save_local_config(cfg_path, configs[0].data, configs[1].data)
+
+        print(f"✅ {bcolors.CYAN}Created validator: {i} config")
+
+        # For local networks, always use features from local source (matches the binary)
+        # feature_content is already a list of lines from get_feature_lines_from_path
+        # Local networks always enable all amendments in genesis
+        if protocol in ("xahau", "xrpl"):
+            features_json: Dict[str, Any] = parse_amendments(feature_content)
+
+        genesis_json: Any = update_amendments(features_json, protocol)
+        write_file(
+            f"{cluster_dir}/{node_dir}/config/genesis.json",
+            json.dumps(genesis_json, indent=4, sort_keys=True),
+        )
+
+        write_file(
+            f"{cluster_dir}/{node_dir}/features.json",
+            json.dumps(features_json, indent=4, sort_keys=True),
+        )
+
+        print(f"✅ {bcolors.CYAN}Updated validator: {i} features")
+
+    # Create peer nodes
+    for i in range(1, num_peers + 1):
+        node_dir = f"pnode{i}"
+        cfg_path = f"{cluster_dir}/{node_dir}/config"
+        rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(i, "peer")
+        configs: List[XrpldBuild] = gen_config(
+            False,
+            protocol,
+            name,
+            network_id,
+            i,
+            rpc_public,
+            rpc_admin,
+            ws_public,
+            ws_admin,
+            peer,
+            "huge",
+            None,
+            nodedb_type,
+            get_node_db_path(nodedb_type, "local"),
+            get_relational_db(nodedb_type),
+            "lib/db",  # Local relative path
+            "../log/debug.log",  # Local relative path (relative to config dir)
+            log_level,
+            None,
+            validators,
+            ["http://127.0.0.1/vl.json"],
+            [vl_key],
+            [ivl_key] if ivl_key else [],
+            [],
+            ips_fixed,
+        )
+        os.makedirs(f"{cluster_dir}/{node_dir}", exist_ok=True)
+        os.makedirs(f"{cluster_dir}/{node_dir}/config", exist_ok=True)
+        os.makedirs(f"{cluster_dir}/{node_dir}/log", exist_ok=True)
+        save_local_config(cfg_path, configs[0].data, configs[1].data)
+
+        print(f"✅ {bcolors.CYAN}Created peer: {i} config")
+
+        # For local networks, always use features from local source (matches the binary)
+        # feature_content is already a list of lines from get_feature_lines_from_path
+        # Local networks always enable all amendments in genesis
+        if protocol in ("xahau", "xrpl"):
+            features_json: Dict[str, Any] = parse_amendments(feature_content)
+        else:
+            features_json: Any = read_json(
+                f"{package_dir}/default.{protocol}.features.json"
+            )
+
+        genesis_json: Any = update_amendments(features_json, protocol)
+        write_file(
+            f"{cluster_dir}/{node_dir}/config/genesis.json",
+            json.dumps(genesis_json, indent=4, sort_keys=True),
+        )
+
+        write_file(
+            f"{cluster_dir}/{node_dir}/features.json",
+            json.dumps(features_json, indent=4, sort_keys=True),
+        )
+
+        print(f"✅ {bcolors.CYAN}Updated peer: {i} features")
+
+    return manifests
+
+
+def create_local_network(
+    log_level: str,
+    import_key: str,
+    protocol: str,
+    num_validators: int,
+    num_peers: int,
+    network_id: int,
+    build_server: str,
+    build_version: str,
+    binary_name: str = "xrpld",
+    genesis: bool = False,
+    quorum: int = None,
+    nodedb_type: str = "NuDB",
+) -> None:
+    """
+    Creates a local multi-node network configuration that runs natively without Docker.
+    Only Explorer and VL services run in Docker.
+
+    The user should run this command from their build directory
+    (e.g., xrpld-quantum/build) where the xrpld binary is located.
+    """
+    # Use a simple name for local networks
+    name: str = f"local-{protocol}"
+    # Create cluster in current working directory instead of package directory
+    cluster_dir = f"{os.getcwd()}/{name}-cluster"
+    os.makedirs(cluster_dir, exist_ok=True)
+
+    # Read features from local source files (user has built locally)
+    content: str = ""
+    if protocol == "xahau":
+        # Look for xahau features file in parent directory (build/../src/...)
+        local_path = "../src/ripple/protocol/impl/Feature.cpp"
+        macro_path = "../include/xrpl/protocol/detail/features.macro"
+        if os.path.exists(local_path):
+            content = get_feature_lines_from_path(local_path)
+        elif os.path.exists(macro_path):
+            content = get_feature_lines_from_path(macro_path)
+        else:
+            print(f"{bcolors.RED}Error: Cannot find features file at {local_path} or {macro_path}")
+            print(f"Please run this command from your build directory.{bcolors.END}")
+            return
+
+    if protocol == "xrpl":
+        # Look for xrpl features file in parent directory (build/../include/...)
+        local_path = "../include/xrpl/protocol/detail/features.macro"
+        if os.path.exists(local_path):
+            content = get_feature_lines_from_path(local_path)
+        else:
+            print(f"{bcolors.RED}Error: Cannot find features file at {local_path}")
+            print(f"Please run this command from your build directory.{bcolors.END}")
+            return
+
+    # Change to cluster directory for key creation
+    original_dir = os.getcwd()
+    os.chdir(cluster_dir)
+
+    try:
+        # Create validator list publisher keys
+        client = PublisherClient()
+        vl_key_path = "keystore/vl/key.json"
+        vl_eph_path = "keystore/vl/eph.json"
+        vl_manifest_path = "keystore/vl/manifest.txt"
+
+        # Check if ALL VL files exist and are valid
+        should_regenerate = False
+        if (
+            os.path.exists(vl_key_path)
+            and os.path.exists(vl_eph_path)
+            and os.path.exists(vl_manifest_path)
+        ):
+            try:
+                # Validate that keys are compatible
+                # (not Dilithium or other incompatible formats)
+                keys = client.get_keys()
+                eph_keys = client.get_ephkeys()
+                # Check key format - standard keys should be reasonable length
+                if keys and eph_keys:
+                    pub_key_len = len(keys.get("publicKey", ""))
+                    priv_key_len = len(keys.get("privateKey", ""))
+                    # Standard secp256k1/Ed25519 keys are
+                    # typically 66-68 chars for public,
+                    # 64-66 for private
+                    # Dilithium keys are 2000+ characters
+                    if pub_key_len > 200 or priv_key_len > 200:
+                        print(
+                            "  Detected incompatible VL keys "
+                            "(possibly post-quantum), "
+                            "regenerating..."
+                        )
+                        should_regenerate = True
+                    else:
+                        print("  Using existing VL keys")
+                else:
+                    should_regenerate = True
+            except Exception:
+                print("  VL keys validation failed, regenerating...")
+                should_regenerate = True
+        else:
+            should_regenerate = True
+
+        if should_regenerate:
+            print("  Creating new VL keys...")
+            client.create_keys()
+
+        keys = client.get_keys()
+
+        # Create node configs without Docker
+        manifests: List[str] = create_local_node_folders(
+            name,
+            cluster_dir,
+            content,
+            num_validators,
+            num_peers,
+            network_id,
+            genesis,
+            quorum,
+            keys["publicKey"],
+            import_key,
+            protocol,
+            log_level,
+            nodedb_type,
+        )
+
+        # Create docker-compose.yml for Explorer and VL services only
+        services: Dict[str, Dict] = {}
+
+        services["vl"] = {
+            "build": {
+                "context": "vl",
+                "dockerfile": "Dockerfile",
+            },
+            "container_name": "vl",
+            "ports": ["80:80"],
+            "networks": [f"{name}-network"],
+            "healthcheck": {
+                "test": ["CMD", "curl", "-f", "http://localhost/vl.json"],
+                "interval": "5s",
+                "timeout": "3s",
+                "retries": 3,
+                "start_period": "10s",
+            },
+        }
+
+        services["network-explorer"] = {
+            "image": "transia/explorer:latest",
+            "container_name": "network-explorer",
+            "environment": [
+                "PORT=4000",
+                f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6016}",
+            ],
+            "ports": ["4000:4000"],
+            "networks": [f"{name}-network"],
+        }
+
+        compose = {
+            "version": "3.9",
+            "services": services,
+            "networks": {f"{name}-network": {"driver": "bridge"}},
+        }
+        with open(f"{cluster_dir}/docker-compose.yml", "w") as f:
+            yaml.dump(compose, f, default_flow_style=False)
+
+        # Generate start.sh for local execution
+        write_file(
+            f"{cluster_dir}/start.sh",
+            build_local_network_start_sh(name, num_validators, num_peers, binary_name),
+        )
+
+        # Generate stop.sh
+        stop_sh_content: str = build_local_network_stop_sh(
+            name,
+            num_validators,
+            num_peers,
+        )
+        write_file(f"{cluster_dir}/stop.sh", stop_sh_content)
+
+        # Create VL (validator list) folder and files
+        os.makedirs(f"{cluster_dir}/vl", exist_ok=True)
+        for manifest in manifests:
+            client.add_validator(manifest)
+        client.sign_unl(f"{cluster_dir}/vl/vl.json")
+        shutil.copyfile(
+            f"{package_dir}/deploykit/nginx.dockerfile",
+            f"{cluster_dir}/vl/Dockerfile",
+        )
+    finally:
+        # Change back to original directory
+        os.chdir(original_dir)
+
+    # Make scripts executable
+    os.chmod(f"{cluster_dir}/start.sh", 0o755)
+    os.chmod(f"{cluster_dir}/stop.sh", 0o755)
+
+    print(f"\n{bcolors.GREEN}✅ Local network created successfully!{bcolors.END}")
+    print(f"{bcolors.CYAN}Location: {cluster_dir}{bcolors.END}")
+    print(f"\n{bcolors.PURPLE}To start the network:{bcolors.END}")
+    print(f"  cd {name}-cluster")
+    print("  ./start.sh")
+    print(
+        f"\n{bcolors.PURPLE}Each node will open in its own"
+        f" Terminal window for easy monitoring.{bcolors.END}"
+    )
+    print(f"\n{bcolors.PURPLE}To stop the network:{bcolors.END}")
+    print(f"  cd {name}-cluster")
+    print("  ./stop.sh")
+    print("  ./stop.sh --remove  # To also clean up data")
+    print(
+        f"\n{bcolors.PURPLE}Note: The binary will be copied"
+        f" from ../{binary_name}{bcolors.END}"
+    )

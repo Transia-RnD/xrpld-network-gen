@@ -76,6 +76,7 @@ bin
 keystore/
 playground.py
 .env
-xrpld/
-xahau/
 rippled
+xrpld
+xahaud
+workspace/

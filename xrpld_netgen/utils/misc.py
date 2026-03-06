@@ -27,11 +27,13 @@ def remove_directory(directory_path: str) -> None:
         name: str = directory_path.split("/")[-1]
         shutil.rmtree(directory_path)
         print(
-            f"{bcolors.CYAN}Directory {name} has been removed successfully. {bcolors.END}"
+            f"{bcolors.CYAN}Directory {name} has been removed successfully. "
+            f"{bcolors.END}"
         )
     except FileNotFoundError:
         print(
-            f"{bcolors.RED}❌ The file {directory_path} does not exist or cannot be found.{bcolors.END}"
+            f"{bcolors.RED}❌ The file {directory_path} does not exist or "
+            f"cannot be found.{bcolors.END}"
         )
     except PermissionError:
         print(
@@ -51,7 +53,8 @@ def run_start(cmd: List[str], protocol: str, version: str, type: str):
         )
         if result.returncode == 0:
             print(
-                f"{bcolors.CYAN}{protocol.capitalize()} {bcolors.GREEN}{version} {type} running at: {bcolors.PURPLE}6006 {bcolors.END}"
+                f"{bcolors.CYAN}{protocol.capitalize()} {bcolors.GREEN}{version} "
+                f"{type} running at: {bcolors.PURPLE}6006 {bcolors.END}"
             )
             print(f"{bcolors.CYAN}Explorer running / starting container{bcolors.END}")
             print(f"Listening at: {bcolors.PURPLE}http://localhost:4000{bcolors.END}")
@@ -60,11 +63,15 @@ def run_start(cmd: List[str], protocol: str, version: str, type: str):
             sys.exit(1)
     except subprocess.CalledProcessError:
         print(
-            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. Is the docker daemon running?{bcolors.END}"
+            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. "
+            f"Is the docker daemon running?{bcolors.END}"
         )
         sys.exit(1)
     except FileNotFoundError:
-        print(f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be found.")
+        print(
+            f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be "
+            f"found."
+        )
         sys.exit(1)
     except OSError as e:
         print(f"{bcolors.RED}❌ An OS error occurred: {e}")
@@ -86,11 +93,15 @@ def run_stop(cmd: List[str]):
             sys.exit(1)
     except subprocess.CalledProcessError:
         print(
-            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. Is the docker daemon running?{bcolors.END}"
+            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. "
+            f"Is the docker daemon running?{bcolors.END}"
         )
         sys.exit(1)
     except FileNotFoundError:
-        print(f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be found.")
+        print(
+            f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be "
+            f"found."
+        )
         sys.exit(1)
     except OSError as e:
         print(f"{bcolors.RED}❌ An OS error occurred: {e}")
@@ -111,17 +122,119 @@ def run_logs():
             os.system("clear")
             print()
             print(
-                f"{bcolors.GREEN}Starting live log monitor, edit with {bcolors.PURPLE}CTRL + C{bcolors.END}"
+                f"{bcolors.GREEN}Starting live log monitor, edit with "
+                f"{bcolors.PURPLE}CTRL + C{bcolors.END}"
             )
             print()
-            log_command = f"docker logs --tail 20 -f {container_name} 2>&1 | grep -E --color=always 'HookTrace|HookError|Publishing ledger [0-9]+'"
+            log_command = (
+                f"docker logs --tail 20 -f {container_name} 2>&1 | "
+                f"grep -E --color=always "
+                f"'HookTrace|HookError|Publishing ledger [0-9]+'"
+            )
             os.system(log_command)
         else:
             print()
             print(
-                f"{bcolors.RED}Cannot watch live logs, container not running. Run {bcolors.PURPLE}./install{bcolors.RED} script{bcolors.END}"
+                f"{bcolors.RED}Cannot watch live logs, container not running. "
+                f"Run {bcolors.PURPLE}./install{bcolors.RED} script{bcolors.END}"
             )
             print()
+    except subprocess.CalledProcessError:
+        return
+
+
+def run_local_logs(node: str = None):
+    try:
+        os.system("clear")
+        print()
+
+        # Determine the log path based on whether this is a network node or standalone
+        if node:
+            # For network nodes (vnode1, pnode1, etc.)
+            # Try multiple potential locations
+            potential_paths = [
+                f"{node}/log/debug.log",  # Current directory
+                f"./{node}/log/debug.log",  # Explicit current directory
+            ]
+
+            # Also check common cluster directory patterns
+            cwd = os.getcwd()
+            if "xrpld-network-gen" in cwd:
+                basedir = os.path.abspath(os.path.dirname(__file__))
+                # Look in xrpld_netgen directory for cluster folders
+                parent_dir = os.path.dirname(os.path.dirname(basedir))
+                for item in os.listdir(parent_dir):
+                    item_path = os.path.join(parent_dir, item)
+                    if os.path.isdir(item_path) and os.path.exists(
+                        os.path.join(item_path, node)
+                    ):
+                        potential_paths.append(
+                            os.path.join(item_path, f"{node}/log/debug.log")
+                        )
+
+            # Also search in common build directories
+            if os.path.exists("build"):
+                for item in os.listdir("build"):
+                    item_path = os.path.join("build", item)
+                    if os.path.isdir(item_path) and "cluster" in item:
+                        potential_paths.append(
+                            os.path.join(item_path, f"{node}/log/debug.log")
+                        )
+
+            log_path = None
+            for path in potential_paths:
+                if os.path.exists(path):
+                    log_path = path
+                    break
+
+            if not log_path:
+                print(
+                    f"{bcolors.RED}Error: Node '{node}' not found or log file "
+                    f"doesn't exist{bcolors.END}"
+                )
+                print()
+                print(f"{bcolors.BLUE}Searched in:{bcolors.END}")
+                for path in potential_paths[:3]:  # Show first 3 paths
+                    print(f"  - {path}")
+                print()
+                print(
+                    f"{bcolors.BLUE}Tip: Run this command from your cluster "
+                    f"directory (e.g., local-xrpl-cluster){bcolors.END}"
+                )
+                print()
+                return
+
+            print(
+                f"{bcolors.GREEN}Starting live log monitor for "
+                f"{bcolors.PURPLE}{node}{bcolors.GREEN}, exit with "
+                f"{bcolors.PURPLE}CTRL + C{bcolors.END}"
+            )
+        else:
+            # Default to standalone config path
+            log_path = "config/debug.log"
+            if not os.path.exists(log_path):
+                print(
+                    f"{bcolors.RED}Error: Log file not found at "
+                    f"{log_path}{bcolors.END}"
+                )
+                print()
+                print(
+                    f"{bcolors.BLUE}For local networks, please specify a node "
+                    f"with --node (e.g., --node vnode1){bcolors.END}"
+                )
+                print()
+                return
+            print(
+                f"{bcolors.GREEN}Starting live log monitor, exit with "
+                f"{bcolors.PURPLE}CTRL + C{bcolors.END}"
+            )
+
+        print()
+        log_command = (
+            f"tail -f {log_path} 2>&1 | grep -E --color=always "
+            f"'HookTrace|HookError|Publishing ledger [0-9]+'"
+        )
+        os.system(log_command)
     except subprocess.CalledProcessError:
         return
 
@@ -135,13 +248,13 @@ def check_deps(cmd: List[str]) -> None:
         else:
             print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
             sys.exit(1)
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
         sys.exit(1)
     except FileNotFoundError:
         print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
         sys.exit(1)
-    except OSError as e:
+    except OSError:
         print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
         sys.exit(1)
 
@@ -160,11 +273,11 @@ def remove_containers(cmd: str) -> None:
         else:
             print(f"{bcolors.RED}Docker ERROR{bcolors.END}")
             return
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         return
     except FileNotFoundError:
         return
-    except OSError as e:
+    except OSError:
         return
 
 
@@ -219,7 +332,7 @@ def download_json(url: str, destination_dir: str) -> Dict[str, Any]:
 
 
 def save_local_config(cfg_path: str, cfg_out: str, validators_out: str) -> None:
-    with open(f"{cfg_path}/rippled.cfg", "w") as text_file:
+    with open(f"{cfg_path}/xrpld.cfg", "w") as text_file:
         text_file.write(cfg_out)
 
     with open(f"{cfg_path}/validators.txt", "w") as text_file:
@@ -232,6 +345,28 @@ def parse_image_name(image_name: str) -> str:
     # Get the version
     version = image_name.split(":")[1]
     return name, version
+
+
+def get_node_db_path(db_type: str, type: str = "local") -> str:
+    if db_type == "NuDB" and type == "local":
+        return "db"
+    if db_type == "NuDB" and type == "standalone":
+        return "/opt/ripple/lib/db"
+    if db_type == "NuDB" and type == "network":
+        return "/var/lib/xrpld/db"
+    if db_type == "Memory":
+        return "./"
+    if db_type == "rwdb" and type == "network":
+        return "/var/lib/xrpld/db"
+
+
+def get_relational_db(db_type: str) -> str:
+    if db_type == "NuDB":
+        return None
+    if db_type == "Memory":
+        return "backend=memory"
+    if db_type == "rwdb":
+        return "backend=rwdb"
 
 
 RPC_PUBLIC: int = 5007
@@ -279,6 +414,7 @@ def sha512_half(hex_string: str) -> str:
     full_digest = hash_obj.hexdigest().upper()
     hash_size = len(full_digest) // 2
     return full_digest[:hash_size]
+
 
 def write_file(path: str, data: Any) -> str:
     """Write File
