@@ -35,7 +35,8 @@ from xrpld_netgen.libs.xrpld import (
     get_feature_lines_from_path,
 )
 
-# Package directory for static resources (deploykit, genesis files, default features, etc.)
+# Package directory for static resources (deploykit, genesis files,
+# default features, etc.)
 package_dir = os.path.abspath(os.path.dirname(__file__))
 # Use workspace directory for deployments
 workspace_dir = os.path.join(os.path.dirname(__file__), "..", "workspace")
@@ -588,7 +589,8 @@ def start_local(
         )
         if result.returncode == 0:
             print(
-                f"{bcolors.CYAN}{protocol.capitalize()} local running at: {bcolors.PURPLE}6006 {bcolors.END}"
+                f"{bcolors.CYAN}{protocol.capitalize()} local running at: "
+                f"{bcolors.PURPLE}6006 {bcolors.END}"
             )
             print(f"{bcolors.CYAN}Explorer running / starting container{bcolors.END}")
             print(f"Listening at: {bcolors.PURPLE}http://localhost:4000{bcolors.END}")
@@ -597,6 +599,7 @@ def start_local(
             sys.exit(1)
     except subprocess.CalledProcessError:
         print(
-            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. Is the docker daemon running?{bcolors.END}"
+            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. "
+            f"Is the docker daemon running?{bcolors.END}"
         )
         sys.exit(1)

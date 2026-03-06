@@ -3,8 +3,6 @@
 
 import re
 import os
-import json
-from datetime import datetime
 from typing import Dict, Any, List  # noqa: F401
 
 from xrpld_netgen.utils.misc import read_json
@@ -56,7 +54,7 @@ def parse_amendments(lines: Any):
     return {
         k: hashlib.sha512(k.encode("utf-8")).digest().hex().upper()[:64]
         for (k, v) in amendments.items()
-        if v["supported"] == True
+        if v["supported"] is True
     }
 
 

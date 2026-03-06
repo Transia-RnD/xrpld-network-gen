@@ -27,11 +27,13 @@ def remove_directory(directory_path: str) -> None:
         name: str = directory_path.split("/")[-1]
         shutil.rmtree(directory_path)
         print(
-            f"{bcolors.CYAN}Directory {name} has been removed successfully. {bcolors.END}"
+            f"{bcolors.CYAN}Directory {name} has been removed successfully. "
+            f"{bcolors.END}"
         )
     except FileNotFoundError:
         print(
-            f"{bcolors.RED}❌ The file {directory_path} does not exist or cannot be found.{bcolors.END}"
+            f"{bcolors.RED}❌ The file {directory_path} does not exist or "
+            f"cannot be found.{bcolors.END}"
         )
     except PermissionError:
         print(
@@ -51,7 +53,8 @@ def run_start(cmd: List[str], protocol: str, version: str, type: str):
         )
         if result.returncode == 0:
             print(
-                f"{bcolors.CYAN}{protocol.capitalize()} {bcolors.GREEN}{version} {type} running at: {bcolors.PURPLE}6006 {bcolors.END}"
+                f"{bcolors.CYAN}{protocol.capitalize()} {bcolors.GREEN}{version} "
+                f"{type} running at: {bcolors.PURPLE}6006 {bcolors.END}"
             )
             print(f"{bcolors.CYAN}Explorer running / starting container{bcolors.END}")
             print(f"Listening at: {bcolors.PURPLE}http://localhost:4000{bcolors.END}")
@@ -60,11 +63,15 @@ def run_start(cmd: List[str], protocol: str, version: str, type: str):
             sys.exit(1)
     except subprocess.CalledProcessError:
         print(
-            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. Is the docker daemon running?{bcolors.END}"
+            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. "
+            f"Is the docker daemon running?{bcolors.END}"
         )
         sys.exit(1)
     except FileNotFoundError:
-        print(f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be found.")
+        print(
+            f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be "
+            f"found."
+        )
         sys.exit(1)
     except OSError as e:
         print(f"{bcolors.RED}❌ An OS error occurred: {e}")
@@ -86,11 +93,15 @@ def run_stop(cmd: List[str]):
             sys.exit(1)
     except subprocess.CalledProcessError:
         print(
-            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. Is the docker daemon running?{bcolors.END}"
+            f"{bcolors.RED}❌ Cannot connect to the Docker daemon at docker.sock. "
+            f"Is the docker daemon running?{bcolors.END}"
         )
         sys.exit(1)
     except FileNotFoundError:
-        print(f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be found.")
+        print(
+            f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be "
+            f"found."
+        )
         sys.exit(1)
     except OSError as e:
         print(f"{bcolors.RED}❌ An OS error occurred: {e}")
@@ -111,15 +122,21 @@ def run_logs():
             os.system("clear")
             print()
             print(
-                f"{bcolors.GREEN}Starting live log monitor, edit with {bcolors.PURPLE}CTRL + C{bcolors.END}"
+                f"{bcolors.GREEN}Starting live log monitor, edit with "
+                f"{bcolors.PURPLE}CTRL + C{bcolors.END}"
             )
             print()
-            log_command = f"docker logs --tail 20 -f {container_name} 2>&1 | grep -E --color=always 'HookTrace|HookError|Publishing ledger [0-9]+'"
+            log_command = (
+                f"docker logs --tail 20 -f {container_name} 2>&1 | "
+                f"grep -E --color=always "
+                f"'HookTrace|HookError|Publishing ledger [0-9]+'"
+            )
             os.system(log_command)
         else:
             print()
             print(
-                f"{bcolors.RED}Cannot watch live logs, container not running. Run {bcolors.PURPLE}./install{bcolors.RED} script{bcolors.END}"
+                f"{bcolors.RED}Cannot watch live logs, container not running. "
+                f"Run {bcolors.PURPLE}./install{bcolors.RED} script{bcolors.END}"
             )
             print()
     except subprocess.CalledProcessError:
@@ -144,20 +161,25 @@ def run_local_logs(node: str = None):
             cwd = os.getcwd()
             if "xrpld-network-gen" in cwd:
                 basedir = os.path.abspath(os.path.dirname(__file__))
-                cluster_dirs = []
                 # Look in xrpld_netgen directory for cluster folders
                 parent_dir = os.path.dirname(os.path.dirname(basedir))
                 for item in os.listdir(parent_dir):
                     item_path = os.path.join(parent_dir, item)
-                    if os.path.isdir(item_path) and os.path.exists(os.path.join(item_path, node)):
-                        potential_paths.append(os.path.join(item_path, f"{node}/log/debug.log"))
+                    if os.path.isdir(item_path) and os.path.exists(
+                        os.path.join(item_path, node)
+                    ):
+                        potential_paths.append(
+                            os.path.join(item_path, f"{node}/log/debug.log")
+                        )
 
             # Also search in common build directories
             if os.path.exists("build"):
                 for item in os.listdir("build"):
                     item_path = os.path.join("build", item)
                     if os.path.isdir(item_path) and "cluster" in item:
-                        potential_paths.append(os.path.join(item_path, f"{node}/log/debug.log"))
+                        potential_paths.append(
+                            os.path.join(item_path, f"{node}/log/debug.log")
+                        )
 
             log_path = None
             for path in potential_paths:
@@ -166,34 +188,52 @@ def run_local_logs(node: str = None):
                     break
 
             if not log_path:
-                print(f"{bcolors.RED}Error: Node '{node}' not found or log file doesn't exist{bcolors.END}")
+                print(
+                    f"{bcolors.RED}Error: Node '{node}' not found or log file "
+                    f"doesn't exist{bcolors.END}"
+                )
                 print()
                 print(f"{bcolors.BLUE}Searched in:{bcolors.END}")
                 for path in potential_paths[:3]:  # Show first 3 paths
                     print(f"  - {path}")
                 print()
-                print(f"{bcolors.BLUE}Tip: Run this command from your cluster directory (e.g., local-xrpl-cluster){bcolors.END}")
+                print(
+                    f"{bcolors.BLUE}Tip: Run this command from your cluster "
+                    f"directory (e.g., local-xrpl-cluster){bcolors.END}"
+                )
                 print()
                 return
 
             print(
-                f"{bcolors.GREEN}Starting live log monitor for {bcolors.PURPLE}{node}{bcolors.GREEN}, exit with {bcolors.PURPLE}CTRL + C{bcolors.END}"
+                f"{bcolors.GREEN}Starting live log monitor for "
+                f"{bcolors.PURPLE}{node}{bcolors.GREEN}, exit with "
+                f"{bcolors.PURPLE}CTRL + C{bcolors.END}"
             )
         else:
             # Default to standalone config path
             log_path = "config/debug.log"
             if not os.path.exists(log_path):
-                print(f"{bcolors.RED}Error: Log file not found at {log_path}{bcolors.END}")
+                print(
+                    f"{bcolors.RED}Error: Log file not found at "
+                    f"{log_path}{bcolors.END}"
+                )
                 print()
-                print(f"{bcolors.BLUE}For local networks, please specify a node with --node (e.g., --node vnode1){bcolors.END}")
+                print(
+                    f"{bcolors.BLUE}For local networks, please specify a node "
+                    f"with --node (e.g., --node vnode1){bcolors.END}"
+                )
                 print()
                 return
             print(
-                f"{bcolors.GREEN}Starting live log monitor, exit with {bcolors.PURPLE}CTRL + C{bcolors.END}"
+                f"{bcolors.GREEN}Starting live log monitor, exit with "
+                f"{bcolors.PURPLE}CTRL + C{bcolors.END}"
             )
 
         print()
-        log_command = f"tail -f {log_path} 2>&1 | grep -E --color=always 'HookTrace|HookError|Publishing ledger [0-9]+'"
+        log_command = (
+            f"tail -f {log_path} 2>&1 | grep -E --color=always "
+            f"'HookTrace|HookError|Publishing ledger [0-9]+'"
+        )
         os.system(log_command)
     except subprocess.CalledProcessError:
         return
@@ -208,13 +248,13 @@ def check_deps(cmd: List[str]) -> None:
         else:
             print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
             sys.exit(1)
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
         sys.exit(1)
     except FileNotFoundError:
         print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
         sys.exit(1)
-    except OSError as e:
+    except OSError:
         print(f"{bcolors.RED}Dependency ERROR{bcolors.END}")
         sys.exit(1)
 
@@ -233,11 +273,11 @@ def remove_containers(cmd: str) -> None:
         else:
             print(f"{bcolors.RED}Docker ERROR{bcolors.END}")
             return
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         return
     except FileNotFoundError:
         return
-    except OSError as e:
+    except OSError:
         return
 
 

@@ -112,7 +112,7 @@ def create_dockerfile(
     EXPOSE $RPC_PUBLIC $RPC_ADMIN $WS_PUBLIC $WS_ADMIN $PEER $PEER/udp $DATA $DATA/udp
         """
 
-    dockerfile += f"""
+    dockerfile += """
     RUN chmod +x /entrypoint.sh && \
         echo '#!/bin/bash' > /usr/bin/server_info && \
         echo '/entrypoint.sh server_info' >> /usr/bin/server_info && \
@@ -120,7 +120,11 @@ def create_dockerfile(
     """  # noqa: E501
 
     if not network:
-        dockerfile += f"EXPOSE {rpc_public_port} {rpc_admin_port} {ws_public_port} {ws_admin_port} {peer_port} {peer_port}/udp\n"
+        dockerfile += (
+            f"EXPOSE {rpc_public_port} {rpc_admin_port}"
+            f" {ws_public_port} {ws_admin_port}"
+            f" {peer_port} {peer_port}/udp\n"
+        )
 
     if include_genesis:
         dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", "{quorum}", "{standalone}" ]'  # noqa: E501
@@ -160,14 +164,16 @@ def download_binary(url: str, save_path: str) -> None:
     print(f"{bcolors.END}Fetching versions of xahaud..")
     if os.path.exists(save_path):
         print(
-            f"{bcolors.GREEN}version: {bcolors.BLUE}{version} {bcolors.END}already exists..."
+            f"{bcolors.GREEN}version: {bcolors.BLUE}"
+            f"{version} {bcolors.END}already exists..."
         )
         os.chmod(save_path, 0o755)
         return
 
     try:
         print(
-            f"{bcolors.GREEN}Found latest version: {bcolors.BLUE}{version}, downloading..."
+            f"{bcolors.GREEN}Found latest version: "
+            f"{bcolors.BLUE}{version}, downloading..."
         )
         # Send a GET request to the URL
         response = requests.get(url, stream=True)
@@ -249,20 +255,26 @@ def build_start_sh(
     protocol: str,
     name: str,
 ):
-    return f"""\
-#! /bin/bash
-docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml up --build --force-recreate -d
-"""
+    return (
+        "#! /bin/bash\n"
+        "docker compose"
+        f" -f {basedir}/{protocol}-{name}"
+        "/docker-compose.yml"
+        " up --build --force-recreate -d\n"
+    )
 
 
 def build_local_start_sh(
     net_type: str,
 ):
-    return f"""\
-#! /bin/bash
-docker compose -f docker-compose.yml up --build --force-recreate -d
-./xrpld {'-a' if net_type == 'standalone' else ''} --conf config/xrpld.cfg --ledgerfile config/genesis.json
-"""
+    flag = "-a" if net_type == "standalone" else ""
+    return (
+        "#! /bin/bash\n"
+        "docker compose -f docker-compose.yml"
+        " up --build --force-recreate -d\n"
+        f"./xrpld {flag} --conf config/xrpld.cfg"
+        " --ledgerfile config/genesis.json\n"
+    )
 
 
 def build_network_start_sh(
@@ -277,7 +289,8 @@ def build_network_start_sh(
     for i in range(1, num_peers + 1):
         start_sh_content += f"cp xrpld.{name} pnode{i}/xrpld.{name}\n"
     start_sh_content += (
-        f"docker compose -f docker-compose.yml up --build --force-recreate -d"
+        "docker compose -f docker-compose.yml"
+        " up --build --force-recreate -d"
     )
     return start_sh_content
 
@@ -300,7 +313,7 @@ done
     stop_sh_content += "\n"
     stop_sh_content += 'if [ "$REMOVE_FLAG" = true ]; then \n'
     if num_validators > 0 and num_peers > 0:
-        stop_sh_content += f"docker compose -f docker-compose.yml down --remove-orphans\n"  # noqa: E501
+        stop_sh_content += "docker compose -f docker-compose.yml down --remove-orphans\n"  # noqa: E501
 
     for i in range(1, num_validators + 1):
         stop_sh_content += f"rm -r vnode{i}/lib\n"
@@ -314,7 +327,7 @@ done
 
     stop_sh_content += "else \n"
     if num_validators > 0 and num_peers > 0:
-        stop_sh_content += f"docker compose -f docker-compose.yml down\n"  # noqa: E501
+        stop_sh_content += "docker compose -f docker-compose.yml down\n"  # noqa: E501
     stop_sh_content += "fi \n"
     return stop_sh_content
 
@@ -332,7 +345,10 @@ def build_local_network_start_sh(
     start_sh_content = "#! /bin/bash\n\n"
     start_sh_content += "# Start Explorer and VL services in Docker\n"
     start_sh_content += "echo 'Starting Docker services (Explorer & VL)...'\n"
-    start_sh_content += "docker compose -f docker-compose.yml up --build --force-recreate -d\n\n"
+    start_sh_content += (
+        "docker compose -f docker-compose.yml"
+        " up --build --force-recreate -d\n\n"
+    )
     start_sh_content += "# Wait for services to be ready\n"
     start_sh_content += "sleep 2\n\n"
 
@@ -349,20 +365,34 @@ def build_local_network_start_sh(
     start_sh_content += "else\n"
     start_sh_content += f"  echo 'Error: {binary_name} binary not found!'\n"
     start_sh_content += f"  echo 'Please ensure {binary_name} is either:'\n"
-    start_sh_content += f"  echo '  1. In the parent directory: $CLUSTER_DIR/../{binary_name}'\n"
-    start_sh_content += f"  echo '  2. In your PATH (e.g., /usr/local/bin/{binary_name})'\n"
+    start_sh_content += (
+        "  echo '  1. In the parent directory:"
+        f" $CLUSTER_DIR/../{binary_name}'\n"
+    )
+    start_sh_content += (
+        "  echo '  2. In your PATH"
+        f" (e.g., /usr/local/bin/{binary_name})'\n"
+    )
     start_sh_content += "  exit 1\n"
     start_sh_content += "fi\n\n"
     start_sh_content += "echo \"Using binary: $BINARY_PATH\"\n\n"
 
     start_sh_content += "# Copy xrpld binary to each node (if not already present)\n"
     for i in range(1, num_validators + 1):
-        start_sh_content += f"if [ ! -f \"vnode{i}/{binary_name}\" ] || [ \"$BINARY_PATH\" -nt \"vnode{i}/{binary_name}\" ]; then\n"
+        start_sh_content += (
+            f"if [ ! -f \"vnode{i}/{binary_name}\" ]"
+            " || [ \"$BINARY_PATH\" -nt"
+            f" \"vnode{i}/{binary_name}\" ]; then\n"
+        )
         start_sh_content += f"  cp \"$BINARY_PATH\" vnode{i}/{binary_name}\n"
         start_sh_content += f"  echo 'Copied binary to vnode{i}'\n"
         start_sh_content += "fi\n"
     for i in range(1, num_peers + 1):
-        start_sh_content += f"if [ ! -f \"pnode{i}/{binary_name}\" ] || [ \"$BINARY_PATH\" -nt \"pnode{i}/{binary_name}\" ]; then\n"
+        start_sh_content += (
+            f"if [ ! -f \"pnode{i}/{binary_name}\" ]"
+            " || [ \"$BINARY_PATH\" -nt"
+            f" \"pnode{i}/{binary_name}\" ]; then\n"
+        )
         start_sh_content += f"  cp \"$BINARY_PATH\" pnode{i}/{binary_name}\n"
         start_sh_content += f"  echo 'Copied binary to pnode{i}'\n"
         start_sh_content += "fi\n"
@@ -372,17 +402,25 @@ def build_local_network_start_sh(
     for i in range(1, num_validators + 1):
         start_sh_content += f"echo 'Starting vnode{i} in background...'\n"
         start_sh_content += f"cd \"$CLUSTER_DIR/vnode{i}\"\n"
-        start_sh_content += f"nohup ./{binary_name} --conf config/xrpld.cfg --ledgerfile config/genesis.json > /dev/null 2>&1 &\n"
+        start_sh_content += (
+            f"nohup ./{binary_name} --conf config/xrpld.cfg"
+            " --ledgerfile config/genesis.json"
+            " > /dev/null 2>&1 &\n"
+        )
         start_sh_content += f"echo $! > \"$CLUSTER_DIR/vnode{i}/xrpld.pid\"\n"
-        start_sh_content += f"cd \"$CLUSTER_DIR\"\n"
+        start_sh_content += "cd \"$CLUSTER_DIR\"\n"
 
     start_sh_content += "\n# Start peer nodes in background\n"
     for i in range(1, num_peers + 1):
         start_sh_content += f"echo 'Starting pnode{i} in background...'\n"
         start_sh_content += f"cd \"$CLUSTER_DIR/pnode{i}\"\n"
-        start_sh_content += f"nohup ./{binary_name} --conf config/xrpld.cfg --ledgerfile config/genesis.json > /dev/null 2>&1 &\n"
+        start_sh_content += (
+            f"nohup ./{binary_name} --conf config/xrpld.cfg"
+            " --ledgerfile config/genesis.json"
+            " > /dev/null 2>&1 &\n"
+        )
         start_sh_content += f"echo $! > \"$CLUSTER_DIR/pnode{i}/xrpld.pid\"\n"
-        start_sh_content += f"cd \"$CLUSTER_DIR\"\n"
+        start_sh_content += "cd \"$CLUSTER_DIR\"\n"
 
     start_sh_content += "\n# Wait for nodes to start\n"
     start_sh_content += "sleep 3\n\n"
@@ -397,7 +435,11 @@ def build_local_network_start_sh(
     start_sh_content += "'\n"
     start_sh_content += "echo ''\n"
     start_sh_content += "echo 'Each node is running in the background.'\n"
-    start_sh_content += "echo 'Use \"xrpld-netgen logs:local --node <node_name>\" to view logs (e.g., --node vnode1).'\n"
+    start_sh_content += (
+        "echo 'Use \"xrpld-netgen logs:local"
+        " --node <node_name>\" to view logs"
+        " (e.g., --node vnode1).'\n"
+    )
     start_sh_content += "echo 'Use \"./stop.sh\" to stop all nodes.'\n"
     start_sh_content += "echo ''\n"
     start_sh_content += "echo 'Explorer UI: http://localhost:4000'\n"
@@ -436,17 +478,20 @@ done
         stop_sh_content += f"echo 'Stopping vnode{i}...'\n"
         stop_sh_content += f"if [ -f \"$CLUSTER_DIR/vnode{i}/xrpld.pid\" ]; then\n"
         stop_sh_content += f"  PID=$(cat \"$CLUSTER_DIR/vnode{i}/xrpld.pid\")\n"
-        stop_sh_content += f"  if ps -p $PID > /dev/null 2>&1; then\n"
-        stop_sh_content += f"    kill $PID 2>/dev/null || true\n"
-        stop_sh_content += f"    sleep 1\n"
-        stop_sh_content += f"    # Force kill if still running\n"
-        stop_sh_content += f"    if ps -p $PID > /dev/null 2>&1; then\n"
-        stop_sh_content += f"      kill -9 $PID 2>/dev/null || true\n"
-        stop_sh_content += f"    fi\n"
-        stop_sh_content += f"  fi\n"
+        stop_sh_content += "  if ps -p $PID > /dev/null 2>&1; then\n"
+        stop_sh_content += "    kill $PID 2>/dev/null || true\n"
+        stop_sh_content += "    sleep 1\n"
+        stop_sh_content += "    # Force kill if still running\n"
+        stop_sh_content += "    if ps -p $PID > /dev/null 2>&1; then\n"
+        stop_sh_content += "      kill -9 $PID 2>/dev/null || true\n"
+        stop_sh_content += "    fi\n"
+        stop_sh_content += "  fi\n"
         stop_sh_content += f"  rm -f \"$CLUSTER_DIR/vnode{i}/xrpld.pid\"\n"
-        stop_sh_content += f"fi\n"
-        stop_sh_content += f"# Fallback: Find and kill any xrpld process running in vnode{i} directory\n"
+        stop_sh_content += "fi\n"
+        stop_sh_content += (
+            "# Fallback: Find and kill any xrpld"
+            f" process running in vnode{i} directory\n"
+        )
         stop_sh_content += f"pkill -9 -f \"vnode{i}/xrpld\" 2>/dev/null || true\n"
 
     stop_sh_content += "\n# Stop peer nodes\n"
@@ -454,17 +499,20 @@ done
         stop_sh_content += f"echo 'Stopping pnode{i}...'\n"
         stop_sh_content += f"if [ -f \"$CLUSTER_DIR/pnode{i}/xrpld.pid\" ]; then\n"
         stop_sh_content += f"  PID=$(cat \"$CLUSTER_DIR/pnode{i}/xrpld.pid\")\n"
-        stop_sh_content += f"  if ps -p $PID > /dev/null 2>&1; then\n"
-        stop_sh_content += f"    kill $PID 2>/dev/null || true\n"
-        stop_sh_content += f"    sleep 1\n"
-        stop_sh_content += f"    # Force kill if still running\n"
-        stop_sh_content += f"    if ps -p $PID > /dev/null 2>&1; then\n"
-        stop_sh_content += f"      kill -9 $PID 2>/dev/null || true\n"
-        stop_sh_content += f"    fi\n"
-        stop_sh_content += f"  fi\n"
+        stop_sh_content += "  if ps -p $PID > /dev/null 2>&1; then\n"
+        stop_sh_content += "    kill $PID 2>/dev/null || true\n"
+        stop_sh_content += "    sleep 1\n"
+        stop_sh_content += "    # Force kill if still running\n"
+        stop_sh_content += "    if ps -p $PID > /dev/null 2>&1; then\n"
+        stop_sh_content += "      kill -9 $PID 2>/dev/null || true\n"
+        stop_sh_content += "    fi\n"
+        stop_sh_content += "  fi\n"
         stop_sh_content += f"  rm -f \"$CLUSTER_DIR/pnode{i}/xrpld.pid\"\n"
-        stop_sh_content += f"fi\n"
-        stop_sh_content += f"# Fallback: Find and kill any xrpld process running in pnode{i} directory\n"
+        stop_sh_content += "fi\n"
+        stop_sh_content += (
+            "# Fallback: Find and kill any xrpld"
+            f" process running in pnode{i} directory\n"
+        )
         stop_sh_content += f"pkill -9 -f \"pnode{i}/xrpld\" 2>/dev/null || true\n"
 
     stop_sh_content += "\n# Wait for processes to terminate\n"
@@ -477,9 +525,15 @@ done
 
     # Clean up directories if --remove flag is used
     for i in range(1, num_validators + 1):
-        stop_sh_content += f"  rm -rf vnode{i}/lib vnode{i}/log vnode{i}/xrpld vnode{i}/db\n"
+        stop_sh_content += (
+            f"  rm -rf vnode{i}/lib vnode{i}/log"
+            f" vnode{i}/xrpld vnode{i}/db\n"
+        )
     for i in range(1, num_peers + 1):
-        stop_sh_content += f"  rm -rf pnode{i}/lib pnode{i}/log pnode{i}/xrpld pnode{i}/db\n"
+        stop_sh_content += (
+            f"  rm -rf pnode{i}/lib pnode{i}/log"
+            f" pnode{i}/xrpld pnode{i}/db\n"
+        )
 
     stop_sh_content += "else\n"
     stop_sh_content += "  echo 'Stopping Docker services...'\n"
