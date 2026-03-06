@@ -33,7 +33,7 @@ This dramatically speeds up local development - you can build rippled natively o
 
 ### Current Versions
 
-- XRPL: `2.6.1`
+- XRPL: `3.1.1`
 - Xahau: `2025.7.9-release+1951`
 
 ## Prerequisites

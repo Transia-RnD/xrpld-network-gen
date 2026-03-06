@@ -60,10 +60,13 @@ from xrpld_netgen.utils.misc import (
     run_command,
 )
 
-basedir = os.path.abspath(os.path.dirname(__file__))
+package_dir = os.path.abspath(os.path.dirname(__file__))
+workspace_dir = os.path.join(os.path.dirname(__file__), "..", "workspace")
+basedir = os.path.abspath(workspace_dir)
+os.makedirs(basedir, exist_ok=True)
 
 XAHAU_RELEASE: str = "2025.7.9-release+1951"
-XRPL_RELEASE: str = "2.6.1"
+XRPL_RELEASE: str = "3.1.1"
 
 
 def main():
@@ -429,7 +432,7 @@ def main():
     print("/_/|_/_/ |_/_/   /_____/_____/  /_/ |_/\\___/\\__/\\____/\\___/_/ /_/  ")  # noqa: W605, E501
     print("")
 
-    check_deps([f"{basedir}/deploykit/prerequisites.sh"])
+    check_deps([f"{package_dir}/deploykit/prerequisites.sh"])
 
     print(f"{bcolors.BLUE}Removing existing containers: {bcolors.RED}")
     remove_containers("docker stop xahau")
@@ -689,7 +692,7 @@ def main():
 
             print(f"{bcolors.BLUE}Deploying to Docker{bcolors.END}")
             shutil.copyfile(
-                f"{basedir}/deploykit/deploy.xahau.dockerfile",
+                f"{package_dir}/deploykit/deploy.xahau.dockerfile",
                 f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/deploy.xahau.dockerfile",
             )
             run_command(
