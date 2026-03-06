@@ -2,18 +2,18 @@
 # ./entrypoint.sh ledgerfile quorum
 # ./entrypoint.sh /genesis.json 5
 
-rippledconfig=`/bin/cat /config/xrpld.cfg 2>/dev/null | wc -l`
+xahaudconfig=`/bin/cat /config/xahaud.cfg 2>/dev/null | wc -l`
 validatorstxt=`/bin/cat /config/validators.txt 2>/dev/null | wc -l`
 
 mkdir -p /config
 
-if [[ "$rippledconfig" -gt "0" && "$validatorstxt" -gt "0" ]]; then
+if [[ "$xahaudconfig" -gt "0" && "$validatorstxt" -gt "0" ]]; then
 
-    echo "Existing rippled config at host /config/, using them."
-    mkdir -p /etc/opt/ripple
+    echo "Existing xahaud config at host /config/, using them."
+    mkdir -p /etc/opt/xahau
 
-    /bin/cat /config/xrpld.cfg > /etc/opt/ripple/xrpld.cfg
-    /bin/cat /config/validators.txt > /etc/opt/ripple/validators.txt
+    /bin/cat /config/xahaud.cfg > /etc/opt/xahau/xahaud.cfg
+    /bin/cat /config/validators.txt > /etc/opt/xahau/validators.txt
 
 fi
 
@@ -38,5 +38,5 @@ else
     standalone=""
 fi
 
-# Start rippled with or without ledgerfile and quorum
-exec /app/xrpld $ledgerfile $quorum $standalone --conf /etc/opt/ripple/xrpld.cfg
+# Start xahaud with or without ledgerfile and quorum
+exec /app/xahaud $ledgerfile $quorum $standalone --conf /etc/opt/xahau/xahaud.cfg

@@ -331,8 +331,8 @@ def download_json(url: str, destination_dir: str) -> Dict[str, Any]:
         raise ValueError(f"Failed to download file from {url}")
 
 
-def save_local_config(cfg_path: str, cfg_out: str, validators_out: str) -> None:
-    with open(f"{cfg_path}/xrpld.cfg", "w") as text_file:
+def save_local_config(protocol: str, cfg_path: str, cfg_out: str, validators_out: str) -> None:
+    with open(f"{cfg_path}/{protocol}d.cfg", "w") as text_file:
         text_file.write(cfg_out)
 
     with open(f"{cfg_path}/validators.txt", "w") as text_file:

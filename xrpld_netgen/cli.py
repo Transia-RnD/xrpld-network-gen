@@ -35,7 +35,6 @@
 
 
 import os
-import shutil
 import argparse
 from xrpld_netgen.main import (
     create_standalone_binary,
@@ -57,7 +56,6 @@ from xrpld_netgen.utils.misc import (
     run_stop,
     run_logs,
     run_local_logs,
-    run_command,
 )
 
 package_dir = os.path.abspath(os.path.dirname(__file__))
@@ -65,9 +63,9 @@ workspace_dir = os.path.join(os.path.dirname(__file__), "..", "workspace")
 basedir = os.path.abspath(workspace_dir)
 os.makedirs(basedir, exist_ok=True)
 
-XAHAU_RELEASE: str = "2025.7.9-release+1951"
-XRPL_RELEASE: str = "3.1.1"
-
+# Fallback versions if network fetch fails
+_XRPL_RELEASE_FALLBACK: str = "3.1.1"
+_XAHAU_RELEASE_FALLBACK: str = "2025.7.9-release+1951"
 
 def main():
     parser = argparse.ArgumentParser(
@@ -338,9 +336,6 @@ def main():
         "--ipfs", type=bool, required=False, help="Add an IPFS server", default=False
     )
     parser_us.add_argument(
-        "--deploy", type=bool, required=False, help="Deploy to Docker", default=False
-    )
-    parser_us.add_argument(
         "--nodedb_type",
         type=str,
         required=False,
@@ -403,10 +398,10 @@ def main():
         BUILD_VERSION = args.version
 
         if PROTOCOL == "xahau" and not BUILD_VERSION:
-            BUILD_VERSION: str = XAHAU_RELEASE
+            BUILD_VERSION: str = _XAHAU_RELEASE_FALLBACK
 
         if PROTOCOL == "xrpl" and not BUILD_VERSION:
-            BUILD_VERSION: str = XRPL_RELEASE
+            BUILD_VERSION: str = _XRPL_RELEASE_FALLBACK
 
         print(f"    - Network Name: {NAME}")
         print(f"    - Protocol: {PROTOCOL}")
@@ -502,7 +497,7 @@ def main():
             if not BUILD_SERVER:
                 BUILD_SERVER = "https://build.xahau.tech"
             if not BUILD_VERSION:
-                BUILD_VERSION = XAHAU_RELEASE
+                BUILD_VERSION = _XAHAU_RELEASE_FALLBACK
             if not NETWORK_ID:
                 NETWORK_ID = 21339
 
@@ -517,7 +512,7 @@ def main():
                 if not BUILD_SERVER:
                     BUILD_SERVER = "https://build.xahau.tech"
             if not BUILD_VERSION:
-                BUILD_VERSION = XRPL_RELEASE
+                BUILD_VERSION = _XRPL_RELEASE_FALLBACK
             if not NETWORK_ID:
                 NETWORK_ID = 21337
 
@@ -619,7 +614,6 @@ def main():
         BUILD_SERVER = args.server
         BUILD_VERSION = args.version
         IPFS_SERVER = args.ipfs
-        DOCKER_DEPLOY = args.deploy
         NODEDB_TYPE = args.nodedb_type
 
         if PROTOCOL == "xahau" and not IMPORT_KEY:
@@ -632,7 +626,7 @@ def main():
             BUILD_TYPE: str = "binary"
 
         if PROTOCOL == "xahau" and not BUILD_VERSION:
-            BUILD_VERSION: str = XAHAU_RELEASE
+            BUILD_VERSION: str = _XAHAU_RELEASE_FALLBACK
 
         if PROTOCOL == "xrpl":
             BUILD_SERVER: str = "rippleci"
@@ -640,7 +634,7 @@ def main():
             NETWORK_ID: int = 1
 
         if PROTOCOL == "xrpl" and not BUILD_VERSION:
-            BUILD_VERSION: str = XRPL_RELEASE
+            BUILD_VERSION: str = _XRPL_RELEASE_FALLBACK
 
         print(
             f"{bcolors.BLUE}Setting Up Standalone Network "
@@ -656,7 +650,6 @@ def main():
         print(f"    - Build Server: {BUILD_SERVER}")
         print(f"    - Build Version: {BUILD_VERSION}")
         print(f"    - IPFS Server: {IPFS_SERVER}")
-        print(f"    - Docker Deploy: {DOCKER_DEPLOY}")
         print(f"    - Node DB: {NODEDB_TYPE}")
 
         if BUILD_TYPE == "image":
@@ -685,25 +678,6 @@ def main():
                 IPFS_SERVER,
                 NODEDB_TYPE,
             )
-
-        if DOCKER_DEPLOY:
-            if PROTOCOL == "xrpl":
-                raise Exception("Docker Deploy not supported for XRPL")
-
-            print(f"{bcolors.BLUE}Deploying to Docker{bcolors.END}")
-            shutil.copyfile(
-                f"{package_dir}/deploykit/deploy.xahau.dockerfile",
-                f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/deploy.xahau.dockerfile",
-            )
-            run_command(
-                f"{basedir}/{PROTOCOL}-{BUILD_VERSION}",
-                f"docker build --tag transia/xahau:{BUILD_VERSION} .",
-            )
-            run_command(
-                f"{basedir}/{PROTOCOL}-{BUILD_VERSION}",
-                f"docker push transia/xahau:{BUILD_VERSION}",
-            )
-            return
 
         run_start(
             [f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/start.sh"],

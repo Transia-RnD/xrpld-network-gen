@@ -114,7 +114,7 @@ def create_xrpl_standalone_folder(
         vl_config["ips_fixed"],
     )
     os.makedirs(f"{basedir}/{protocol}-{name}/config", exist_ok=True)
-    save_local_config(cfg_path, configs[0].data, configs[1].data)
+    save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
     features_json: Dict[str, Any] = parse_amendments(feature_content)
@@ -127,6 +127,7 @@ def create_xrpl_standalone_folder(
     print(f"✅ {bcolors.CYAN}Updating features")
 
     dockerfile: str = create_dockerfile(
+        protocol,
         False,
         binary,
         name,
@@ -306,7 +307,7 @@ def create_xahau_standalone_folder(
         vl_config["ips_fixed"],
     )
     os.makedirs(f"{basedir}/{protocol}-{name}/config", exist_ok=True)
-    save_local_config(cfg_path, configs[0].data, configs[1].data)
+    save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
     features_json: Dict[str, Any] = parse_amendments(feature_content)
@@ -320,6 +321,7 @@ def create_xahau_standalone_folder(
     #     print(f"{bcolors.GREEN}feature: {bcolors.BLUE}{k}")
 
     dockerfile: str = create_dockerfile(
+        protocol,
         False,
         binary,
         name,
@@ -388,7 +390,7 @@ def create_standalone_binary(
     )
     content = get_feature_lines_from_content(content_bytes)
     url: str = f"{build_server}/{build_version}"
-    download_binary(url, f"{basedir}/{protocol}-{name}/xrpld.{name}")
+    download_binary(url, f"{basedir}/{protocol}-{name}/{protocol}d.{name}")
     image: str = "ubuntu:jammy"
     create_xahau_standalone_folder(
         True,
@@ -503,20 +505,19 @@ def create_local_folder(
     )
     os.makedirs(cfg_path, exist_ok=True)
     os.makedirs(db_path, exist_ok=True)
-    save_local_config(cfg_path, configs[0].data, configs[1].data)
+    save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
     features_json: Dict[str, Any] = {}
+    cpp_path = "../src/ripple/protocol/impl/Feature.cpp"
+    macro_path = "../include/xrpl/protocol/detail/features.macro"
+    features_path = cpp_path if os.path.exists(cpp_path) else macro_path
+        
     if protocol == "xahau":
-        cpp_path = "../src/ripple/protocol/impl/Feature.cpp"
-        macro_path = "../include/xrpl/protocol/detail/features.macro"
-        path = cpp_path if os.path.exists(cpp_path) else macro_path
-        content: str = get_feature_lines_from_path(cpp_path)
+        content: str = get_feature_lines_from_path(features_path)
         features_json: Dict[str, Any] = parse_amendments(content)
     if protocol == "xrpl":
-        content: str = get_feature_lines_from_path(
-            "../include/xrpl/protocol/detail/features.macro"
-        )
+        content: str = get_feature_lines_from_path(features_path)
         features_json: Dict[str, Any] = parse_amendments(content)
 
     if not features_json:
@@ -564,7 +565,6 @@ def start_local(
     }
 
     compose = {
-        "version": "3.9",
         "services": services,
         "networks": {"standalone-network": {"driver": "bridge"}},
     }
@@ -574,7 +574,7 @@ def start_local(
 
     write_file(
         "start.sh",
-        build_local_start_sh(net_type),  # noqa: E501
+        build_local_start_sh(protocol, net_type),  # noqa: E501
     )
     os.chmod("start.sh", 0o755)
     stop_sh_content: str = build_stop_sh(basedir, protocol, name, 0, 0, False, True)

@@ -65,6 +65,7 @@ def create_ansible_vars_file(
 
 
 def create_dockerfile(
+    protocol: str,
     network: bool,
     binary: bool,
     version: str,
@@ -98,7 +99,7 @@ def create_dockerfile(
         dockerfile += "COPY genesis.json /genesis.json\n"
 
     if binary:
-        dockerfile += f"COPY xrpld.{version} /app/xrpld\n"
+        dockerfile += f"COPY {protocol}d.{version} /app/{protocol}d\n"
 
     if network:
         dockerfile += f"""
@@ -265,14 +266,17 @@ def build_start_sh(
 
 
 def build_local_start_sh(
+    protocol: str,
     net_type: str,
 ):
+    exe_filename: str = "xrpld" if protocol == "xrpl" else "rippled"
+    config_filename: str = "xrpld.cfg" if protocol == "xrpl" else "xahaud.cfg"
     flag = "-a" if net_type == "standalone" else ""
     return (
         "#! /bin/bash\n"
         "docker compose -f docker-compose.yml"
         " up --build --force-recreate -d\n"
-        f"./xrpld {flag} --conf config/xrpld.cfg"
+        f"./{exe_filename} {flag} --conf config/{config_filename}"
         " --ledgerfile config/genesis.json\n"
     )
 

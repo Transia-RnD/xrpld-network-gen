@@ -175,7 +175,7 @@ def create_node_folders(
 
         os.makedirs(f"{basedir}/{name}-cluster/{node_dir}", exist_ok=True)
         os.makedirs(f"{basedir}/{name}-cluster/{node_dir}/config", exist_ok=True)
-        save_local_config(cfg_path, configs[0].data, configs[1].data)
+        save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
 
         print(f"✅ {bcolors.CYAN}Created validator: {i} config")
 
@@ -203,6 +203,7 @@ def create_node_folders(
         print(f"✅ {bcolors.CYAN}Updated validator: {i} features")
 
         dockerfile: str = create_dockerfile(
+            protocol,
             True,
             binary,
             name,
@@ -282,7 +283,7 @@ def create_node_folders(
         # print(f'CONFIG: {configs}')
         os.makedirs(f"{basedir}/{name}-cluster/{node_dir}", exist_ok=True)
         os.makedirs(f"{basedir}/{name}-cluster/{node_dir}/config", exist_ok=True)
-        save_local_config(cfg_path, configs[0].data, configs[1].data)
+        save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
 
         print(f"✅ {bcolors.CYAN}Created peer: {i} config")
 
@@ -307,6 +308,7 @@ def create_node_folders(
         print(f"✅ {bcolors.CYAN}Updated peer: {i} features")
 
         dockerfile: str = create_dockerfile(
+            protocol,
             True,
             binary,
             name,
@@ -1016,7 +1018,7 @@ def create_local_node_folders(
         os.makedirs(f"{cluster_dir}/{node_dir}", exist_ok=True)
         os.makedirs(f"{cluster_dir}/{node_dir}/config", exist_ok=True)
         os.makedirs(f"{cluster_dir}/{node_dir}/log", exist_ok=True)
-        save_local_config(cfg_path, configs[0].data, configs[1].data)
+        save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
 
         print(f"✅ {bcolors.CYAN}Created validator: {i} config")
 
@@ -1074,7 +1076,7 @@ def create_local_node_folders(
         os.makedirs(f"{cluster_dir}/{node_dir}", exist_ok=True)
         os.makedirs(f"{cluster_dir}/{node_dir}/config", exist_ok=True)
         os.makedirs(f"{cluster_dir}/{node_dir}/log", exist_ok=True)
-        save_local_config(cfg_path, configs[0].data, configs[1].data)
+        save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
 
         print(f"✅ {bcolors.CYAN}Created peer: {i} config")
 
