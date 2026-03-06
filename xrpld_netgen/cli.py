@@ -386,7 +386,8 @@ def main():
     if args.command == "down:standalone":
         NAME = args.name
         print(
-            f"{bcolors.BLUE}Taking Down Standalone Network with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Taking Down Standalone Network "
+            f"with the following parameters:{bcolors.END}"
         )
 
         if NAME:
@@ -421,11 +422,11 @@ def main():
         )
 
     print("")
-    print("   _  __ ____  ____  __    ____     _   __     __  ______          ")
-    print("  | |/ // __ \/ __ \/ /   / __ \   / | / /__  / /_/ ____/__  ____  ")
-    print("  |   // /_/ / /_/ / /   / / / /  /  |/ / _ \/ __/ / __/ _ \/ __ \ ")
-    print(" /   |/ _, _/ ____/ /___/ /_/ /  / /|  /  __/ /_/ /_/ /  __/ / / / ")
-    print("/_/|_/_/ |_/_/   /_____/_____/  /_/ |_/\___/\__/\____/\___/_/ /_/  ")
+    print("   _  __ ____  ____  __    ____     _   __     __  ______          ")  # noqa: W605, E501
+    print("  | |/ // __ \\/ __ \\/ /   / __ \\   / | / /__  / /_/ ____/__  ____  ")  # noqa: W605, E501
+    print("  |   // /_/ / /_/ / /   / / / /  /  |/ / _ \\/ __/ / __/ _ \\/ __ \\ ")  # noqa: W605, E501
+    print(" /   |/ _, _/ ____/ /___/ /_/ /  / /|  /  __/ /_/ /_/ /  __/ / / / ")  # noqa: W605, E501
+    print("/_/|_/_/ |_/_/   /_____/_____/  /_/ |_/\\___/\\__/\\____/\\___/_/ /_/  ")  # noqa: W605, E501
     print("")
 
     check_deps([f"{basedir}/deploykit/prerequisites.sh"])
@@ -449,7 +450,8 @@ def main():
         NODEDB_TYPE = args.nodedb_type
 
         print(
-            f"{bcolors.BLUE}Starting Local Network with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Starting Local Network "
+            f"with the following parameters:{bcolors.END}"
         )
         print(f"    - Log Level: {LOG_LEVEL}")
         print(f"    - Public Key: {PUBLIC_KEY}")
@@ -521,7 +523,8 @@ def main():
 
         network_type = "Local Network" if LOCAL else "Network"
         print(
-            f"{bcolors.BLUE}Creating {network_type} with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Creating {network_type} "
+            f"with the following parameters:{bcolors.END}"
         )
         print(f"    - Log Level: {LOG_LEVEL}")
         print(f"    - Protocol: {PROTOCOL}")
@@ -535,7 +538,7 @@ def main():
         print(f"    - Node DB: {NODEDB_TYPE}")
         if LOCAL:
             print(f"    - Binary Name: {BINARY_NAME}")
-            print(f"    - Deployment: Local (native processes, no Docker for nodes)")
+            print("    - Deployment: Local (native processes, no Docker for nodes)")
 
         if LOCAL:
             # Create local network without Docker
@@ -576,7 +579,8 @@ def main():
         BUILD_SERVER = args.build_server
         BUILD_VERSION = args.build_version
         print(
-            f"{bcolors.BLUE}Updating Node Version with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Updating Node Version "
+            f"with the following parameters:{bcolors.END}"
         )
         print(f"    - Network Name: {NAME}")
         print(f"    - Node ID: {NODE_ID}")
@@ -591,7 +595,8 @@ def main():
         NODE_ID = args.node_id
         NODE_VERSION = args.node_version
         print(
-            f"{bcolors.BLUE}Enabling Amendment with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Enabling Amendment "
+            f"with the following parameters:{bcolors.END}"
         )
         print(f"    - Network Name: {NAME}")
         print(f"    - Amendment Name: {AMENDMENT_NAME}")
@@ -635,7 +640,8 @@ def main():
             BUILD_VERSION: str = XRPL_RELEASE
 
         print(
-            f"{bcolors.BLUE}Setting Up Standalone Network with the following parameters:{bcolors.END}"
+            f"{bcolors.BLUE}Setting Up Standalone Network "
+            f"with the following parameters:{bcolors.END}"
         )
         print(f"    - Log Level: {LOG_LEVEL}")
         print(f"    - Build Type: {BUILD_TYPE}")

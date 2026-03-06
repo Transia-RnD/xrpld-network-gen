@@ -3,8 +3,6 @@
 
 import re
 import os
-import json
-from datetime import datetime
 from typing import Dict, Any, List  # noqa: F401
 
 from xrpld_netgen.utils.misc import read_json
@@ -37,10 +35,12 @@ def parse_xrpld_amendments(lines: Any):
         if re.match(r"XRPL_FEATURE", line) or re.match(r"XRPL_FIX", line):
             amendment_name: str = ""
             if re.match(r"XRPL_FIX", line):
-                amendment_name = re.search("XRPL_FIX\)?.*?\((.*?),", line).group(1) or 0
+                amendment_name = (
+                    re.search(r"XRPL_FIX\)?.*?\((.*?),", line).group(1) or 0
+                )
                 amendment_name = f"fix{amendment_name}"
             if re.match(r"XRPL_FEATURE", line):
-                amendment_name = re.search("XRPL_FEATURE\((.*?),", line).group(1) or 0
+                amendment_name = re.search(r"XRPL_FEATURE\((.*?),", line).group(1) or 0
             supported = re.findall(r"Supported::(.*),", line)
             default_vote = re.findall(r"DefaultVote::(.*),", line)
             amendments[amendment_name] = {
@@ -50,7 +50,7 @@ def parse_xrpld_amendments(lines: Any):
     return {
         k: hashlib.sha512(k.encode("utf-8")).digest().hex().upper()[:64]
         for (k, v) in amendments.items()
-        if v["supported"] == True
+        if v["supported"] is True
     }
 
 
@@ -61,11 +61,11 @@ def parse_xahaud_amendments(lines: Any):
             amendment_name: str = ""
             if re.match(r"REGISTER_FIX", line):
                 amendment_name = (
-                    re.search("REGISTER_FIX\)?.*?\((.*?),", line).group(1) or 0
+                    re.search(r"REGISTER_FIX\)?.*?\((.*?),", line).group(1) or 0
                 )
             if re.match(r"REGISTER_FEATURE", line):
                 amendment_name = (
-                    re.search("REGISTER_FEATURE\((.*?),", line).group(1) or 0
+                    re.search(r"REGISTER_FEATURE\((.*?),", line).group(1) or 0
                 )
             supported = re.findall(r"Supported::(.*),", line)
             default_vote = re.findall(r"DefaultVote::(.*),", line)
@@ -76,7 +76,7 @@ def parse_xahaud_amendments(lines: Any):
     return {
         k: hashlib.sha512(k.encode("utf-8")).digest().hex().upper()[:64]
         for (k, v) in amendments.items()
-        if v["supported"] == True
+        if v["supported"] is True
     }
 
 

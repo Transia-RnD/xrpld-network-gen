@@ -48,7 +48,10 @@ def download_file_at_commit_or_tag(
     :return: The content of the file
     """
     # Construct the raw content URL
-    url = f"https://raw.githubusercontent.com/{owner}/{repo}/{commit_hash_or_tag}/{file_path}"
+    url = (
+        f"https://raw.githubusercontent.com/"
+        f"{owner}/{repo}/{commit_hash_or_tag}/{file_path}"
+    )
 
     # Send a GET request to the URL
     response = requests.get(url)
