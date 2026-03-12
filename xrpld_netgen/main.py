@@ -235,7 +235,6 @@ def create_standalone_image(
         }
 
     compose = {
-        "version": "3.9",
         "services": services,
         "networks": {"standalone-network": {"driver": "bridge"}},
     }
@@ -433,7 +432,6 @@ def create_standalone_binary(
         }
 
     compose = {
-        "version": "3.9",
         "services": services,
         "networks": {"standalone-network": {"driver": "bridge"}},
     }

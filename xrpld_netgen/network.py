@@ -514,7 +514,6 @@ def create_network(
         }
 
         compose = {
-            "version": "3.9",
             "services": services,
             "networks": {f"{name}-network": {"driver": "bridge"}},
         }
@@ -757,7 +756,6 @@ def create_ansible(
         }
 
         compose = {
-            "version": "3.9",
             "services": services,
             "networks": {f"{name}-network": {"driver": "bridge"}},
         }
@@ -1261,7 +1259,6 @@ def create_local_network(
         }
 
         compose = {
-            "version": "3.9",
             "services": services,
             "networks": {f"{name}-network": {"driver": "bridge"}},
         }
