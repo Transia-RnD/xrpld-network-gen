@@ -47,6 +47,15 @@ from xrpld_netgen.libs.xrpld import (
     get_feature_lines_from_path,
 )
 
+from xrpld_netgen.faucet import (
+    generate_faucet_package_json,
+    generate_faucet_tsconfig,
+    generate_faucet_server,
+    generate_faucet_dockerfile,
+    generate_faucet_test,
+    generate_faucet_jest_config,
+)
+
 from xrpld_publisher.publisher import PublisherClient
 from xrpld_publisher.validator import ValidatorClient
 
@@ -378,7 +387,9 @@ def create_network(
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
         content_bytes = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
+            owner, repo, commit_hash,
+            "src/ripple/protocol/impl/Feature.cpp",
+            "include/xrpl/protocol/detail/features.macro",
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
@@ -513,6 +524,57 @@ def create_network(
             "networks": [f"{name}-network"],
         }
 
+        # Faucet service
+        ws_port = 6006 + (1 * 100)
+        services["faucet"] = {
+            "build": {
+                "context": "faucet",
+                "dockerfile": "Dockerfile",
+            },
+            "container_name": "faucet",
+            "environment": [
+                f"XRPLD_WS_URL=ws://vnode1:{ws_port}",
+                "DEFAULT_XRP_AMOUNT=1000",
+                f"PROTOCOL={protocol}",
+            ],
+            "ports": ["8080:8080"],
+            "depends_on": {
+                "vnode1": {"condition": "service_started"},
+            },
+            "networks": [f"{name}-network"],
+        }
+
+        # Create faucet directory and files
+        faucet_dir = f"{basedir}/{name}-cluster/faucet"
+        os.makedirs(faucet_dir, exist_ok=True)
+        os.makedirs(f"{faucet_dir}/src", exist_ok=True)
+        write_file(
+            f"{faucet_dir}/package.json",
+            generate_faucet_package_json(),
+        )
+        write_file(
+            f"{faucet_dir}/tsconfig.json",
+            generate_faucet_tsconfig(),
+        )
+        write_file(
+            f"{faucet_dir}/src/server.ts",
+            generate_faucet_server(),
+        )
+        write_file(
+            f"{faucet_dir}/Dockerfile",
+            generate_faucet_dockerfile(),
+        )
+        write_file(
+            f"{faucet_dir}/src/server.test.ts",
+            generate_faucet_test(),
+        )
+        write_file(
+            f"{faucet_dir}/jest.config.js",
+            generate_faucet_jest_config(),
+        )
+
+        print(f"✅ {bcolors.CYAN}Created faucet service")
+
         compose = {
             "version": "3.9",
             "services": services,
@@ -624,7 +686,9 @@ def create_ansible(
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
         content_bytes = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
+            owner, repo, commit_hash,
+            "src/ripple/protocol/impl/Feature.cpp",
+            "include/xrpl/protocol/detail/features.macro",
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
@@ -1146,7 +1210,10 @@ def create_local_network(
         elif os.path.exists(macro_path):
             content = get_feature_lines_from_path(macro_path)
         else:
-            print(f"{bcolors.RED}Error: Cannot find features file at {local_path} or {macro_path}")
+            print(
+                f"{bcolors.RED}Error: Cannot find features"
+                f" file at {local_path} or {macro_path}"
+            )
             print(f"Please run this command from your build directory.{bcolors.END}")
             return
 
