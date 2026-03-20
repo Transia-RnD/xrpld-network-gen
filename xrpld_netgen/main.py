@@ -1,39 +1,40 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import os
-import yaml
-import shutil
 import json
-from typing import List, Any, Dict
+import os
+import shutil
+from typing import Any, Dict, List
 
-from xrpld_netgen.xrpld_cfg import gen_config, XrpldBuild
-from xrpld_netgen.utils.deploy_kit import (
-    create_dockerfile,
-    download_binary,
-    build_stop_sh,
-    build_start_sh,
-    build_local_start_sh,
-)
+import yaml
+
 from xrpld_netgen.libs.github import (
-    get_commit_hash_from_server_version,
     download_file_at_commit_or_tag,
-)
-from xrpld_netgen.utils.misc import (
-    generate_ports,
-    save_local_config,
-    bcolors,
-    write_file,
-    read_json,
-    get_node_db_path,
-    get_relational_db,
+    get_commit_hash_from_server_version,
 )
 from xrpld_netgen.libs.xrpld import (
-    update_amendments,
-    parse_amendments,
     get_feature_lines_from_content,
     get_feature_lines_from_path,
+    parse_amendments,
+    update_amendments,
 )
+from xrpld_netgen.utils.deploy_kit import (
+    build_local_start_sh,
+    build_start_sh,
+    build_stop_sh,
+    create_dockerfile,
+    download_binary,
+)
+from xrpld_netgen.utils.misc import (
+    bcolors,
+    generate_ports,
+    get_node_db_path,
+    get_relational_db,
+    read_json,
+    save_local_config,
+    write_file,
+)
+from xrpld_netgen.xrpld_cfg import XrpldBuild, gen_config
 
 # Package directory for static resources (deploykit, genesis files,
 # default features, etc.)
@@ -386,7 +387,11 @@ def create_standalone_binary(
     repo = "xahaud"
     commit_hash = get_commit_hash_from_server_version(build_server, build_version)
     content_bytes = download_file_at_commit_or_tag(
-        owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
+        owner,
+        repo,
+        commit_hash,
+        "src/ripple/protocol/impl/Feature.cpp",
+        "include/xrpl/protocol/detail/features.macro",
     )
     content = get_feature_lines_from_content(content_bytes)
     url: str = f"{build_server}/{build_version}"
@@ -512,7 +517,7 @@ def create_local_folder(
     cpp_path = "../src/ripple/protocol/impl/Feature.cpp"
     macro_path = "../include/xrpl/protocol/detail/features.macro"
     features_path = cpp_path if os.path.exists(cpp_path) else macro_path
-        
+
     if protocol == "xahau":
         content: str = get_feature_lines_from_path(features_path)
         features_json: Dict[str, Any] = parse_amendments(content)
@@ -580,8 +585,8 @@ def start_local(
     stop_sh_content: str = build_stop_sh(basedir, protocol, name, 0, 0, False, True)
     write_file("stop.sh", stop_sh_content)
     os.chmod("stop.sh", 0o755)
-    import sys
     import subprocess
+    import sys
 
     try:
         result = subprocess.run(

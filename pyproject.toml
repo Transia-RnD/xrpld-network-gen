@@ -10,9 +10,21 @@ pyyaml = "^6.0.1"
 requests = "^2.31.0"
 xrpld-publisher = "^2.0.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
-flake8 = "^3.8.4"
+pre-commit = ">=3.7,<4"
+ruff = ">=0.8"
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+exclude = [".venv", "tests", "dist", "keystore"]
+
+[tool.ruff.lint]
+# Mirrors flake8 as declared in Poetry (pycodestyle E/W, pyflakes F); isort (I).
+# Former .flake8 also listed D/ANN/ABS/DAR/BLK plugins but they were not dependencies.
+select = ["E", "W", "F", "I"]
+ignore = ["E203"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -42,9 +42,13 @@ jobs:
         run: |
           poetry install
 
-      - name: Lint with flake8
+      - name: Format check (Ruff)
         run: |
-          poetry run flake8 .
+          poetry run ruff format --check .
+
+      - name: Lint with Ruff
+        run: |
+          poetry run ruff check .
 
   integration:
     runs-on: ubuntu-latest

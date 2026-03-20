@@ -34,28 +34,29 @@
 # xrpld-netgen down:standalone
 
 
-import os
 import argparse
+import os
+
 from xrpld_netgen.main import (
     create_standalone_binary,
     create_standalone_image,
     start_local,
 )
 from xrpld_netgen.network import (
-    create_network,
     create_local_network,
-    update_node_binary,
+    create_network,
     enable_node_amendment,
+    update_node_binary,
 )
 from xrpld_netgen.utils.misc import (
-    remove_directory,
     bcolors,
     check_deps,
     remove_containers,
+    remove_directory,
+    run_local_logs,
+    run_logs,
     run_start,
     run_stop,
-    run_logs,
-    run_local_logs,
 )
 
 package_dir = os.path.abspath(os.path.dirname(__file__))
@@ -66,6 +67,7 @@ os.makedirs(basedir, exist_ok=True)
 # Fallback versions if network fetch fails
 _XRPL_RELEASE_FALLBACK: str = "3.1.1"
 _XAHAU_RELEASE_FALLBACK: str = "2025.7.9-release+1951"
+
 
 def main():
     parser = argparse.ArgumentParser(

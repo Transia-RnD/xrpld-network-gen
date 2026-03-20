@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import pytest
-from basedir import basedir
 import os
 import shutil
 import sys
+
+import pytest
+
+from basedir import basedir
 
 
 def main():
@@ -17,22 +19,22 @@ def main():
     pytest.main(argv)
 
     try:
-        os.remove(os.path.join(basedir, '.coverage'))
+        os.remove(os.path.join(basedir, ".coverage"))
 
     except OSError:
         pass
 
     try:
-        shutil.rmtree(os.path.join(basedir, '.cache'))
+        shutil.rmtree(os.path.join(basedir, ".cache"))
 
     except OSError:
         pass
 
     try:
-        shutil.rmtree(os.path.join(basedir, 'tests/.cache'))
+        shutil.rmtree(os.path.join(basedir, "tests/.cache"))
     except OSError:
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
