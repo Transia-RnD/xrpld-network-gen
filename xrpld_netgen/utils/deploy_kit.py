@@ -99,7 +99,7 @@ def create_dockerfile(
         dockerfile += "COPY genesis.json /genesis.json\n"
 
     if binary:
-        dockerfile += f"COPY xrpld.{version} /app/xrpld\n"
+        dockerfile += f"COPY {protocol}d.{version} /app/{protocol}d\n"
 
     if network:
         dockerfile += f"""
@@ -193,20 +193,20 @@ def download_binary(url: str, save_path: str) -> None:
         raise ValueError(f"{bcolors.RED}An error occurred: {e}")
 
 
-def update_dockerfile(build_version: str, save_path: str) -> None:
+def update_dockerfile(protocol: str, build_version: str, save_path: str) -> None:
     # Read the Dockerfile
     with open(save_path, "r") as file:
         lines = file.readlines()
 
     # Define the pattern to search for any xrpld COPY line
-    pattern = re.compile(r"^COPY xrpld.* /app/xrpld$")
+    pattern = re.compile(fr"^COPY {protocol}d.* /app/{protocol}d$")
 
     # Replace the line with the new version
     with open(save_path, "w") as file:
         for line in lines:
             if pattern.match(line):
                 # Replace the line with the new xrpld version
-                file.write(f"COPY xrpld.{build_version} /app/xrpld\n")
+                file.write(f"COPY {protocol}d.{build_version} /app/{protocol}d\n")
             else:
                 file.write(line)
 
@@ -285,15 +285,16 @@ def build_local_start_sh(
 
 def build_network_start_sh(
     name: str,
+    protocol: str,
     num_validators: int,
     num_peers: int,
 ):
     start_sh_content = '#! /bin/bash\ncd "$(dirname "$0")"\n'
     for i in range(1, num_validators + 1):
-        start_sh_content += f"cp xrpld.{name} vnode{i}/xrpld.{name}\n"
+        start_sh_content += f"cp {protocol}d.{name} vnode{i}/{protocol}d.{name}\n"
 
     for i in range(1, num_peers + 1):
-        start_sh_content += f"cp xrpld.{name} pnode{i}/xrpld.{name}\n"
+        start_sh_content += f"cp {protocol}d.{name} pnode{i}/{protocol}d.{name}\n"
     start_sh_content += (
         "docker compose -f docker-compose.yml"
         " up --build --force-recreate -d"
@@ -303,6 +304,7 @@ def build_network_start_sh(
 
 def build_network_stop_sh(
     name: str,
+    protocol: str,
     num_validators: int,
     num_peers: int,
 ) -> str:
@@ -324,12 +326,12 @@ done
     for i in range(1, num_validators + 1):
         stop_sh_content += f"rm -r vnode{i}/lib\n"
         stop_sh_content += f"rm -r vnode{i}/log\n"
-        stop_sh_content += f"rm -r vnode{i}/xrpld.{name}\n"
+        stop_sh_content += f"rm -r vnode{i}/{protocol}d.{name}\n"
 
     for i in range(1, num_peers + 1):
         stop_sh_content += f"rm -r pnode{i}/lib\n"
         stop_sh_content += f"rm -r pnode{i}/log\n"
-        stop_sh_content += f"rm -r pnode{i}/xrpld.{name}\n"
+        stop_sh_content += f"rm -r pnode{i}/{protocol}d.{name}\n"
 
     stop_sh_content += "else \n"
     if num_validators > 0 and num_peers > 0:
