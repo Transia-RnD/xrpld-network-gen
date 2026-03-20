@@ -99,7 +99,7 @@ def create_dockerfile(
         dockerfile += "COPY genesis.json /genesis.json\n"
 
     if binary:
-        dockerfile += f"COPY {protocol}d.{version} /app/{protocol}d\n"
+        dockerfile += f"COPY {protocol}d /app/{protocol}d\n"
 
     if network:
         dockerfile += f"""
@@ -199,14 +199,14 @@ def update_dockerfile(protocol: str, build_version: str, save_path: str) -> None
         lines = file.readlines()
 
     # Define the pattern to search for any xrpld COPY line
-    pattern = re.compile(fr"^COPY {protocol}d.* /app/{protocol}d$")
+    pattern = re.compile(fr"^COPY {protocol}d /app/{protocol}d$")
 
     # Replace the line with the new version
     with open(save_path, "w") as file:
         for line in lines:
             if pattern.match(line):
                 # Replace the line with the new xrpld version
-                file.write(f"COPY {protocol}d.{build_version} /app/{protocol}d\n")
+                file.write(f"COPY {protocol}d /app/{protocol}d\n")
             else:
                 file.write(line)
 
@@ -290,11 +290,6 @@ def build_network_start_sh(
     num_peers: int,
 ):
     start_sh_content = '#! /bin/bash\ncd "$(dirname "$0")"\n'
-    for i in range(1, num_validators + 1):
-        start_sh_content += f"cp {protocol}d.{name} vnode{i}/{protocol}d.{name}\n"
-
-    for i in range(1, num_peers + 1):
-        start_sh_content += f"cp {protocol}d.{name} pnode{i}/{protocol}d.{name}\n"
     start_sh_content += (
         "docker compose -f docker-compose.yml"
         " up --build --force-recreate -d"
@@ -322,16 +317,6 @@ done
     stop_sh_content += 'if [ "$REMOVE_FLAG" = true ]; then \n'
     if num_validators > 0 and num_peers > 0:
         stop_sh_content += "docker compose -f docker-compose.yml down --remove-orphans\n"  # noqa: E501
-
-    for i in range(1, num_validators + 1):
-        stop_sh_content += f"rm -r vnode{i}/lib\n"
-        stop_sh_content += f"rm -r vnode{i}/log\n"
-        stop_sh_content += f"rm -r vnode{i}/{protocol}d.{name}\n"
-
-    for i in range(1, num_peers + 1):
-        stop_sh_content += f"rm -r pnode{i}/lib\n"
-        stop_sh_content += f"rm -r pnode{i}/log\n"
-        stop_sh_content += f"rm -r pnode{i}/{protocol}d.{name}\n"
 
     stop_sh_content += "else \n"
     if num_validators > 0 and num_peers > 0:
