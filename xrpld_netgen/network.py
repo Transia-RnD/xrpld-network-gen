@@ -228,6 +228,7 @@ def create_node_folders(
             f"{basedir}/{name}-cluster/{protocol}d",
             f"{basedir}/{name}-cluster/{node_dir}/{protocol}d",
         )
+        os.chmod(f"{basedir}/{cluster_slug}-cluster/{node_dir}/{protocol}d", 0o755)
 
         print(f"✅ {bcolors.CYAN}Built validator: {i} docker container...")
 
@@ -337,6 +338,7 @@ def create_node_folders(
             f"{basedir}/{name}-cluster/{protocol}d",
             f"{basedir}/{name}-cluster/{node_dir}/{protocol}d",
         )
+        os.chmod(f"{basedir}/{cluster_slug}-cluster/{node_dir}/{protocol}d", 0o755)
 
         print(f"✅ {bcolors.CYAN}Built peer: {i} docker container...")
 
