@@ -91,6 +91,7 @@ xrpld-netgen create:network [OPTIONS]
 - `--nodedb_type` - Database type: "Memory" or "NuDB" (default: "NuDB")
 - `--local` - Create local network without Docker (runs natively)
 - `--binary_name` - Custom xrpld binary name (default: "xrpld")
+- `--name` - Optional cluster base name: creates `workspace/{name}-cluster` instead of defaulting to the build version (or Git branch id). Start with `xrpld-netgen up --name {name}-cluster`.
 - `--build_server` - Build server URL (auto-detected by protocol)
 
 **Examples:**
@@ -239,11 +240,16 @@ xrpld-netgen up:standalone [OPTIONS]
 - `--server` - Build server URL (optional)
 - `--public_key` - Validator list public key
 - `--import_key` - Import validator list key
+- `--name` - Optional directory slug: files go under `workspace/{protocol}-{name}` instead of `workspace/{protocol}-{version}`. Tear down with `down:standalone --name {protocol}-{name}`.
 
 **Examples:**
 ```bash
 # Create standalone with current version
 xrpld-netgen up:standalone --protocol xahau
+
+# Custom folder name (same version, different workspace directory)
+xrpld-netgen up:standalone --protocol xahau --name my-ledger
+xrpld-netgen down:standalone --name xahau-my-ledger
 
 # Create with specific version and IPFS
 xrpld-netgen up:standalone --protocol xahau --version 2025.7.9-release+1951 --ipfs

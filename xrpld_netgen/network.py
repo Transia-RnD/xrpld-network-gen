@@ -5,7 +5,7 @@ import os
 import yaml
 import shutil
 import json
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
 from dotenv import load_dotenv
 
 from xrpld_netgen.xrpld_cfg import gen_config, XrpldBuild
@@ -20,6 +20,7 @@ from xrpld_netgen.utils.deploy_kit import (
     build_network_start_sh,
     build_local_network_start_sh,
     build_local_network_stop_sh,
+    network_docker_binary_basename,
 )
 from xrpld_netgen.libs.github import (
     get_commit_hash_from_server_version,
@@ -38,6 +39,8 @@ from xrpld_netgen.utils.misc import (
     read_json,
     get_node_db_path,
     get_relational_db,
+    sanitize_cluster_name,
+    docker_compose_top_level_name,
 )
 
 from xrpld_netgen.libs.xrpld import (
@@ -76,7 +79,8 @@ services: Dict[str, Dict] = {}
 
 def create_node_folders(
     binary: bool,
-    name: str,
+    cluster_slug: str,
+    binary_tag: str,
     image: str,
     feature_content: str,
     num_validators: int,
@@ -93,7 +97,7 @@ def create_node_folders(
     nodedb_type: str = "NuDB",
 ):
     # Create cluster directory and keystore inside it
-    cluster_dir = f"{basedir}/{name}-cluster"
+    cluster_dir = f"{basedir}/{cluster_slug}-cluster"
     os.makedirs(cluster_dir, exist_ok=True)
 
     # Create directories for validator nodes
@@ -139,7 +143,7 @@ def create_node_folders(
     for i in range(1, num_validators + 1):
         ips_dir = ips[i - 1] if ansible else f"vnode{i}"
         node_dir = f"vnode{i}"
-        cfg_path = f"{basedir}/{name}-cluster/{node_dir}/config"
+        cfg_path = f"{basedir}/{cluster_slug}-cluster/{node_dir}/config"
         # GENERATE PORTS
         rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(
             i, "validator"
@@ -148,7 +152,7 @@ def create_node_folders(
         configs: List[XrpldBuild] = gen_config(
             ansible,
             protocol,
-            name,
+            cluster_slug,
             network_id,
             i,
             rpc_public,
@@ -173,8 +177,10 @@ def create_node_folders(
             [ips for ips in ips_fixed if ips != f"{ips_dir} {peer}"],
         )
 
-        os.makedirs(f"{basedir}/{name}-cluster/{node_dir}", exist_ok=True)
-        os.makedirs(f"{basedir}/{name}-cluster/{node_dir}/config", exist_ok=True)
+        os.makedirs(f"{basedir}/{cluster_slug}-cluster/{node_dir}", exist_ok=True)
+        os.makedirs(
+            f"{basedir}/{cluster_slug}-cluster/{node_dir}/config", exist_ok=True
+        )
         save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
 
         print(f"✅ {bcolors.CYAN}Created validator: {i} config")
@@ -191,12 +197,12 @@ def create_node_folders(
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
-            f"{basedir}/{name}-cluster/{node_dir}/genesis.json",
+            f"{basedir}/{cluster_slug}-cluster/{node_dir}/genesis.json",
             json.dumps(genesis_json, indent=4, sort_keys=True),
         )
 
         write_file(
-            f"{basedir}/{name}-cluster/{node_dir}/features.json",
+            f"{basedir}/{cluster_slug}-cluster/{node_dir}/features.json",
             json.dumps(features_json, indent=4, sort_keys=True),
         )
 
@@ -206,7 +212,7 @@ def create_node_folders(
             protocol,
             True,
             binary,
-            name,
+            binary_tag,
             image,
             rpc_public,
             rpc_admin,
@@ -217,12 +223,14 @@ def create_node_folders(
             quorum,
             "",
         )
-        with open(f"{basedir}/{name}-cluster/{node_dir}/Dockerfile", "w") as file:
+        with open(
+            f"{basedir}/{cluster_slug}-cluster/{node_dir}/Dockerfile", "w"
+        ) as file:
             file.write(dockerfile)
 
         shutil.copyfile(
             f"{package_dir}/deploykit/network.entrypoint",
-            f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
+            f"{basedir}/{cluster_slug}-cluster/{node_dir}/entrypoint",
         )
 
         print(f"✅ {bcolors.CYAN}Built validator: {i} docker container...")
@@ -246,17 +254,17 @@ def create_node_folders(
                 f"./vnode{i}/log:/opt/ripple/log",
                 f"./vnode{i}/lib:/opt/ripple/lib",
             ],
-            "networks": [f"{name}-network"],
+            "networks": [f"{cluster_slug}-network"],
         }
 
     for i in range(1, num_peers + 1):
         node_dir = f"pnode{i}"
-        cfg_path = f"{basedir}/{name}-cluster/{node_dir}/config"
+        cfg_path = f"{basedir}/{cluster_slug}-cluster/{node_dir}/config"
         rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(i, "peer")
         configs: List[XrpldBuild] = gen_config(
             ansible,
             protocol,
-            name,
+            cluster_slug,
             network_id,
             i,
             rpc_public,
@@ -281,8 +289,10 @@ def create_node_folders(
             ips_fixed,
         )
         # print(f'CONFIG: {configs}')
-        os.makedirs(f"{basedir}/{name}-cluster/{node_dir}", exist_ok=True)
-        os.makedirs(f"{basedir}/{name}-cluster/{node_dir}/config", exist_ok=True)
+        os.makedirs(f"{basedir}/{cluster_slug}-cluster/{node_dir}", exist_ok=True)
+        os.makedirs(
+            f"{basedir}/{cluster_slug}-cluster/{node_dir}/config", exist_ok=True
+        )
         save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
 
         print(f"✅ {bcolors.CYAN}Created peer: {i} config")
@@ -296,12 +306,12 @@ def create_node_folders(
 
         genesis_json: Any = update_amendments(features_json, protocol)
         write_file(
-            f"{basedir}/{name}-cluster/{node_dir}/genesis.json",
+            f"{basedir}/{cluster_slug}-cluster/{node_dir}/genesis.json",
             json.dumps(genesis_json, indent=4, sort_keys=True),
         )
 
         write_file(
-            f"{basedir}/{name}-cluster/{node_dir}/features.json",
+            f"{basedir}/{cluster_slug}-cluster/{node_dir}/features.json",
             json.dumps(features_json, indent=4, sort_keys=True),
         )
 
@@ -311,7 +321,7 @@ def create_node_folders(
             protocol,
             True,
             binary,
-            name,
+            binary_tag,
             image,
             rpc_public,
             rpc_admin,
@@ -322,12 +332,14 @@ def create_node_folders(
             quorum,
             "",
         )
-        with open(f"{basedir}/{name}-cluster/{node_dir}/Dockerfile", "w") as file:
+        with open(
+            f"{basedir}/{cluster_slug}-cluster/{node_dir}/Dockerfile", "w"
+        ) as file:
             file.write(dockerfile)
 
         shutil.copyfile(
             f"{package_dir}/deploykit/network.entrypoint",
-            f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
+            f"{basedir}/{cluster_slug}-cluster/{node_dir}/entrypoint",
         )
 
         print(f"✅ {bcolors.CYAN}Built peer: {i} docker container...")
@@ -351,7 +363,7 @@ def create_node_folders(
                 f"./pnode{i}/log:/opt/ripple/log",
                 f"./pnode{i}/lib:/opt/ripple/lib",
             ],
-            "networks": [f"{name}-network"],
+            "networks": [f"{cluster_slug}-network"],
         }
 
     return manifests
@@ -369,32 +381,50 @@ def create_network(
     genesis: bool = False,
     quorum: int = None,
     nodedb_type: str = "NuDB",
+    network_name: Optional[str] = None,
 ) -> None:
     if protocol == "xahau":
-        name: str = build_version
-        os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+        name_binary = build_version
+        cluster_slug = (
+            sanitize_cluster_name(network_name) if network_name else name_binary
+        )
+        os.makedirs(f"{basedir}/{cluster_slug}-cluster", exist_ok=True)
         # Usage
         owner = "Xahau"
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
         content_bytes = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
+            owner,
+            repo,
+            commit_hash,
+            "src/ripple/protocol/impl/Feature.cpp",
+            "include/xrpl/protocol/detail/features.macro",
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
-        download_binary(url, f"{basedir}/{name}-cluster/xrpld.{build_version}")
+        bin_root = network_docker_binary_basename("xahau", name_binary)
+        download_binary(url, f"{basedir}/{cluster_slug}-cluster/{bin_root}")
         image: str = "ubuntu:jammy"
 
-    if protocol == "xrpl":
+    elif protocol == "xrpl":
         if build_server.startswith("https://github.com/"):
             owner: str = build_server.split("https://github.com/")[1].split("/")[0]
             # Extract branch name from URL (supports both rippled and xrpld repo names)
-            name: str = build_server.split(f"https://github.com/{owner}/")[1]
-            name = name.split("/tree/")[1] if "/tree/" in name else name
-            name = name.replace("/", "-")
-            os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+            name_binary = build_server.split(f"https://github.com/{owner}/")[1]
+            name_binary = (
+                name_binary.split("/tree/")[1]
+                if "/tree/" in name_binary
+                else name_binary
+            )
+            name_binary = name_binary.replace("/", "-")
+            cluster_slug: str = (
+                sanitize_cluster_name(network_name) if network_name else name_binary
+            )
+            os.makedirs(f"{basedir}/{cluster_slug}-cluster", exist_ok=True)
             repo = "rippled"
-            copy_file("./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
+            copy_file(
+                "./xrpld", f"{basedir}/{cluster_slug}-cluster/xrpld.{name_binary}"
+            )
             content_bytes = download_file_at_commit_or_tag(
                 owner,
                 repo,
@@ -404,8 +434,11 @@ def create_network(
             content = get_feature_lines_from_content(content_bytes)
             image: str = "ubuntu:jammy"
         else:
-            name: str = build_version
-            os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+            name_binary = build_version
+            cluster_slug = (
+                sanitize_cluster_name(network_name) if network_name else name_binary
+            )
+            os.makedirs(f"{basedir}/{cluster_slug}-cluster", exist_ok=True)
             owner = "XRPLF"
             repo = "rippled"
             content_bytes = download_file_at_commit_or_tag(
@@ -413,10 +446,12 @@ def create_network(
             )
             content = get_feature_lines_from_content(content_bytes)
             image: str = f"{build_server}/{build_version}"
+    else:
+        raise ValueError(f"Unsupported protocol: {protocol}")
 
     # Change to cluster directory for VL key creation
     original_dir = os.getcwd()
-    os.chdir(f"{basedir}/{name}-cluster")
+    os.chdir(f"{basedir}/{cluster_slug}-cluster")
 
     try:
         client = PublisherClient()
@@ -468,7 +503,8 @@ def create_network(
         keys = client.get_keys()
         manifests: List[str] = create_node_folders(
             True,
-            name,
+            cluster_slug,
+            name_binary,
             image,
             content,
             num_validators,
@@ -492,7 +528,7 @@ def create_network(
             },
             "container_name": "vl",
             "ports": ["80:80"],
-            "networks": [f"{name}-network"],
+            "networks": [f"{cluster_slug}-network"],
             "healthcheck": {
                 "test": ["CMD", "curl", "-f", "http://localhost/vl.json"],
                 "interval": "5s",
@@ -510,43 +546,50 @@ def create_network(
                 f"VUE_APP_WSS_ENDPOINT=ws://0.0.0.0:{6016}",
             ],
             "ports": ["4000:4000"],
-            "networks": [f"{name}-network"],
+            "networks": [f"{cluster_slug}-network"],
         }
 
         compose = {
             "version": "3.9",
             "services": services,
-            "networks": {f"{name}-network": {"driver": "bridge"}},
+            "networks": {f"{cluster_slug}-network": {"driver": "bridge"}},
         }
-        with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
+        if network_name:
+            compose = {
+                "name": docker_compose_top_level_name(cluster_slug),
+                **compose,
+            }
+        with open(f"{basedir}/{cluster_slug}-cluster/docker-compose.yml", "w") as f:
             yaml.dump(compose, f, default_flow_style=False)
 
         write_file(
-            f"{basedir}/{name}-cluster/start.sh",
-            build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
+            f"{basedir}/{cluster_slug}-cluster/start.sh",
+            build_network_start_sh(protocol, name_binary, num_validators, num_peers),  # noqa: E501
         )
         stop_sh_content: str = build_network_stop_sh(
-            name,
+            protocol,
+            name_binary,
             num_validators,
             num_peers,
         )
-        write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
+        write_file(f"{basedir}/{cluster_slug}-cluster/stop.sh", stop_sh_content)
 
-        os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
+        os.makedirs(f"{basedir}/{cluster_slug}-cluster/vl", exist_ok=True)
         for manifest in manifests:
             client.add_validator(manifest)
-        client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
+        client.sign_unl(f"{basedir}/{cluster_slug}-cluster/vl/vl.json")
         shutil.copyfile(
             f"{package_dir}/deploykit/nginx.dockerfile",
-            f"{basedir}/{name}-cluster/vl/Dockerfile",
+            f"{basedir}/{cluster_slug}-cluster/vl/Dockerfile",
         )
     finally:
         # Change back to original directory
         os.chdir(original_dir)
 
-    os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
-    os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
-    os.chmod(f"{basedir}/{name}-cluster/xrpld.{name}", 0o755)
+    bin_chmod = network_docker_binary_basename(protocol, name_binary)
+    os.chmod(f"{basedir}/{cluster_slug}-cluster/start.sh", 0o755)
+    os.chmod(f"{basedir}/{cluster_slug}-cluster/stop.sh", 0o755)
+    os.chmod(f"{basedir}/{cluster_slug}-cluster/{bin_chmod}", 0o755)
 
 
 def update_node_binary(
@@ -593,9 +636,7 @@ def enable_node_amendment(
     port: int = get_node_port(int(node_id), node_type)
     json_str: str = json.dumps(command)
     escaped_str = json_str.replace('"', '\\"')
-    command: str = (
-        f'curl -X POST -H "Content-Type: application/json" -d "{escaped_str}" http://localhost:{port}'  # noqa: E501
-    )
+    command: str = f'curl -X POST -H "Content-Type: application/json" -d "{escaped_str}" http://localhost:{port}'  # noqa: E501
     run_command(f"{basedir}/{name}", command)
 
 
@@ -613,32 +654,50 @@ def create_ansible(
     nodedb_type: str = "NuDB",
     vips: List[str] = [],
     pips: List[str] = [],
+    network_name: Optional[str] = None,
 ) -> None:
     if protocol == "xahau":
-        name: str = build_version
-        os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+        name_binary = build_version
+        cluster_slug = (
+            sanitize_cluster_name(network_name) if network_name else name_binary
+        )
+        os.makedirs(f"{basedir}/{cluster_slug}-cluster", exist_ok=True)
         # Usage
         owner = "Xahau"
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
         content_bytes = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
+            owner,
+            repo,
+            commit_hash,
+            "src/ripple/protocol/impl/Feature.cpp",
+            "include/xrpl/protocol/detail/features.macro",
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
-        download_binary(url, f"{basedir}/{name}-cluster/xrpld.{build_version}")
+        bin_root = network_docker_binary_basename("xahau", name_binary)
+        download_binary(url, f"{basedir}/{cluster_slug}-cluster/{bin_root}")
         image: str = "ubuntu:jammy"
 
-    if protocol == "xrpl":
+    elif protocol == "xrpl":
         if build_server.startswith("https://github.com/"):
             repo: str = "rippled"
             owner: str = build_server.split("https://github.com/")[1].split("/")[0]
             # Extract branch name from URL (supports both rippled and xrpld repo names)
-            name: str = build_server.split(f"https://github.com/{owner}/")[1]
-            name = name.split("/tree/")[1] if "/tree/" in name else name
-            name = name.replace("/", "-")
-            os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-            copy_file("./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
+            name_binary = build_server.split(f"https://github.com/{owner}/")[1]
+            name_binary = (
+                name_binary.split("/tree/")[1]
+                if "/tree/" in name_binary
+                else name_binary
+            )
+            name_binary = name_binary.replace("/", "-")
+            cluster_slug: str = (
+                sanitize_cluster_name(network_name) if network_name else name_binary
+            )
+            os.makedirs(f"{basedir}/{cluster_slug}-cluster", exist_ok=True)
+            copy_file(
+                "./xrpld", f"{basedir}/{cluster_slug}-cluster/xrpld.{name_binary}"
+            )
             content_bytes = download_file_at_commit_or_tag(
                 owner,
                 repo,
@@ -648,8 +707,11 @@ def create_ansible(
             content = get_feature_lines_from_content(content_bytes)
             image: str = "ubuntu:jammy"
         else:
-            name: str = build_version
-            os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
+            name_binary = build_version
+            cluster_slug = (
+                sanitize_cluster_name(network_name) if network_name else name_binary
+            )
+            os.makedirs(f"{basedir}/{cluster_slug}-cluster", exist_ok=True)
             owner = "XRPLF"
             repo = "rippled"
             content_bytes = download_file_at_commit_or_tag(
@@ -657,10 +719,12 @@ def create_ansible(
             )
             content = get_feature_lines_from_content(content_bytes)
             image: str = f"{build_server}/{build_version}"
+    else:
+        raise ValueError(f"Unsupported protocol: {protocol}")
 
     # Change to cluster directory for VL key creation
     original_dir = os.getcwd()
-    os.chdir(f"{basedir}/{name}-cluster")
+    os.chdir(f"{basedir}/{cluster_slug}-cluster")
 
     try:
         client = PublisherClient()
@@ -712,7 +776,8 @@ def create_ansible(
         keys = client.get_keys()
         manifests: List[str] = create_node_folders(
             True,
-            name,
+            cluster_slug,
+            name_binary,
             image,
             content,
             num_validators,
@@ -736,7 +801,7 @@ def create_ansible(
             },
             "container_name": "vl",
             "ports": ["80:80"],
-            "networks": [f"{name}-network"],
+            "networks": [f"{cluster_slug}-network"],
             "healthcheck": {
                 "test": ["CMD", "curl", "-f", "http://localhost/vl.json"],
                 "interval": "5s",
@@ -753,65 +818,74 @@ def create_ansible(
                 "PORT=4000",
             ],
             "ports": ["4000:4000"],
-            "networks": [f"{name}-network"],
+            "networks": [f"{cluster_slug}-network"],
         }
 
         compose = {
             "version": "3.9",
             "services": services,
-            "networks": {f"{name}-network": {"driver": "bridge"}},
+            "networks": {f"{cluster_slug}-network": {"driver": "bridge"}},
         }
-        with open(f"{basedir}/{name}-cluster/docker-compose.yml", "w") as f:
+        if network_name:
+            compose = {
+                "name": docker_compose_top_level_name(cluster_slug),
+                **compose,
+            }
+        with open(f"{basedir}/{cluster_slug}-cluster/docker-compose.yml", "w") as f:
             yaml.dump(compose, f, default_flow_style=False)
 
         write_file(
-            f"{basedir}/{name}-cluster/start.sh",
-            build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
+            f"{basedir}/{cluster_slug}-cluster/start.sh",
+            build_network_start_sh(protocol, name_binary, num_validators, num_peers),  # noqa: E501
         )
-        stop_sh_content: str = build_network_stop_sh(name, num_validators, num_peers)
-        write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
+        stop_sh_content: str = build_network_stop_sh(
+            protocol, name_binary, num_validators, num_peers
+        )
+        write_file(f"{basedir}/{cluster_slug}-cluster/stop.sh", stop_sh_content)
 
-        os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
+        os.makedirs(f"{basedir}/{cluster_slug}-cluster/vl", exist_ok=True)
         for manifest in manifests:
             client.add_validator(manifest)
-        client.sign_unl(f"{basedir}/{name}-cluster/vl/vl.json")
+        client.sign_unl(f"{basedir}/{cluster_slug}-cluster/vl/vl.json")
         shutil.copyfile(
             f"{package_dir}/deploykit/nginx.dockerfile",
-            f"{basedir}/{name}-cluster/vl/Dockerfile",
+            f"{basedir}/{cluster_slug}-cluster/vl/Dockerfile",
         )
     finally:
         # Change back to original directory
         os.chdir(original_dir)
 
-    os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
-    os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
-    os.chmod(f"{basedir}/{name}-cluster/xrpld.{name}", 0o755)
+    bin_chmod = network_docker_binary_basename(protocol, name_binary)
+    os.chmod(f"{basedir}/{cluster_slug}-cluster/start.sh", 0o755)
+    os.chmod(f"{basedir}/{cluster_slug}-cluster/stop.sh", 0o755)
+    os.chmod(f"{basedir}/{cluster_slug}-cluster/{bin_chmod}", 0o755)
 
-    os.makedirs(f"{basedir}/{name}-cluster/ansible", exist_ok=True)
-    os.makedirs(f"{basedir}/{name}-cluster/ansible/host_vars", exist_ok=True)
+    os.makedirs(f"{basedir}/{cluster_slug}-cluster/ansible", exist_ok=True)
+    os.makedirs(f"{basedir}/{cluster_slug}-cluster/ansible/host_vars", exist_ok=True)
 
     shutil.copytree(
         f"{package_dir}/deploykit/ansible",
-        f"{basedir}/{name}-cluster/ansible",
+        f"{basedir}/{cluster_slug}-cluster/ansible",
         dirs_exist_ok=True,
     )
     image_name: str = build_version.replace("-", ".")
     image_name: str = image_name.replace("+", ".")
     ssh_port: int = os.environ.get("SSH_PORT", 20)
+    ansible_docker_bin = network_docker_binary_basename(protocol, name_binary)
     for k, v in services.items():
         if k[:5] == "vnode":
             index: int = int(k[5:])
             c_name: str = v["container_name"]
             ports: List[str] = v["ports"]
             vars = DockerVars(
-                f"{basedir}/{name}-cluster/{c_name}/config/",
+                f"{basedir}/{cluster_slug}-cluster/{c_name}/config/",
                 ssh_port,
                 [
-                    f'RPC_PUBLIC: {ports[0].split(":")[0]}',
-                    f'RPC_ADMIN: {ports[1].split(":")[0]}',
-                    f'WS_PUBLIC: {ports[2].split(":")[0]}',
-                    f'WS_ADMIN: {ports[3].split(":")[0]}',
-                    f'PEER: {ports[4].split(":")[0]}',
+                    f"RPC_PUBLIC: {ports[0].split(':')[0]}",
+                    f"RPC_ADMIN: {ports[1].split(':')[0]}",
+                    f"WS_PUBLIC: {ports[2].split(':')[0]}",
+                    f"WS_ADMIN: {ports[3].split(':')[0]}",
+                    f"PEER: {ports[4].split(':')[0]}",
                 ],
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
@@ -833,39 +907,41 @@ def create_ansible(
                 ],
             )
             create_ansible_vars_file(
-                f"{basedir}/{name}-cluster/ansible/host_vars", vips[index - 1], vars
+                f"{basedir}/{cluster_slug}-cluster/ansible/host_vars",
+                vips[index - 1],
+                vars,
             )
 
         run_command(
-            f"{basedir}/{name}-cluster",
-            f"cp xrpld.{name} {basedir}/{name}-cluster/vnode1",
+            f"{basedir}/{cluster_slug}-cluster",
+            f"cp {ansible_docker_bin} {basedir}/{cluster_slug}-cluster/vnode1",
         )
         run_command(
-            f"{basedir}/{name}-cluster/vnode1",
+            f"{basedir}/{cluster_slug}-cluster/vnode1",
             "docker build -f Dockerfile --platform linux/x86_64"
             f" --tag transia/cluster:{image_name} .",
         )
         run_command(
-            f"{basedir}/{name}-cluster/vnode1",
+            f"{basedir}/{cluster_slug}-cluster/vnode1",
             f"docker push transia/cluster:{image_name}",
         )
         run_command(
-            f"{basedir}/{name}-cluster/vnode1",
-            f"rm -r xrpld.{name}",
+            f"{basedir}/{cluster_slug}-cluster/vnode1",
+            f"rm -f {ansible_docker_bin}",
         )
         if k[:5] == "pnode":
             index: int = int(k[5:])
             c_name: str = v["container_name"]
             ports: List[str] = v["ports"]
             vars = DockerVars(
-                f"{basedir}/{name}-cluster/{c_name}/config/",
+                f"{basedir}/{cluster_slug}-cluster/{c_name}/config/",
                 ssh_port,
                 [
-                    f'RPC_PUBLIC: {ports[0].split(":")[0]}',
-                    f'RPC_ADMIN: {ports[1].split(":")[0]}',
-                    f'WS_PUBLIC: {ports[2].split(":")[0]}',
-                    f'WS_ADMIN: {ports[3].split(":")[0]}',
-                    f'PEER: {ports[4].split(":")[0]}',
+                    f"RPC_PUBLIC: {ports[0].split(':')[0]}",
+                    f"RPC_ADMIN: {ports[1].split(':')[0]}",
+                    f"WS_PUBLIC: {ports[2].split(':')[0]}",
+                    f"WS_ADMIN: {ports[3].split(':')[0]}",
+                    f"PEER: {ports[4].split(':')[0]}",
                 ],
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
@@ -887,7 +963,9 @@ def create_ansible(
                 ],
             )
             create_ansible_vars_file(
-                f"{basedir}/{name}-cluster/ansible/host_vars", pips[index - 1], vars
+                f"{basedir}/{cluster_slug}-cluster/ansible/host_vars",
+                pips[index - 1],
+                vars,
             )
     hosts_content: str = """
 # this is a basic file putting different hosts into categories
@@ -907,7 +985,7 @@ def create_ansible(
     hosts_content += "[peer]\n"
     hosts_content += f"{pips[0]} ansible_port={ssh} ansible_user={user} ansible_ssh_private_key_file={ssh_key} vars_file=host_vars/{pips[0]}.yml \n"  # noqa: E501
 
-    write_file(f"{basedir}/{name}-cluster/ansible/hosts.txt", hosts_content)
+    write_file(f"{basedir}/{cluster_slug}-cluster/ansible/hosts.txt", hosts_content)
 
 
 def stop_network(name: str, remove: bool = False):
@@ -1119,6 +1197,7 @@ def create_local_network(
     genesis: bool = False,
     quorum: int = None,
     nodedb_type: str = "NuDB",
+    network_name: Optional[str] = None,
 ) -> None:
     """
     Creates a local multi-node network configuration that runs natively without Docker.
@@ -1127,8 +1206,8 @@ def create_local_network(
     The user should run this command from their build directory
     (e.g., xrpld-quantum/build) where the xrpld binary is located.
     """
-    # Use a simple name for local networks
-    name: str = f"local-{protocol}"
+    default_local = f"local-{protocol}"
+    name: str = sanitize_cluster_name(network_name) if network_name else default_local
     # Create cluster in current working directory instead of package directory
     cluster_dir = f"{os.getcwd()}/{name}-cluster"
     os.makedirs(cluster_dir, exist_ok=True)
@@ -1144,7 +1223,9 @@ def create_local_network(
         elif os.path.exists(macro_path):
             content = get_feature_lines_from_path(macro_path)
         else:
-            print(f"{bcolors.RED}Error: Cannot find features file at {local_path} or {macro_path}")
+            print(
+                f"{bcolors.RED}Error: Cannot find features file at {local_path} or {macro_path}"
+            )
             print(f"Please run this command from your build directory.{bcolors.END}")
             return
 
@@ -1265,6 +1346,11 @@ def create_local_network(
             "services": services,
             "networks": {f"{name}-network": {"driver": "bridge"}},
         }
+        if network_name:
+            compose = {
+                "name": docker_compose_top_level_name(name),
+                **compose,
+            }
         with open(f"{cluster_dir}/docker-compose.yml", "w") as f:
             yaml.dump(compose, f, default_flow_style=False)
 
