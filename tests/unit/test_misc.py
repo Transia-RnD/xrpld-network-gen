@@ -2,12 +2,15 @@
 # coding: utf-8
 
 import pytest
+from xrpld_netgen.main import standalone_workspace_dirname
 from xrpld_netgen.utils.misc import (
+    docker_compose_top_level_name,
     generate_ports,
     get_node_port,
     sha512_half,
     get_node_db_path,
     get_relational_db,
+    sanitize_cluster_name,
 )
 
 
@@ -15,7 +18,9 @@ class TestGeneratePorts:
     """Test port generation for different node types"""
 
     def test_generate_ports_validator_first(self):
-        rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(1, "validator")
+        rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(
+            1, "validator"
+        )
         assert rpc_public == 5107
         assert rpc_admin == 5105
         assert ws_public == 6108
@@ -23,7 +28,9 @@ class TestGeneratePorts:
         assert peer == 51335
 
     def test_generate_ports_validator_second(self):
-        rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(2, "validator")
+        rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(
+            2, "validator"
+        )
         assert rpc_public == 5207
         assert rpc_admin == 5205
         assert ws_public == 6208
@@ -47,7 +54,9 @@ class TestGeneratePorts:
         assert peer == 51255
 
     def test_generate_ports_standalone(self):
-        rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
+        rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(
+            0, "standalone"
+        )
         assert rpc_public == 5007
         assert rpc_admin == 5005
         assert ws_public == 6008
@@ -127,6 +136,36 @@ class TestGetNodeDbPath:
     def test_get_node_db_path_rwdb_network(self):
         path = get_node_db_path("rwdb", "network")
         assert path == "/var/lib/xrpld/db"
+
+
+class TestStandaloneWorkspaceDirname:
+    def test_default_uses_version(self):
+        assert (
+            standalone_workspace_dirname("xahau", "2025.1.0", None) == "xahau-2025.1.0"
+        )
+
+    def test_custom_slug(self):
+        assert (
+            standalone_workspace_dirname("xahau", "2025.1.0", "dev-a") == "xahau-dev-a"
+        )
+
+
+class TestDockerComposeTopLevelName:
+    def test_lowercase_and_dots(self):
+        assert docker_compose_top_level_name("My.Net") == "my-net"
+
+
+class TestSanitizeClusterName:
+    def test_trims_and_keeps_safe_chars(self):
+        assert sanitize_cluster_name("  my-net_1  ") == "my-net_1"
+
+    def test_rejects_path_separators(self):
+        with pytest.raises(ValueError, match="path"):
+            sanitize_cluster_name("a/b")
+
+    def test_rejects_parent_dir(self):
+        with pytest.raises(ValueError, match="path"):
+            sanitize_cluster_name("x..y")
 
 
 class TestGetRelationalDb:

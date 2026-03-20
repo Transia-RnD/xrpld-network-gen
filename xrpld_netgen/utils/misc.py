@@ -22,6 +22,32 @@ class bcolors:
     END = "\033[0m"
 
 
+def sanitize_cluster_name(raw: str) -> str:
+    """Normalize a user-supplied name for workspace dirs and Docker networks."""
+    s = raw.strip()
+    if not s:
+        raise ValueError("Cluster name must not be empty.")
+    if ".." in s or "/" in s or "\\" in s:
+        raise ValueError("Cluster name must not contain path separators or '..'.")
+    out: List[str] = []
+    for c in s:
+        if c.isalnum() or c in "._-":
+            out.append(c)
+        elif c.isspace():
+            out.append("-")
+        else:
+            out.append("-")
+    collapsed = "".join(out).strip("-_.")
+    if not collapsed:
+        raise ValueError("Cluster name has no valid characters.")
+    return collapsed
+
+
+def docker_compose_top_level_name(slug: str) -> str:
+    """Normalize a directory slug for Compose ``name`` (project name)."""
+    return slug.lower().replace(".", "-")
+
+
 def remove_directory(directory_path: str) -> None:
     try:
         name: str = directory_path.split("/")[-1]
@@ -68,10 +94,7 @@ def run_start(cmd: List[str], protocol: str, version: str, type: str):
         )
         sys.exit(1)
     except FileNotFoundError:
-        print(
-            f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be "
-            f"found."
-        )
+        print(f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be found.")
         sys.exit(1)
     except OSError as e:
         print(f"{bcolors.RED}❌ An OS error occurred: {e}")
@@ -98,10 +121,7 @@ def run_stop(cmd: List[str]):
         )
         sys.exit(1)
     except FileNotFoundError:
-        print(
-            f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be "
-            f"found."
-        )
+        print(f"{bcolors.RED}❌ The file {cmd[0]} does not exist or cannot be found.")
         sys.exit(1)
     except OSError as e:
         print(f"{bcolors.RED}❌ An OS error occurred: {e}")
@@ -214,8 +234,7 @@ def run_local_logs(node: str = None):
             log_path = "config/debug.log"
             if not os.path.exists(log_path):
                 print(
-                    f"{bcolors.RED}Error: Log file not found at "
-                    f"{log_path}{bcolors.END}"
+                    f"{bcolors.RED}Error: Log file not found at {log_path}{bcolors.END}"
                 )
                 print()
                 print(
@@ -331,7 +350,9 @@ def download_json(url: str, destination_dir: str) -> Dict[str, Any]:
         raise ValueError(f"Failed to download file from {url}")
 
 
-def save_local_config(protocol: str, cfg_path: str, cfg_out: str, validators_out: str) -> None:
+def save_local_config(
+    protocol: str, cfg_path: str, cfg_out: str, validators_out: str
+) -> None:
     with open(f"{cfg_path}/{protocol}d.cfg", "w") as text_file:
         text_file.write(cfg_out)
 

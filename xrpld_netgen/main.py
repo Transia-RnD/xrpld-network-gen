@@ -5,7 +5,7 @@ import os
 import yaml
 import shutil
 import json
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
 
 from xrpld_netgen.xrpld_cfg import gen_config, XrpldBuild
 from xrpld_netgen.utils.deploy_kit import (
@@ -27,6 +27,8 @@ from xrpld_netgen.utils.misc import (
     read_json,
     get_node_db_path,
     get_relational_db,
+    sanitize_cluster_name,
+    docker_compose_top_level_name,
 )
 from xrpld_netgen.libs.xrpld import (
     update_amendments,
@@ -43,6 +45,14 @@ workspace_dir = os.path.join(os.path.dirname(__file__), "..", "workspace")
 basedir = os.path.abspath(workspace_dir)
 # Create workspace directory if it doesn't exist
 os.makedirs(basedir, exist_ok=True)
+
+
+def standalone_workspace_dirname(
+    protocol: str, version_key: str, network_name: Optional[str] = None
+) -> str:
+    """Directory name under workspace: ``{protocol}-{slug}`` (slug defaults to version)."""
+    slug = sanitize_cluster_name(network_name) if network_name else version_key
+    return f"{protocol}-{slug}"
 
 
 def generate_validator_config(protocol: str, network: str) -> str:
@@ -62,7 +72,8 @@ services: Dict[str, Dict] = {}
 
 def create_xrpl_standalone_folder(
     binary: bool,
-    name: str,
+    deploy_slug: str,
+    binary_tag: str,
     image: str,
     feature_content: str,
     network_id: int,
@@ -73,7 +84,7 @@ def create_xrpl_standalone_folder(
     log_level: str = "trace",
     nodedb_type: str = "NuDB",
 ):
-    cfg_path = f"{basedir}/{protocol}-{name}/config"
+    cfg_path = f"{basedir}/{protocol}-{deploy_slug}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
     vl_config: Dict[str, Any] = generate_validator_config(protocol, net_type)
 
@@ -89,7 +100,7 @@ def create_xrpl_standalone_folder(
     configs: List[XrpldBuild] = gen_config(
         False,
         protocol,
-        name,
+        deploy_slug,
         vl_config["network_id"],
         0,
         rpc_public,
@@ -113,7 +124,7 @@ def create_xrpl_standalone_folder(
         vl_config["ips"],
         vl_config["ips_fixed"],
     )
-    os.makedirs(f"{basedir}/{protocol}-{name}/config", exist_ok=True)
+    os.makedirs(f"{basedir}/{protocol}-{deploy_slug}/config", exist_ok=True)
     save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
@@ -121,7 +132,7 @@ def create_xrpl_standalone_folder(
     print(json.dumps(features_json, indent=4))
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
-        f"{basedir}/{protocol}-{name}/genesis.json",
+        f"{basedir}/{protocol}-{deploy_slug}/genesis.json",
         json.dumps(genesis_json, indent=4, sort_keys=True),
     )
     print(f"✅ {bcolors.CYAN}Updating features")
@@ -130,7 +141,7 @@ def create_xrpl_standalone_folder(
         protocol,
         False,
         binary,
-        name,
+        binary_tag,
         image,
         rpc_public,
         rpc_admin,
@@ -141,12 +152,12 @@ def create_xrpl_standalone_folder(
         "",
         "-a",
     )
-    with open(f"{basedir}/{protocol}-{name}/Dockerfile", "w") as file:
+    with open(f"{basedir}/{protocol}-{deploy_slug}/Dockerfile", "w") as file:
         file.write(dockerfile)
 
     shutil.copyfile(
         f"{package_dir}/deploykit/{protocol}.entrypoint",
-        f"{basedir}/{protocol}-{name}/entrypoint",
+        f"{basedir}/{protocol}-{deploy_slug}/entrypoint",
     )
     print(f"✅ {bcolors.CYAN}Building docker container...")
     pwd_str: str = "${PWD}"
@@ -184,9 +195,13 @@ def create_standalone_image(
     build_name: str,
     add_ipfs: bool = False,
     nodedb_type: str = "NuDB",
+    network_name: Optional[str] = None,
 ) -> None:
-    name: str = build_name
-    os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
+    binary_tag: str = build_name
+    deploy_slug: str = (
+        sanitize_cluster_name(network_name) if network_name else binary_tag
+    )
+    os.makedirs(f"{basedir}/{protocol}-{deploy_slug}", exist_ok=True)
     owner = "XRPLF"
     repo = "rippled"
     content_bytes = download_file_at_commit_or_tag(
@@ -196,7 +211,8 @@ def create_standalone_image(
     image: str = f"{build_system}/xrpld:{build_name}"
     create_xrpl_standalone_folder(
         False,
-        name,
+        deploy_slug,
+        binary_tag,
         image,
         content,
         network_id,
@@ -239,23 +255,29 @@ def create_standalone_image(
         "services": services,
         "networks": {"standalone-network": {"driver": "bridge"}},
     }
+    if network_name:
+        compose = {
+            "name": docker_compose_top_level_name(deploy_slug),
+            **compose,
+        }
 
-    with open(f"{basedir}/{protocol}-{name}/docker-compose.yml", "w") as f:
+    with open(f"{basedir}/{protocol}-{deploy_slug}/docker-compose.yml", "w") as f:
         yaml.dump(compose, f, default_flow_style=False)
 
     write_file(
-        f"{basedir}/{protocol}-{name}/start.sh",
-        build_start_sh(basedir, protocol, name),  # noqa: E501
+        f"{basedir}/{protocol}-{deploy_slug}/start.sh",
+        build_start_sh(basedir, protocol, deploy_slug),  # noqa: E501
     )
-    os.chmod(f"{basedir}/{protocol}-{name}/start.sh", 0o755)
-    stop_sh_content: str = build_stop_sh(basedir, protocol, name, 0, 0, True)
-    write_file(f"{basedir}/{protocol}-{name}/stop.sh", stop_sh_content)
-    os.chmod(f"{basedir}/{protocol}-{name}/stop.sh", 0o755)
+    os.chmod(f"{basedir}/{protocol}-{deploy_slug}/start.sh", 0o755)
+    stop_sh_content: str = build_stop_sh(basedir, protocol, deploy_slug, 0, 0, True)
+    write_file(f"{basedir}/{protocol}-{deploy_slug}/stop.sh", stop_sh_content)
+    os.chmod(f"{basedir}/{protocol}-{deploy_slug}/stop.sh", 0o755)
 
 
 def create_xahau_standalone_folder(
     binary: bool,
-    name: str,
+    deploy_slug: str,
+    binary_tag: str,
     image: str,
     feature_content: str,
     network_id: int,
@@ -266,7 +288,7 @@ def create_xahau_standalone_folder(
     log_level: str = "trace",
     nodedb_type: str = "NuDB",
 ):
-    cfg_path = f"{basedir}/{protocol}-{name}/config"
+    cfg_path = f"{basedir}/{protocol}-{deploy_slug}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
     vl_config: Dict[str, Any] = generate_validator_config(protocol, net_type)
 
@@ -282,7 +304,7 @@ def create_xahau_standalone_folder(
     configs: List[XrpldBuild] = gen_config(
         False,
         protocol,
-        name,
+        deploy_slug,
         vl_config["network_id"],
         0,
         rpc_public,
@@ -306,14 +328,14 @@ def create_xahau_standalone_folder(
         vl_config["ips"],
         vl_config["ips_fixed"],
     )
-    os.makedirs(f"{basedir}/{protocol}-{name}/config", exist_ok=True)
+    os.makedirs(f"{basedir}/{protocol}-{deploy_slug}/config", exist_ok=True)
     save_local_config(protocol, cfg_path, configs[0].data, configs[1].data)
     print(f"✅ {bcolors.CYAN}Creating config")
 
     features_json: Dict[str, Any] = parse_amendments(feature_content)
     genesis_json: Any = update_amendments(features_json, protocol)
     write_file(
-        f"{basedir}/{protocol}-{name}/genesis.json",
+        f"{basedir}/{protocol}-{deploy_slug}/genesis.json",
         json.dumps(genesis_json, indent=4, sort_keys=True),
     )
     print(f"✅ {bcolors.CYAN}Updating features")
@@ -324,7 +346,7 @@ def create_xahau_standalone_folder(
         protocol,
         False,
         binary,
-        name,
+        binary_tag,
         image,
         rpc_public,
         rpc_admin,
@@ -335,12 +357,12 @@ def create_xahau_standalone_folder(
         "",
         "-a",
     )
-    with open(f"{basedir}/{protocol}-{name}/Dockerfile", "w") as file:
+    with open(f"{basedir}/{protocol}-{deploy_slug}/Dockerfile", "w") as file:
         file.write(dockerfile)
 
     shutil.copyfile(
         f"{package_dir}/deploykit/{protocol}.entrypoint",
-        f"{basedir}/{protocol}-{name}/entrypoint",
+        f"{basedir}/{protocol}-{deploy_slug}/entrypoint",
     )
     print(f"✅ {bcolors.CYAN}Building docker container...")
     pwd_str: str = "${PWD}"
@@ -378,23 +400,32 @@ def create_standalone_binary(
     build_version: str,
     add_ipfs: bool = False,
     nodedb_type: str = "NuDB",
+    network_name: Optional[str] = None,
 ) -> None:
-    name: str = build_version
-    os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
+    binary_tag: str = build_version
+    deploy_slug: str = (
+        sanitize_cluster_name(network_name) if network_name else binary_tag
+    )
+    os.makedirs(f"{basedir}/{protocol}-{deploy_slug}", exist_ok=True)
     # Usage
     owner = "Xahau"
     repo = "xahaud"
     commit_hash = get_commit_hash_from_server_version(build_server, build_version)
     content_bytes = download_file_at_commit_or_tag(
-        owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
+        owner,
+        repo,
+        commit_hash,
+        "src/ripple/protocol/impl/Feature.cpp",
+        "include/xrpl/protocol/detail/features.macro",
     )
     content = get_feature_lines_from_content(content_bytes)
     url: str = f"{build_server}/{build_version}"
-    download_binary(url, f"{basedir}/{protocol}-{name}/{protocol}d.{name}")
+    download_binary(url, f"{basedir}/{protocol}-{deploy_slug}/{protocol}d.{binary_tag}")
     image: str = "ubuntu:jammy"
     create_xahau_standalone_folder(
         True,
-        name,
+        deploy_slug,
+        binary_tag,
         image,
         content,
         network_id,
@@ -437,18 +468,23 @@ def create_standalone_binary(
         "services": services,
         "networks": {"standalone-network": {"driver": "bridge"}},
     }
+    if network_name:
+        compose = {
+            "name": docker_compose_top_level_name(deploy_slug),
+            **compose,
+        }
 
-    with open(f"{basedir}/{protocol}-{name}/docker-compose.yml", "w") as f:
+    with open(f"{basedir}/{protocol}-{deploy_slug}/docker-compose.yml", "w") as f:
         yaml.dump(compose, f, default_flow_style=False)
 
     write_file(
-        f"{basedir}/{protocol}-{name}/start.sh",
-        build_start_sh(basedir, protocol, name),  # noqa: E501
+        f"{basedir}/{protocol}-{deploy_slug}/start.sh",
+        build_start_sh(basedir, protocol, deploy_slug),  # noqa: E501
     )
-    os.chmod(f"{basedir}/{protocol}-{name}/start.sh", 0o755)
-    stop_sh_content: str = build_stop_sh(basedir, protocol, name, 0, 0, True)
-    write_file(f"{basedir}/{protocol}-{name}/stop.sh", stop_sh_content)
-    os.chmod(f"{basedir}/{protocol}-{name}/stop.sh", 0o755)
+    os.chmod(f"{basedir}/{protocol}-{deploy_slug}/start.sh", 0o755)
+    stop_sh_content: str = build_stop_sh(basedir, protocol, deploy_slug, 0, 0, True)
+    write_file(f"{basedir}/{protocol}-{deploy_slug}/stop.sh", stop_sh_content)
+    os.chmod(f"{basedir}/{protocol}-{deploy_slug}/stop.sh", 0o755)
 
 
 def create_local_folder(
@@ -512,7 +548,7 @@ def create_local_folder(
     cpp_path = "../src/ripple/protocol/impl/Feature.cpp"
     macro_path = "../include/xrpl/protocol/detail/features.macro"
     features_path = cpp_path if os.path.exists(cpp_path) else macro_path
-        
+
     if protocol == "xahau":
         content: str = get_feature_lines_from_path(features_path)
         features_json: Dict[str, Any] = parse_amendments(content)

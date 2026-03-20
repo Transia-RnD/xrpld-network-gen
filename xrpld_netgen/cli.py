@@ -40,6 +40,7 @@ from xrpld_netgen.main import (
     create_standalone_binary,
     create_standalone_image,
     start_local,
+    standalone_workspace_dirname,
 )
 from xrpld_netgen.network import (
     create_network,
@@ -66,6 +67,7 @@ os.makedirs(basedir, exist_ok=True)
 # Fallback versions if network fetch fails
 _XRPL_RELEASE_FALLBACK: str = "3.1.1"
 _XAHAU_RELEASE_FALLBACK: str = "2025.7.9-release+1951"
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -213,6 +215,17 @@ def main():
         help="The name of the xrpld binary for local networks (default: xrpld)",
         default="xrpld",
     )
+    parser_cn.add_argument(
+        "--name",
+        type=str,
+        required=False,
+        default=None,
+        help=(
+            "Optional cluster base name: creates workspace/{name}-cluster "
+            "(default: build version or branch id). "
+            "Start with: xrpld-netgen up --name {name}-cluster"
+        ),
+    )
     # update:node
     parser_un = subparsers.add_parser("update:node", help="Update Node Version")
     parser_un.add_argument(
@@ -343,6 +356,17 @@ def main():
         choices=["Memory", "NuDB"],
         default="NuDB",
     )
+    parser_us.add_argument(
+        "--name",
+        type=str,
+        required=False,
+        default=None,
+        help=(
+            "Optional workspace directory slug: deploys to workspace/{protocol}-{name} "
+            "(default: build version). Use the same value with down:standalone --name "
+            "{protocol}-{name}."
+        ),
+    )
     # down:standalone
     parser_ds = subparsers.add_parser("down:standalone", help="Down Standalone")
     parser_ds.add_argument("--name", required=False, help="The name of the network")
@@ -406,7 +430,8 @@ def main():
         print(f"    - Network Name: {NAME}")
         print(f"    - Protocol: {PROTOCOL}")
         print(f"    - Build Version: {BUILD_VERSION}")
-        return run_stop([f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/stop.sh"])
+        rel = standalone_workspace_dirname(PROTOCOL, BUILD_VERSION, None)
+        return run_stop([f"{basedir}/{rel}/stop.sh"])
 
     # MANAGE NETWORK/STANDALONE
     if args.command == "up":
@@ -487,6 +512,7 @@ def main():
         NODEDB_TYPE = args.nodedb_type
         LOCAL = args.local
         BINARY_NAME = args.binary_name
+        NETWORK_LABEL = (args.name or "").strip() or None
 
         import_vl_key: str = (
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
@@ -537,6 +563,8 @@ def main():
         if LOCAL:
             print(f"    - Binary Name: {BINARY_NAME}")
             print("    - Deployment: Local (native processes, no Docker for nodes)")
+        if NETWORK_LABEL is not None:
+            print(f"    - Cluster name: {NETWORK_LABEL}")
 
         if LOCAL:
             # Create local network without Docker
@@ -553,6 +581,7 @@ def main():
                 GENESIS,
                 QUORUM,
                 NODEDB_TYPE,
+                NETWORK_LABEL,
             )
         else:
             # Create traditional Docker-based network
@@ -568,6 +597,7 @@ def main():
                 GENESIS,
                 QUORUM,
                 NODEDB_TYPE,
+                NETWORK_LABEL,
             )
 
     if args.command == "update:node":
@@ -615,6 +645,7 @@ def main():
         BUILD_VERSION = args.version
         IPFS_SERVER = args.ipfs
         NODEDB_TYPE = args.nodedb_type
+        STANDALONE_LABEL = (args.name or "").strip() or None
 
         if PROTOCOL == "xahau" and not IMPORT_KEY:
             IMPORT_KEY: str = (
@@ -651,6 +682,8 @@ def main():
         print(f"    - Build Version: {BUILD_VERSION}")
         print(f"    - IPFS Server: {IPFS_SERVER}")
         print(f"    - Node DB: {NODEDB_TYPE}")
+        if STANDALONE_LABEL is not None:
+            print(f"    - Standalone directory slug: {STANDALONE_LABEL}")
 
         if BUILD_TYPE == "image":
             create_standalone_image(
@@ -664,6 +697,7 @@ def main():
                 BUILD_VERSION,
                 IPFS_SERVER,
                 NODEDB_TYPE,
+                STANDALONE_LABEL,
             )
         else:
             create_standalone_binary(
@@ -677,10 +711,14 @@ def main():
                 BUILD_VERSION,
                 IPFS_SERVER,
                 NODEDB_TYPE,
+                STANDALONE_LABEL,
             )
 
+        deploy_dir = standalone_workspace_dirname(
+            PROTOCOL, BUILD_VERSION, STANDALONE_LABEL
+        )
         run_start(
-            [f"{basedir}/{PROTOCOL}-{BUILD_VERSION}/start.sh"],
+            [f"{basedir}/{deploy_dir}/start.sh"],
             PROTOCOL,
             BUILD_VERSION,
             "standalone",
