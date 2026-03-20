@@ -1,0 +1,20 @@
+# Ruff: format then lint (same commands as CI / Poetry env).
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format-poetry
+        name: ruff format (poetry run ruff format .)
+        entry: poetry run ruff format .
+        language: system
+        pass_filenames: false
+        always_run: true
+        require_serial: true
+  - repo: local
+    hooks:
+      - id: ruff-poetry
+        name: ruff check (poetry run ruff check .)
+        entry: poetry run ruff check --fix .
+        language: system
+        pass_filenames: false
+        always_run: true
+        require_serial: true

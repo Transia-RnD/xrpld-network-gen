@@ -1,54 +1,53 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import os
-import yaml
-import shutil
 import json
-from typing import List, Any, Dict
+import os
+import shutil
+from typing import Any, Dict, List
+
+import yaml
 from dotenv import load_dotenv
-
-from xrpld_netgen.xrpld_cfg import gen_config, XrpldBuild
-from xrpld_netgen.utils.deploy_kit import (
-    create_dockerfile,
-    copy_file,
-    download_binary,
-    update_dockerfile,
-    DockerVars,
-    create_ansible_vars_file,
-    build_network_stop_sh,
-    build_network_start_sh,
-    build_local_network_start_sh,
-    build_local_network_stop_sh,
-)
-from xrpld_netgen.libs.github import (
-    get_commit_hash_from_server_version,
-    download_file_at_commit_or_tag,
-)
-from xrpld_netgen.utils.misc import (
-    run_command,
-    generate_ports,
-    save_local_config,
-    get_node_port,
-    sha512_half,
-    run_stop,
-    remove_directory,
-    bcolors,
-    write_file,
-    read_json,
-    get_node_db_path,
-    get_relational_db,
-)
-
-from xrpld_netgen.libs.xrpld import (
-    update_amendments,
-    parse_amendments,
-    get_feature_lines_from_content,
-    get_feature_lines_from_path,
-)
-
 from xrpld_publisher.publisher import PublisherClient
 from xrpld_publisher.validator import ValidatorClient
+
+from xrpld_netgen.libs.github import (
+    download_file_at_commit_or_tag,
+    get_commit_hash_from_server_version,
+)
+from xrpld_netgen.libs.xrpld import (
+    get_feature_lines_from_content,
+    get_feature_lines_from_path,
+    parse_amendments,
+    update_amendments,
+)
+from xrpld_netgen.utils.deploy_kit import (
+    DockerVars,
+    build_local_network_start_sh,
+    build_local_network_stop_sh,
+    build_network_start_sh,
+    build_network_stop_sh,
+    copy_file,
+    create_ansible_vars_file,
+    create_dockerfile,
+    download_binary,
+    update_dockerfile,
+)
+from xrpld_netgen.utils.misc import (
+    bcolors,
+    generate_ports,
+    get_node_db_path,
+    get_node_port,
+    get_relational_db,
+    read_json,
+    remove_directory,
+    run_command,
+    run_stop,
+    save_local_config,
+    sha512_half,
+    write_file,
+)
+from xrpld_netgen.xrpld_cfg import XrpldBuild, gen_config
 
 load_dotenv()
 
@@ -378,7 +377,11 @@ def create_network(
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
         content_bytes = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
+            owner,
+            repo,
+            commit_hash,
+            "src/ripple/protocol/impl/Feature.cpp",
+            "include/xrpl/protocol/detail/features.macro",
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
@@ -593,9 +596,7 @@ def enable_node_amendment(
     port: int = get_node_port(int(node_id), node_type)
     json_str: str = json.dumps(command)
     escaped_str = json_str.replace('"', '\\"')
-    command: str = (
-        f'curl -X POST -H "Content-Type: application/json" -d "{escaped_str}" http://localhost:{port}'  # noqa: E501
-    )
+    command: str = f'curl -X POST -H "Content-Type: application/json" -d "{escaped_str}" http://localhost:{port}'  # noqa: E501
     run_command(f"{basedir}/{name}", command)
 
 
@@ -622,7 +623,11 @@ def create_ansible(
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
         content_bytes = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
+            owner,
+            repo,
+            commit_hash,
+            "src/ripple/protocol/impl/Feature.cpp",
+            "include/xrpl/protocol/detail/features.macro",
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
@@ -807,11 +812,11 @@ def create_ansible(
                 f"{basedir}/{name}-cluster/{c_name}/config/",
                 ssh_port,
                 [
-                    f'RPC_PUBLIC: {ports[0].split(":")[0]}',
-                    f'RPC_ADMIN: {ports[1].split(":")[0]}',
-                    f'WS_PUBLIC: {ports[2].split(":")[0]}',
-                    f'WS_ADMIN: {ports[3].split(":")[0]}',
-                    f'PEER: {ports[4].split(":")[0]}',
+                    f"RPC_PUBLIC: {ports[0].split(':')[0]}",
+                    f"RPC_ADMIN: {ports[1].split(':')[0]}",
+                    f"WS_PUBLIC: {ports[2].split(':')[0]}",
+                    f"WS_ADMIN: {ports[3].split(':')[0]}",
+                    f"PEER: {ports[4].split(':')[0]}",
                 ],
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
@@ -861,11 +866,11 @@ def create_ansible(
                 f"{basedir}/{name}-cluster/{c_name}/config/",
                 ssh_port,
                 [
-                    f'RPC_PUBLIC: {ports[0].split(":")[0]}',
-                    f'RPC_ADMIN: {ports[1].split(":")[0]}',
-                    f'WS_PUBLIC: {ports[2].split(":")[0]}',
-                    f'WS_ADMIN: {ports[3].split(":")[0]}',
-                    f'PEER: {ports[4].split(":")[0]}',
+                    f"RPC_PUBLIC: {ports[0].split(':')[0]}",
+                    f"RPC_ADMIN: {ports[1].split(':')[0]}",
+                    f"WS_PUBLIC: {ports[2].split(':')[0]}",
+                    f"WS_ADMIN: {ports[3].split(':')[0]}",
+                    f"PEER: {ports[4].split(':')[0]}",
                 ],
                 int(ports[2].split(":")[-1]),
                 int(ports[4].split(":")[-1]),
@@ -1144,7 +1149,10 @@ def create_local_network(
         elif os.path.exists(macro_path):
             content = get_feature_lines_from_path(macro_path)
         else:
-            print(f"{bcolors.RED}Error: Cannot find features file at {local_path} or {macro_path}")
+            print(
+                f"{bcolors.RED}Error: Cannot find features file \
+                                 at {local_path} or {macro_path}"
+            )
             print(f"Please run this command from your build directory.{bcolors.END}")
             return
 

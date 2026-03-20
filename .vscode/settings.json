@@ -1,9 +1,10 @@
 // Place your settings in this file to overwrite default and user settings.
 {
   "[python]": {
-    "formatting.provider": "black",
+    "editor.defaultFormatter": "charliermarsh.ruff",
     "linting.pylintEnabled": false,
-    "linting.flake8Enabled": true,
+    "linting.flake8Enabled": false,
+    "ruff.enable": true,
     "linting.enabled": true,
     "linting.mypyEnabled": true,
     // "editor.wordWrap": "wordWrapColumn",

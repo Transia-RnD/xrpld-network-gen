@@ -1,5 +1,5 @@
-from xrpld_netgen.utils.deploy_kit import download_binary
 from xrpld_netgen.cli import XAHAU_RELEASE
+from xrpld_netgen.utils.deploy_kit import download_binary
 
 build_server: str = "https://build.xahau.tech"
 build_version: str = XAHAU_RELEASE

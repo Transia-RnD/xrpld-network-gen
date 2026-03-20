@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import re
+import hashlib
 import os
-from typing import Dict, Any, List  # noqa: F401
+import re
+from typing import Any, Dict, List  # noqa: F401
 
 from xrpld_netgen.utils.misc import read_json
-import hashlib
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 parentdir = os.path.dirname(basedir)
@@ -39,7 +39,9 @@ def parse_amendments(lines: Any):
         elif re.match(r"XRPL_FEATURE", line):
             amendment_name = re.search(r"XRPL_FEATURE\((.*?),", line).group(1) or 0
         elif re.match(r"REGISTER_FIX", line):
-            amendment_name = re.search(r"REGISTER_FIX\)?.*?\((.*?),", line).group(1) or 0
+            amendment_name = (
+                re.search(r"REGISTER_FIX\)?.*?\((.*?),", line).group(1) or 0
+            )
         elif re.match(r"REGISTER_FEATURE", line):
             amendment_name = re.search(r"REGISTER_FEATURE\((.*?),", line).group(1) or 0
         else:

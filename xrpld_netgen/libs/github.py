@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import requests
 import re
+
+import requests
 
 
 def get_commit_hash_from_server_version(server: str, version: str) -> str:
@@ -36,7 +37,11 @@ def get_commit_hash_from_server_version(server: str, version: str) -> str:
 
 
 def download_file_at_commit_or_tag(
-    owner: str, repo: str, commit_hash_or_tag: str, file_path: str, fallback_file_path: str = None
+    owner: str,
+    repo: str,
+    commit_hash_or_tag: str,
+    file_path: str,
+    fallback_file_path: str = None,
 ) -> str:
     """
     Download a specific file from a GitHub repository at a given commit hash or tag.
@@ -56,7 +61,9 @@ def download_file_at_commit_or_tag(
     # Send a GET request to the URL
     response = requests.get(url)
     if response.status_code == 404 and fallback_file_path:
-        return download_file_at_commit_or_tag(owner, repo, commit_hash_or_tag, fallback_file_path)
+        return download_file_at_commit_or_tag(
+            owner, repo, commit_hash_or_tag, fallback_file_path
+        )
     response.raise_for_status()
 
     # Return the content of the file
