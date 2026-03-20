@@ -47,6 +47,15 @@ from xrpld_netgen.libs.xrpld import (
     get_feature_lines_from_path,
 )
 
+from xrpld_netgen.faucet import (
+    generate_faucet_package_json,
+    generate_faucet_tsconfig,
+    generate_faucet_server,
+    generate_faucet_dockerfile,
+    generate_faucet_test,
+    generate_faucet_jest_config,
+)
+
 from xrpld_publisher.publisher import PublisherClient
 from xrpld_publisher.validator import ValidatorClient
 
@@ -224,6 +233,10 @@ def create_node_folders(
             f"{package_dir}/deploykit/network.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
+        shutil.copyfile(
+            f"{basedir}/{name}-cluster/{protocol}d",
+            f"{basedir}/{name}-cluster/{node_dir}/{protocol}d",
+        )
 
         print(f"✅ {bcolors.CYAN}Built validator: {i} docker container...")
 
@@ -329,6 +342,10 @@ def create_node_folders(
             f"{package_dir}/deploykit/network.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
+        shutil.copyfile(
+            f"{basedir}/{name}-cluster/{protocol}d",
+            f"{basedir}/{name}-cluster/{node_dir}/{protocol}d",
+        )
 
         print(f"✅ {bcolors.CYAN}Built peer: {i} docker container...")
 
@@ -378,11 +395,13 @@ def create_network(
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
         content_bytes = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
+            owner, repo, commit_hash,
+            "src/ripple/protocol/impl/Feature.cpp",
+            "include/xrpl/protocol/detail/features.macro",
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
-        download_binary(url, f"{basedir}/{name}-cluster/xrpld.{build_version}")
+        download_binary(url, f"{basedir}/{name}-cluster/{protocol}d")
         image: str = "ubuntu:jammy"
 
     if protocol == "xrpl":
@@ -394,7 +413,7 @@ def create_network(
             name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
             repo = "rippled"
-            copy_file("./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
+            copy_file("./xrpld", f"{basedir}/{name}-cluster/{protocol}d")
             content_bytes = download_file_at_commit_or_tag(
                 owner,
                 repo,
@@ -513,6 +532,57 @@ def create_network(
             "networks": [f"{name}-network"],
         }
 
+        # Faucet service
+        ws_port = 6006 + (1 * 100)
+        services["faucet"] = {
+            "build": {
+                "context": "faucet",
+                "dockerfile": "Dockerfile",
+            },
+            "container_name": "faucet",
+            "environment": [
+                f"XRPLD_WS_URL=ws://vnode1:{ws_port}",
+                "DEFAULT_XRP_AMOUNT=1000",
+                f"PROTOCOL={protocol}",
+            ],
+            "ports": ["8080:8080"],
+            "depends_on": {
+                "vnode1": {"condition": "service_started"},
+            },
+            "networks": [f"{name}-network"],
+        }
+
+        # Create faucet directory and files
+        faucet_dir = f"{basedir}/{name}-cluster/faucet"
+        os.makedirs(faucet_dir, exist_ok=True)
+        os.makedirs(f"{faucet_dir}/src", exist_ok=True)
+        write_file(
+            f"{faucet_dir}/package.json",
+            generate_faucet_package_json(),
+        )
+        write_file(
+            f"{faucet_dir}/tsconfig.json",
+            generate_faucet_tsconfig(),
+        )
+        write_file(
+            f"{faucet_dir}/src/server.ts",
+            generate_faucet_server(),
+        )
+        write_file(
+            f"{faucet_dir}/Dockerfile",
+            generate_faucet_dockerfile(),
+        )
+        write_file(
+            f"{faucet_dir}/src/server.test.ts",
+            generate_faucet_test(),
+        )
+        write_file(
+            f"{faucet_dir}/jest.config.js",
+            generate_faucet_jest_config(),
+        )
+
+        print(f"✅ {bcolors.CYAN}Created faucet service")
+
         compose = {
             "version": "3.9",
             "services": services,
@@ -523,10 +593,11 @@ def create_network(
 
         write_file(
             f"{basedir}/{name}-cluster/start.sh",
-            build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
+            build_network_start_sh(name, protocol, num_validators, num_peers),  # noqa: E501
         )
         stop_sh_content: str = build_network_stop_sh(
             name,
+            protocol,
             num_validators,
             num_peers,
         )
@@ -546,11 +617,12 @@ def create_network(
 
     os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
     os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
-    os.chmod(f"{basedir}/{name}-cluster/xrpld.{name}", 0o755)
+    os.chmod(f"{basedir}/{name}-cluster/{protocol}d", 0o755)
 
 
 def update_node_binary(
     name: str,
+    protocol: str,
     node_id: str,
     node_type: str,
     build_server: str,
@@ -559,14 +631,14 @@ def update_node_binary(
     node_dir: str = f"{'v' if node_type == 'validator' else 'p'}node{node_id}"
     run_command(f"{basedir}/{name}", f"docker-compose stop {node_dir}")
     url: str = f"{build_server}/{new_version}"
-    download_binary(url, f"{basedir}/{name}/xrpld.{new_version}")
+    download_binary(url, f"{basedir}/{name}/{protocol}d")
     shutil.copyfile(
-        f"{basedir}/{name}/xrpld.{new_version}",
-        f"{basedir}/{name}/{node_dir}/xrpld.{new_version}",
+        f"{basedir}/{name}/{protocol}d",
+        f"{basedir}/{name}/{node_dir}/{protocol}d",
     )
     # remove the db
     run_command(f"{basedir}/{name}", f"rm -r {node_dir}/lib")
-    os.chmod(f"{basedir}/{name}/{node_dir}/xrpld.{new_version}", 0o755)
+    os.chmod(f"{basedir}/{name}/{node_dir}/{protocol}d", 0o755)
     update_dockerfile(new_version, f"{basedir}/{name}/{node_dir}/Dockerfile")
     run_command(
         f"{basedir}/{name}",
@@ -622,11 +694,13 @@ def create_ansible(
         repo = "xahaud"
         commit_hash = get_commit_hash_from_server_version(build_server, build_version)
         content_bytes = download_file_at_commit_or_tag(
-            owner, repo, commit_hash, "src/ripple/protocol/impl/Feature.cpp", "include/xrpl/protocol/detail/features.macro"
+            owner, repo, commit_hash,
+            "src/ripple/protocol/impl/Feature.cpp",
+            "include/xrpl/protocol/detail/features.macro",
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
-        download_binary(url, f"{basedir}/{name}-cluster/xrpld.{build_version}")
+        download_binary(url, f"{basedir}/{name}-cluster/{protocol}d")
         image: str = "ubuntu:jammy"
 
     if protocol == "xrpl":
@@ -638,7 +712,7 @@ def create_ansible(
             name = name.split("/tree/")[1] if "/tree/" in name else name
             name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-            copy_file("./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
+            copy_file("./xrpld", f"{basedir}/{name}-cluster/{protocol}d")
             content_bytes = download_file_at_commit_or_tag(
                 owner,
                 repo,
@@ -766,9 +840,9 @@ def create_ansible(
 
         write_file(
             f"{basedir}/{name}-cluster/start.sh",
-            build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
+            build_network_start_sh(name, protocol, num_validators, num_peers),  # noqa: E501
         )
-        stop_sh_content: str = build_network_stop_sh(name, num_validators, num_peers)
+        stop_sh_content: str = build_network_stop_sh(name, protocol, num_validators, num_peers)
         write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
 
         os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
@@ -785,7 +859,7 @@ def create_ansible(
 
     os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
     os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
-    os.chmod(f"{basedir}/{name}-cluster/xrpld.{name}", 0o755)
+    os.chmod(f"{basedir}/{name}-cluster/{protocol}d", 0o755)
 
     os.makedirs(f"{basedir}/{name}-cluster/ansible", exist_ok=True)
     os.makedirs(f"{basedir}/{name}-cluster/ansible/host_vars", exist_ok=True)
@@ -838,7 +912,7 @@ def create_ansible(
 
         run_command(
             f"{basedir}/{name}-cluster",
-            f"cp xrpld.{name} {basedir}/{name}-cluster/vnode1",
+            f"cp {protocol}d {basedir}/{name}-cluster/vnode1",
         )
         run_command(
             f"{basedir}/{name}-cluster/vnode1",
@@ -851,7 +925,7 @@ def create_ansible(
         )
         run_command(
             f"{basedir}/{name}-cluster/vnode1",
-            f"rm -r xrpld.{name}",
+            f"rm -r {protocol}d",
         )
         if k[:5] == "pnode":
             index: int = int(k[5:])
@@ -984,6 +1058,7 @@ def create_local_node_folders(
         cfg_path = f"{cluster_dir}/{node_dir}/config"
         # GENERATE PORTS
         rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(
+            
             i, "validator"
         )
         # GENERATE CONFIG - Use local paths instead of Docker paths
@@ -1144,7 +1219,10 @@ def create_local_network(
         elif os.path.exists(macro_path):
             content = get_feature_lines_from_path(macro_path)
         else:
-            print(f"{bcolors.RED}Error: Cannot find features file at {local_path} or {macro_path}")
+            print(
+                f"{bcolors.RED}Error: Cannot find features"
+                f" file at {local_path} or {macro_path}"
+            )
             print(f"Please run this command from your build directory.{bcolors.END}")
             return
 

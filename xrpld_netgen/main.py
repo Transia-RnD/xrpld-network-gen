@@ -390,7 +390,7 @@ def create_standalone_binary(
     )
     content = get_feature_lines_from_content(content_bytes)
     url: str = f"{build_server}/{build_version}"
-    download_binary(url, f"{basedir}/{protocol}-{name}/{protocol}d.{name}")
+    download_binary(url, f"{basedir}/{protocol}-{name}/{protocol}d")
     image: str = "ubuntu:jammy"
     create_xahau_standalone_folder(
         True,

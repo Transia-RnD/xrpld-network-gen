@@ -99,7 +99,7 @@ def create_dockerfile(
         dockerfile += "COPY genesis.json /genesis.json\n"
 
     if binary:
-        dockerfile += f"COPY {protocol}d.{version} /app/{protocol}d\n"
+        dockerfile += f"COPY {protocol}d /app/{protocol}d\n"
 
     if network:
         dockerfile += f"""
@@ -128,9 +128,9 @@ def create_dockerfile(
         )
 
     if include_genesis:
-        dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", "{quorum}", "{standalone}" ]'  # noqa: E501
+        dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "{protocol}", "/genesis.json", "{quorum}", "{standalone}" ]'  # noqa: E501
     else:
-        dockerfile += 'ENTRYPOINT [ "/entrypoint.sh" ]'
+        dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "{protocol}" ]'
 
     return dockerfile
 
@@ -193,20 +193,20 @@ def download_binary(url: str, save_path: str) -> None:
         raise ValueError(f"{bcolors.RED}An error occurred: {e}")
 
 
-def update_dockerfile(build_version: str, save_path: str) -> None:
+def update_dockerfile(protocol: str, build_version: str, save_path: str) -> None:
     # Read the Dockerfile
     with open(save_path, "r") as file:
         lines = file.readlines()
 
     # Define the pattern to search for any xrpld COPY line
-    pattern = re.compile(r"^COPY xrpld.* /app/xrpld$")
+    pattern = re.compile(fr"^COPY {protocol}d /app/{protocol}d$")
 
     # Replace the line with the new version
     with open(save_path, "w") as file:
         for line in lines:
             if pattern.match(line):
                 # Replace the line with the new xrpld version
-                file.write(f"COPY xrpld.{build_version} /app/xrpld\n")
+                file.write(f"COPY {protocol}d /app/{protocol}d\n")
             else:
                 file.write(line)
 
@@ -222,7 +222,7 @@ def build_stop_sh(
     standalone: bool = False,
     local: bool = False,
 ) -> str:
-    stop_sh_content = "#! /bin/bash\n"
+    stop_sh_content = '#! /bin/bash\ncd "$(dirname "$0")"\n'
     if num_validators > 0 and num_peers > 0:
         stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
 
@@ -243,7 +243,7 @@ def build_stop_sh(
 
     if local:
         stop_sh_content = (
-            "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
+            '#! /bin/bash\ncd "$(dirname "$0")"\ndocker compose -f docker-compose.yml down --remove-orphans\n'
         )
         stop_sh_content += "rm -r db\n"
         stop_sh_content += "rm -r debug.log\n"
@@ -257,7 +257,8 @@ def build_start_sh(
     name: str,
 ):
     return (
-        "#! /bin/bash\n"
+        '#! /bin/bash\n'
+        'cd "$(dirname "$0")"\n'
         "docker compose"
         f" -f {basedir}/{protocol}-{name}"
         "/docker-compose.yml"
@@ -273,7 +274,8 @@ def build_local_start_sh(
     config_filename: str = "xrpld.cfg" if protocol == "xrpl" else "xahaud.cfg"
     flag = "-a" if net_type == "standalone" else ""
     return (
-        "#! /bin/bash\n"
+        '#! /bin/bash\n'
+        'cd "$(dirname "$0")"\n'
         "docker compose -f docker-compose.yml"
         " up --build --force-recreate -d\n"
         f"./{exe_filename} {flag} --conf config/{config_filename}"
@@ -283,15 +285,11 @@ def build_local_start_sh(
 
 def build_network_start_sh(
     name: str,
+    protocol: str,
     num_validators: int,
     num_peers: int,
 ):
-    start_sh_content = "#! /bin/bash \n"
-    for i in range(1, num_validators + 1):
-        start_sh_content += f"cp xrpld.{name} vnode{i}/xrpld.{name}\n"
-
-    for i in range(1, num_peers + 1):
-        start_sh_content += f"cp xrpld.{name} pnode{i}/xrpld.{name}\n"
+    start_sh_content = '#! /bin/bash\ncd "$(dirname "$0")"\n'
     start_sh_content += (
         "docker compose -f docker-compose.yml"
         " up --build --force-recreate -d"
@@ -301,10 +299,11 @@ def build_network_start_sh(
 
 def build_network_stop_sh(
     name: str,
+    protocol: str,
     num_validators: int,
     num_peers: int,
 ) -> str:
-    stop_sh_content = "#! /bin/bash\n"
+    stop_sh_content = '#! /bin/bash\ncd "$(dirname "$0")"\n'
     stop_sh_content += "REMOVE_FLAG=false \n"
     stop_sh_content += """
 for arg in "$@"; do
@@ -318,16 +317,6 @@ done
     stop_sh_content += 'if [ "$REMOVE_FLAG" = true ]; then \n'
     if num_validators > 0 and num_peers > 0:
         stop_sh_content += "docker compose -f docker-compose.yml down --remove-orphans\n"  # noqa: E501
-
-    for i in range(1, num_validators + 1):
-        stop_sh_content += f"rm -r vnode{i}/lib\n"
-        stop_sh_content += f"rm -r vnode{i}/log\n"
-        stop_sh_content += f"rm -r vnode{i}/xrpld.{name}\n"
-
-    for i in range(1, num_peers + 1):
-        stop_sh_content += f"rm -r pnode{i}/lib\n"
-        stop_sh_content += f"rm -r pnode{i}/log\n"
-        stop_sh_content += f"rm -r pnode{i}/xrpld.{name}\n"
 
     stop_sh_content += "else \n"
     if num_validators > 0 and num_peers > 0:

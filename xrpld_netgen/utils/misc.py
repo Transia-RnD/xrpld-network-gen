@@ -53,7 +53,7 @@ def run_start(cmd: List[str], protocol: str, version: str, type: str):
         )
         if result.returncode == 0:
             print(
-                f"{bcolors.CYAN}{protocol.capitalize()} {bcolors.GREEN}{version} "
+                f"{bcolors.CYAN}{protocol.capitalize() if protocol is not None else ''} {bcolors.GREEN}{version} "
                 f"{type} running at: {bcolors.PURPLE}6006 {bcolors.END}"
             )
             print(f"{bcolors.CYAN}Explorer running / starting container{bcolors.END}")

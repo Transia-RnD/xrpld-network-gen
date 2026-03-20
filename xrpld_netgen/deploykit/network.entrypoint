@@ -1,27 +1,34 @@
 #!/bin/bash
-# ./entrypoint.sh ledgerfile quorum
-# ./entrypoint.sh /genesis.json 5
+# ./entrypoint.sh protocol ledgerfile quorum
+# ./entrypoint.sh protocol /genesis.json 5
 
 # Check if $1 is passed
 if [[ -n "$1" ]]; then
-    ledgerfile="--ledgerfile $1"
+    protocol="$1"
 else
-    ledgerfile=""
+    protocol="xrpl"
 fi
 
 # Check if $2 is passed
 if [[ -n "$2" ]]; then
-    quorum="--quorum=$2"
+    ledgerfile="--ledgerfile $2"
 else
-    quorum=""
+    ledgerfile=""
 fi
 
 # Check if $3 is passed
 if [[ -n "$3" ]]; then
-    standalone="$3"
+    quorum="--quorum=$3"
+else
+    quorum=""
+fi
+
+# Check if $4 is passed
+if [[ -n "$4" ]]; then
+    standalone="$4"
 else
     standalone=""
 fi
 
 # Start xrpld with or without ledgerfile and quorum
-exec /app/xrpld $ledgerfile $quorum $standalone --conf /opt/ripple/config/xrpld.cfg
+exec /app/"$protocol"d $ledgerfile $quorum $standalone --conf /opt/ripple/config/"$protocol"d.cfg
