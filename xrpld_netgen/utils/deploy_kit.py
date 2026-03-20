@@ -99,7 +99,7 @@ def create_dockerfile(
         dockerfile += "COPY genesis.json /genesis.json\n"
 
     if binary:
-        dockerfile += f"COPY {protocol}d.{version} /app/{protocol}d\n"
+        dockerfile += f"COPY xrpld.{version} /app/xrpld\n"
 
     if network:
         dockerfile += f"""
@@ -222,7 +222,7 @@ def build_stop_sh(
     standalone: bool = False,
     local: bool = False,
 ) -> str:
-    stop_sh_content = "#! /bin/bash\n"
+    stop_sh_content = '#! /bin/bash\ncd "$(dirname "$0")"\n'
     if num_validators > 0 and num_peers > 0:
         stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
 
@@ -243,7 +243,7 @@ def build_stop_sh(
 
     if local:
         stop_sh_content = (
-            "#! /bin/bash\ndocker compose -f docker-compose.yml down --remove-orphans\n"
+            '#! /bin/bash\ncd "$(dirname "$0")"\ndocker compose -f docker-compose.yml down --remove-orphans\n'
         )
         stop_sh_content += "rm -r db\n"
         stop_sh_content += "rm -r debug.log\n"
@@ -257,7 +257,8 @@ def build_start_sh(
     name: str,
 ):
     return (
-        "#! /bin/bash\n"
+        '#! /bin/bash\n'
+        'cd "$(dirname "$0")"\n'
         "docker compose"
         f" -f {basedir}/{protocol}-{name}"
         "/docker-compose.yml"
@@ -273,7 +274,8 @@ def build_local_start_sh(
     config_filename: str = "xrpld.cfg" if protocol == "xrpl" else "xahaud.cfg"
     flag = "-a" if net_type == "standalone" else ""
     return (
-        "#! /bin/bash\n"
+        '#! /bin/bash\n'
+        'cd "$(dirname "$0")"\n'
         "docker compose -f docker-compose.yml"
         " up --build --force-recreate -d\n"
         f"./{exe_filename} {flag} --conf config/{config_filename}"
@@ -286,7 +288,7 @@ def build_network_start_sh(
     num_validators: int,
     num_peers: int,
 ):
-    start_sh_content = "#! /bin/bash \n"
+    start_sh_content = '#! /bin/bash\ncd "$(dirname "$0")"\n'
     for i in range(1, num_validators + 1):
         start_sh_content += f"cp xrpld.{name} vnode{i}/xrpld.{name}\n"
 
@@ -304,7 +306,7 @@ def build_network_stop_sh(
     num_validators: int,
     num_peers: int,
 ) -> str:
-    stop_sh_content = "#! /bin/bash\n"
+    stop_sh_content = '#! /bin/bash\ncd "$(dirname "$0")"\n'
     stop_sh_content += "REMOVE_FLAG=false \n"
     stop_sh_content += """
 for arg in "$@"; do
