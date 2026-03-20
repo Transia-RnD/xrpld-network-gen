@@ -224,6 +224,11 @@ def create_node_folders(
             f"{package_dir}/deploykit/network.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
+        shutil.copyfile(
+            f"{basedir}/{name}-cluster/{protocol}d",
+            f"{basedir}/{name}-cluster/{node_dir}/{protocol}d",
+        )
+        os.chmod(f"{basedir}/{cluster_slug}-cluster/{node_dir}/{protocol}d", 0o755)
 
         print(f"✅ {bcolors.CYAN}Built validator: {i} docker container...")
 
@@ -329,6 +334,11 @@ def create_node_folders(
             f"{package_dir}/deploykit/network.entrypoint",
             f"{basedir}/{name}-cluster/{node_dir}/entrypoint",
         )
+        shutil.copyfile(
+            f"{basedir}/{name}-cluster/{protocol}d",
+            f"{basedir}/{name}-cluster/{node_dir}/{protocol}d",
+        )
+        os.chmod(f"{basedir}/{cluster_slug}-cluster/{node_dir}/{protocol}d", 0o755)
 
         print(f"✅ {bcolors.CYAN}Built peer: {i} docker container...")
 
@@ -382,7 +392,7 @@ def create_network(
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
-        download_binary(url, f"{basedir}/{name}-cluster/xrpld.{build_version}")
+        download_binary(url, f"{basedir}/{name}-cluster/{protocol}d")
         image: str = "ubuntu:jammy"
 
     if protocol == "xrpl":
@@ -394,7 +404,7 @@ def create_network(
             name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
             repo = "rippled"
-            copy_file("./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
+            copy_file("./xrpld", f"{basedir}/{name}-cluster/{protocol}d")
             content_bytes = download_file_at_commit_or_tag(
                 owner,
                 repo,
@@ -523,10 +533,11 @@ def create_network(
 
         write_file(
             f"{basedir}/{name}-cluster/start.sh",
-            build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
+            build_network_start_sh(name, protocol, num_validators, num_peers),  # noqa: E501
         )
         stop_sh_content: str = build_network_stop_sh(
             name,
+            protocol,
             num_validators,
             num_peers,
         )
@@ -546,11 +557,12 @@ def create_network(
 
     os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
     os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
-    os.chmod(f"{basedir}/{name}-cluster/xrpld.{name}", 0o755)
+    os.chmod(f"{basedir}/{name}-cluster/{protocol}d", 0o755)
 
 
 def update_node_binary(
     name: str,
+    protocol: str,
     node_id: str,
     node_type: str,
     build_server: str,
@@ -559,14 +571,14 @@ def update_node_binary(
     node_dir: str = f"{'v' if node_type == 'validator' else 'p'}node{node_id}"
     run_command(f"{basedir}/{name}", f"docker-compose stop {node_dir}")
     url: str = f"{build_server}/{new_version}"
-    download_binary(url, f"{basedir}/{name}/xrpld.{new_version}")
+    download_binary(url, f"{basedir}/{name}/{protocol}d")
     shutil.copyfile(
-        f"{basedir}/{name}/xrpld.{new_version}",
-        f"{basedir}/{name}/{node_dir}/xrpld.{new_version}",
+        f"{basedir}/{name}/{protocol}d",
+        f"{basedir}/{name}/{node_dir}/{protocol}d",
     )
     # remove the db
     run_command(f"{basedir}/{name}", f"rm -r {node_dir}/lib")
-    os.chmod(f"{basedir}/{name}/{node_dir}/xrpld.{new_version}", 0o755)
+    os.chmod(f"{basedir}/{name}/{node_dir}/{protocol}d", 0o755)
     update_dockerfile(new_version, f"{basedir}/{name}/{node_dir}/Dockerfile")
     run_command(
         f"{basedir}/{name}",
@@ -626,7 +638,7 @@ def create_ansible(
         )
         content = get_feature_lines_from_content(content_bytes)
         url: str = f"{build_server}/{build_version}"
-        download_binary(url, f"{basedir}/{name}-cluster/xrpld.{build_version}")
+        download_binary(url, f"{basedir}/{name}-cluster/{protocol}d")
         image: str = "ubuntu:jammy"
 
     if protocol == "xrpl":
@@ -638,7 +650,7 @@ def create_ansible(
             name = name.split("/tree/")[1] if "/tree/" in name else name
             name = name.replace("/", "-")
             os.makedirs(f"{basedir}/{name}-cluster", exist_ok=True)
-            copy_file("./xrpld", f"{basedir}/{name}-cluster/xrpld.{name}")
+            copy_file("./xrpld", f"{basedir}/{name}-cluster/{protocol}d")
             content_bytes = download_file_at_commit_or_tag(
                 owner,
                 repo,
@@ -766,9 +778,9 @@ def create_ansible(
 
         write_file(
             f"{basedir}/{name}-cluster/start.sh",
-            build_network_start_sh(name, num_validators, num_peers),  # noqa: E501
+            build_network_start_sh(name, protocol, num_validators, num_peers),  # noqa: E501
         )
-        stop_sh_content: str = build_network_stop_sh(name, num_validators, num_peers)
+        stop_sh_content: str = build_network_stop_sh(name, protocol, num_validators, num_peers)
         write_file(f"{basedir}/{name}-cluster/stop.sh", stop_sh_content)
 
         os.makedirs(f"{basedir}/{name}-cluster/vl", exist_ok=True)
@@ -785,7 +797,7 @@ def create_ansible(
 
     os.chmod(f"{basedir}/{name}-cluster/start.sh", 0o755)
     os.chmod(f"{basedir}/{name}-cluster/stop.sh", 0o755)
-    os.chmod(f"{basedir}/{name}-cluster/xrpld.{name}", 0o755)
+    os.chmod(f"{basedir}/{name}-cluster/{protocol}d", 0o755)
 
     os.makedirs(f"{basedir}/{name}-cluster/ansible", exist_ok=True)
     os.makedirs(f"{basedir}/{name}-cluster/ansible/host_vars", exist_ok=True)
@@ -838,7 +850,7 @@ def create_ansible(
 
         run_command(
             f"{basedir}/{name}-cluster",
-            f"cp xrpld.{name} {basedir}/{name}-cluster/vnode1",
+            f"cp {protocol}d {basedir}/{name}-cluster/vnode1",
         )
         run_command(
             f"{basedir}/{name}-cluster/vnode1",
@@ -851,7 +863,7 @@ def create_ansible(
         )
         run_command(
             f"{basedir}/{name}-cluster/vnode1",
-            f"rm -r xrpld.{name}",
+            f"rm -r {protocol}d",
         )
         if k[:5] == "pnode":
             index: int = int(k[5:])
@@ -984,6 +996,7 @@ def create_local_node_folders(
         cfg_path = f"{cluster_dir}/{node_dir}/config"
         # GENERATE PORTS
         rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(
+            
             i, "validator"
         )
         # GENERATE CONFIG - Use local paths instead of Docker paths

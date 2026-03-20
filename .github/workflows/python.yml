@@ -91,6 +91,10 @@ jobs:
       matrix:
         python-version: ['3.9', '3.10']
 
+    env:
+      XRPL_VERSION: 3.1.1
+      XAHAU_VERSION: 2025.7.9-release+1951
+
     steps:
       - uses: actions/checkout@v3
 
@@ -129,6 +133,7 @@ jobs:
       - name: Test CLI subcommand help
         run: |
           poetry run xrpld-netgen create:network --help
+          poetry run xrpld-netgen up --help
           poetry run xrpld-netgen up:standalone --help
           poetry run xrpld-netgen up:local --help
 
@@ -136,16 +141,37 @@ jobs:
         run: |
           poetry run xrpld-netgen || true
           
-      - name: Test CLI command for xrpl
+      - name: Test CLI standalone command for xrpl
         run: |
-          poetry run xrpld-netgen up:standalone --protocol xrpl
+          poetry run xrpld-netgen up:standalone --protocol xrpl --version ${{ env.XRPL_VERSION }}
           sleep 5
           docker logs xrpl
           docker ps | grep xrpl
+          # poetry run xrpld-netgen down:standalone --protocol xrpl --version ${{ env.XRPL_VERSION }}
 
-      - name: Test CLI command for xahau
+      - name: Test CLI standalone command for xahau
         run: |
-          poetry run xrpld-netgen up:standalone --protocol xahau
+          poetry run xrpld-netgen up:standalone --protocol xahau --version ${{ env.XAHAU_VERSION }}
           sleep 5
           docker logs xahau
           docker ps | grep xahau
+          # poetry run xrpld-netgen down:standalone --protocol xahau --version ${{ env.XAHAU_VERSION }}
+
+      # TODO: not supported?
+      # - name: Test CLI create:network, up, stop, down command for xrpl
+      #   run: |
+      #     poetry run xrpld-netgen create:network --protocol xrpl --build_version ${{ env.XRPL_VERSION }}
+      #     poetry run xrpld-netgen up --name xrpld-${{ env.XRPL_VERSION }}-cluster
+      #     sleep 5
+      #     docker ps | grep cluster
+      #     poetry run xrpld-netgen down --name xrpld-${{ env.XRPL_VERSION }}-cluster
+      #     poetry run xrpld-netgen remove --name xrpld-${{ env.XRPL_VERSION }}-cluster
+          
+      - name: Test CLI create:network, up, stop, down command for xahau
+        run: |
+          poetry run xrpld-netgen create:network --protocol xahau --build_version ${{ env.XAHAU_VERSION }}
+          poetry run xrpld-netgen up --name ${{ env.XAHAU_VERSION }}-cluster
+          sleep 5
+          docker ps | grep cluster
+          poetry run xrpld-netgen down --name ${{ env.XAHAU_VERSION }}-cluster
+          poetry run xrpld-netgen remove --name ${{ env.XAHAU_VERSION }}-cluster

@@ -1,6 +1,6 @@
 #!/bin/bash
-# ./entrypoint.sh ledgerfile quorum
-# ./entrypoint.sh /genesis.json 5
+# ./entrypoint.sh xrpl ledgerfile quorum
+# ./entrypoint.sh xrpl /genesis.json 5
 
 xrpldconfig=`/bin/cat /config/xrpld.cfg 2>/dev/null | wc -l`
 validatorstxt=`/bin/cat /config/validators.txt 2>/dev/null | wc -l`
@@ -17,23 +17,29 @@ if [[ "$xrpldconfig" -gt "0" && "$validatorstxt" -gt "0" ]]; then
 
 fi
 
-# Check if $1 is passed
-if [[ -n "$1" ]]; then
-    ledgerfile="--ledgerfile $1"
-else
-    ledgerfile=""
+# Check if $1 is xrpl
+if [[ "$1" != "xrpl" ]]; then
+    echo "Invalid protocol: $1"
+    exit 1
 fi
 
 # Check if $2 is passed
 if [[ -n "$2" ]]; then
-    quorum="--quorum=$2"
+    ledgerfile="--ledgerfile $2"
 else
-    quorum=""
+    ledgerfile=""
 fi
 
 # Check if $3 is passed
 if [[ -n "$3" ]]; then
-    standalone="$3"
+    quorum="--quorum=$3"
+else
+    quorum=""
+fi
+
+# Check if $4 is passed
+if [[ -n "$4" ]]; then
+    standalone="$4"
 else
     standalone=""
 fi

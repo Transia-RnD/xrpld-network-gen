@@ -80,6 +80,7 @@ class TestINetGenXahau(BaseTestConfig):
     def _test_update_node(cls):
         update_node_binary(
             "2025.2.6-release+1299-cluster",  # network name
+            "xahau",  # protocol
             "1",  # node id
             "peer",  # node type: validator or peer
             "https://build.xahau.tech",  # build server

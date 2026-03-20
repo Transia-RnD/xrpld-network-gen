@@ -585,7 +585,7 @@ def main():
         print(f"    - Node Type: {NODE_VERSION}")
         print(f"    - Build Server: {BUILD_SERVER}")
         print(f"    - Build Version: {BUILD_VERSION}")
-        update_node_binary(NAME, NODE_ID, NODE_VERSION, BUILD_SERVER, BUILD_VERSION)
+        update_node_binary(NAME, PROTOCOL, NODE_ID, NODE_VERSION, BUILD_SERVER, BUILD_VERSION)
 
     if args.command == "enable:amendment":
         NAME = args.name
