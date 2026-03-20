@@ -128,9 +128,9 @@ def create_dockerfile(
         )
 
     if include_genesis:
-        dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", "{quorum}", "{standalone}" ]'  # noqa: E501
+        dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "{protocol}", "/genesis.json", "{quorum}", "{standalone}" ]'  # noqa: E501
     else:
-        dockerfile += 'ENTRYPOINT [ "/entrypoint.sh" ]'
+        dockerfile += f'ENTRYPOINT [ "/entrypoint.sh", "{protocol}" ]'
 
     return dockerfile
 
