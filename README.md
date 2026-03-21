@@ -88,7 +88,7 @@ xrpld-netgen create:network [OPTIONS]
 - `--log_level` - Log level: "warning", "debug", "trace" (default: "trace")
 - `--genesis` - Enable genesis mode (default: false)
 - `--quorum` - Consensus quorum requirement (default: num_validators - 1)
-- `--nodedb_type` - Database type: "Memory" or "NuDB" (default: "NuDB")
+- `--nodedb_type` - Database type: "Memory" or "NuDB" or "rwdb" (default: "NuDB")
 - `--local` - Create local network without Docker (runs natively)
 - `--binary_name` - Custom xrpld binary name (default: "xrpld")
 - `--build_server` - Build server URL (auto-detected by protocol)
@@ -189,7 +189,7 @@ xrpld-netgen up:local [OPTIONS]
 - `--protocol` - Protocol: "xrpl" or "xahau" (default: "xahau")
 - `--log_level` - Log level: "warning", "debug", "trace" (default: "trace")
 - `--network_id` - Network identifier (default: 21339)
-- `--nodedb_type` - Database type: "Memory" or "NuDB" (default: "NuDB")
+- `--nodedb_type` - Database type: "Memory" or "NuDB" or "rwdb" (default: "NuDB")
 - `--public_key` - Validator list public key
 - `--import_key` - Import validator list key
 
@@ -233,7 +233,7 @@ xrpld-netgen up:standalone [OPTIONS]
 - `--build_type` - Build type: "image" or "binary" (default: "binary")
 - `--log_level` - Log level: "warning", "debug", "trace" (default: "trace")
 - `--network_id` - Network identifier (default: 21339 for xahau, 1 for xrpl)
-- `--nodedb_type` - Database type: "Memory" or "NuDB" (default: "NuDB")
+- `--nodedb_type` - Database type: "Memory" or "NuDB" or "rwdb" (default: "NuDB")
 - `--ipfs` - Include IPFS server in deployment (default: false)
 - `--deploy` - Deploy as Docker image to registry (default: false)
 - `--server` - Build server URL (optional)
