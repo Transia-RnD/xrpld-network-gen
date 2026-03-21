@@ -122,7 +122,7 @@ def main():
         type=str,
         required=False,
         help="The node db",
-        choices=["Memory", "NuDB"],
+        choices=["Memory", "NuDB", "rwdb"],
         default="NuDB",
     )
     # down:local
@@ -197,7 +197,7 @@ def main():
         type=str,
         required=False,
         help="The node db for the network",
-        choices=["Memory", "NuDB"],
+        choices=["Memory", "NuDB", "rwdb"],
         default="NuDB",
     )
     parser_cn.add_argument(
@@ -340,7 +340,7 @@ def main():
         type=str,
         required=False,
         help="The node db",
-        choices=["Memory", "NuDB"],
+        choices=["Memory", "NuDB", "rwdb"],
         default="NuDB",
     )
     # down:standalone
