@@ -213,6 +213,24 @@ def update_dockerfile(build_version: str, save_path: str) -> None:
     print(f"Dockerfile has been updated with the new xrpld version: {build_version}")
 
 
+def build_debugstream_service(
+    protocol: str,
+    network_name: str,
+    port: int = 9999,
+) -> dict:
+    return {
+        "build": {
+            "context": "./debugstream",
+            "dockerfile": "Dockerfile",
+        },
+        "container_name": "debugstream",
+        "ports": [f"{port}:{port}"],
+        "volumes": [f"{protocol}-log:/opt/ripple/log:ro"],
+        "depends_on": [protocol],
+        "networks": [network_name],
+    }
+
+
 def build_stop_sh(
     basedir: str,
     protocol: str,
@@ -235,10 +253,9 @@ def build_stop_sh(
         stop_sh_content += f"rm -r pnode{i}/log\n"
 
     if standalone:
-        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down --remove-orphans\n"  # noqa: E501
+        stop_sh_content += f"docker compose -f {basedir}/{protocol}-{name}/docker-compose.yml down -v --remove-orphans\n"  # noqa: E501
         stop_sh_content += f"rm -r {protocol}/config\n"
         stop_sh_content += f"rm -r {protocol}/lib\n"
-        stop_sh_content += f"rm -r {protocol}/log\n"
         stop_sh_content += f"rm -r {protocol}\n"
 
     if local:

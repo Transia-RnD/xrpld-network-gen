@@ -343,6 +343,13 @@ def main():
         choices=["Memory", "NuDB"],
         default="NuDB",
     )
+    parser_us.add_argument(
+        "--debugstream_port",
+        type=int,
+        required=False,
+        help="The debugstream port",
+        default=9999,
+    )
     # down:standalone
     parser_ds = subparsers.add_parser("down:standalone", help="Down Standalone")
     parser_ds.add_argument("--name", required=False, help="The name of the network")
@@ -615,6 +622,7 @@ def main():
         BUILD_VERSION = args.version
         IPFS_SERVER = args.ipfs
         NODEDB_TYPE = args.nodedb_type
+        DEBUGSTREAM_PORT = args.debugstream_port
 
         if PROTOCOL == "xahau" and not IMPORT_KEY:
             IMPORT_KEY: str = (
@@ -651,6 +659,7 @@ def main():
         print(f"    - Build Version: {BUILD_VERSION}")
         print(f"    - IPFS Server: {IPFS_SERVER}")
         print(f"    - Node DB: {NODEDB_TYPE}")
+        print(f"    - Debugstream Port: {DEBUGSTREAM_PORT}")
 
         if BUILD_TYPE == "image":
             create_standalone_image(
@@ -664,6 +673,7 @@ def main():
                 BUILD_VERSION,
                 IPFS_SERVER,
                 NODEDB_TYPE,
+                DEBUGSTREAM_PORT,
             )
         else:
             create_standalone_binary(
@@ -677,6 +687,7 @@ def main():
                 BUILD_VERSION,
                 IPFS_SERVER,
                 NODEDB_TYPE,
+                DEBUGSTREAM_PORT,
             )
 
         run_start(

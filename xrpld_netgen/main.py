@@ -11,6 +11,7 @@ from xrpld_netgen.xrpld_cfg import gen_config, XrpldBuild
 from xrpld_netgen.utils.deploy_kit import (
     create_dockerfile,
     download_binary,
+    build_debugstream_service,
     build_stop_sh,
     build_start_sh,
     build_local_start_sh,
@@ -184,6 +185,7 @@ def create_standalone_image(
     build_name: str,
     add_ipfs: bool = False,
     nodedb_type: str = "NuDB",
+    debugstream_port: int = 9999,
 ) -> None:
     name: str = build_name
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
@@ -265,6 +267,7 @@ def create_xahau_standalone_folder(
     net_type: str,
     log_level: str = "trace",
     nodedb_type: str = "NuDB",
+    debugstream_port: int = 9999,
 ):
     cfg_path = f"{basedir}/{protocol}-{name}/config"
     rpc_public, rpc_admin, ws_public, ws_admin, peer = generate_ports(0, "standalone")
@@ -342,6 +345,12 @@ def create_xahau_standalone_folder(
         f"{package_dir}/deploykit/{protocol}.entrypoint",
         f"{basedir}/{protocol}-{name}/entrypoint",
     )
+    debugstream_src = f"{package_dir}/deploykit/debugstream"
+    debugstream_dst = f"{basedir}/{protocol}-{name}/debugstream"
+    if os.path.exists(debugstream_dst):
+        shutil.rmtree(debugstream_dst)
+    shutil.copytree(debugstream_src, debugstream_dst)
+
     print(f"✅ {bcolors.CYAN}Building docker container...")
     pwd_str: str = "${PWD}"
     services[f"{protocol}"] = {
@@ -360,11 +369,14 @@ def create_xahau_standalone_folder(
         ],
         "volumes": [
             f"{pwd_str}/{protocol}/config:/etc/opt/ripple",
-            f"{pwd_str}/{protocol}/log:/opt/ripple/log",
+            f"{protocol}-log:/opt/ripple/log",
             f"{pwd_str}/{protocol}/lib:/opt/ripple/lib",
         ],
         "networks": ["standalone-network"],
     }
+    services["debugstream"] = build_debugstream_service(
+        protocol, "standalone-network", debugstream_port
+    )
 
 
 def create_standalone_binary(
@@ -378,6 +390,7 @@ def create_standalone_binary(
     build_version: str,
     add_ipfs: bool = False,
     nodedb_type: str = "NuDB",
+    debugstream_port: int = 9999,
 ) -> None:
     name: str = build_version
     os.makedirs(f"{basedir}/{protocol}-{name}", exist_ok=True)
@@ -404,6 +417,7 @@ def create_standalone_binary(
         net_type,
         log_level,
         nodedb_type,
+        debugstream_port,
     )
     services["explorer"] = {
         "image": "transia/explorer:latest",
@@ -435,6 +449,7 @@ def create_standalone_binary(
     compose = {
         "version": "3.9",
         "services": services,
+        "volumes": {f"{protocol}-log": None},
         "networks": {"standalone-network": {"driver": "bridge"}},
     }
 
