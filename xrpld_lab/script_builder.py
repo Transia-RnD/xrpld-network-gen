@@ -107,12 +107,10 @@ class DockerfileBuilder:
             )
 
         if include_genesis:
-            dockerfile += (
-                f'ENTRYPOINT [ "/entrypoint.sh",'
-                f' "/genesis.json",'
-                f' "{quorum}",'
-                f' "{standalone}" ]'
-            )
+            parts = ['"/entrypoint.sh"', '"/genesis.json"', f'"{quorum}"']
+            if standalone:
+                parts.append(f'"{standalone}"')
+            dockerfile += f'ENTRYPOINT [ {", ".join(parts)} ]'
         else:
             dockerfile += 'ENTRYPOINT [ "/entrypoint.sh" ]'
 

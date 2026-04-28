@@ -125,7 +125,7 @@ class LabRunner:
         dockerfile = DockerfileBuilder.build(
             protocol=protocol_name,
             ports=node.ports,
-            image_name=source.image or "ubuntu:jammy",
+            image_name=source.image or "ubuntu:noble",
             binary=source.build_type == BuildType.BINARY,
             version=name,
             include_genesis=True,
@@ -206,6 +206,7 @@ class LabRunner:
             self.resolver.download_binary(url, binary_dest)
 
         # 2. Create VL keys
+        algo = lab.key_algorithm
         original_dir = os.getcwd()
         os.chdir(cluster_dir)
         try:
@@ -222,6 +223,7 @@ class LabRunner:
             validators: List[str] = []
             tokens: List[str] = []
             ips_fixed: List[str] = []
+            use_ansible = lab.ansible is not None
 
             for i in range(1, lab.num_validators + 1):
                 node_name = f"vnode{i}"
@@ -239,14 +241,17 @@ class LabRunner:
                 tokens.append(token)
 
                 ports = PortSet.for_node(i, NodeRole.VALIDATOR)
-                ips_fixed.append(f"vnode{i} {ports.peer}")
+                if use_ansible and i <= len(lab.ansible.vips):
+                    ips_fixed.append(f"{lab.ansible.vips[i - 1]} {ports.peer}")
+                else:
+                    ips_fixed.append(f"vnode{i} {ports.peer}")
 
         finally:
             os.chdir(original_dir)
 
         # 4-7. Create nodes, configs, genesis, dockerfiles
         compose = ComposeBuilder(f"{name}-network")
-        image_name = source.image or "ubuntu:jammy"
+        image_name = source.image or "ubuntu:noble"
         ansible_image = f"transia/cluster:{source.commit_hash or source.build_version}"
 
         for i in range(1, lab.num_validators + 1):
@@ -294,6 +299,7 @@ class LabRunner:
                 version=name,
                 include_genesis=True,
                 quorum=lab.effective_quorum,
+                standalone="--valid" if lab.genesis else None,
             )
             write_file(os.path.join(node_dir, "Dockerfile"), dockerfile)
 
@@ -354,6 +360,7 @@ class LabRunner:
                 version=name,
                 include_genesis=True,
                 quorum=lab.effective_quorum,
+                standalone="--valid" if lab.genesis else None,
             )
             write_file(os.path.join(node_dir, "Dockerfile"), dockerfile)
 
@@ -392,8 +399,7 @@ class LabRunner:
 
         # Copy nginx dockerfile for VL
         nginx_src = os.path.join(
-            self.workspace.package_dir, "..",
-            "xrpld_netgen", "deploykit", "nginx.dockerfile",
+            self.workspace.package_dir, "deploykit", "nginx.dockerfile",
         )
         if os.path.exists(nginx_src):
             shutil.copyfile(nginx_src, os.path.join(vl_dir, "Dockerfile"))
@@ -493,6 +499,7 @@ class LabRunner:
                 break
 
         # 2-3. Create VL + validator keys
+        algo = lab.key_algorithm
         original_dir = os.getcwd()
         os.chdir(cluster_dir)
         try:
@@ -627,8 +634,7 @@ class LabRunner:
 
         # Copy nginx dockerfile for VL
         nginx_src = os.path.join(
-            self.workspace.package_dir, "..",
-            "xrpld_netgen", "deploykit", "nginx.dockerfile",
+            self.workspace.package_dir, "deploykit", "nginx.dockerfile",
         )
         if os.path.exists(nginx_src):
             shutil.copyfile(nginx_src, os.path.join(vl_dir, "Dockerfile"))

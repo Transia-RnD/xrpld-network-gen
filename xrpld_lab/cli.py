@@ -82,6 +82,8 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
                    help="Path to YAML/JSON file with config overrides")
     p.add_argument("--binary_path", type=str, default=None,
                    help="Path to pre-built binary (skips download)")
+    p.add_argument("--quantum", action="store_true",
+                   help="Use dilithium (post-quantum) keys for validators and publisher")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -439,6 +441,8 @@ def _build_network_config(args, protocol, spec):
         if ansible.pips and num_peers == 1:
             num_peers = len(ansible.pips)
 
+    key_algorithm = "dilithium" if getattr(args, "quantum", False) else "ed25519"
+
     return LabConfig(
         protocol=protocol,
         mode=mode,
@@ -452,6 +456,7 @@ def _build_network_config(args, protocol, spec):
         node_db_type=NodeDbType(args.nodedb_type),
         binary_name=args.binary_name,
         import_vl_key=_DEFAULT_VL_KEY,
+        key_algorithm=key_algorithm,
         config_overrides=config_overrides,
         ansible=ansible,
     )

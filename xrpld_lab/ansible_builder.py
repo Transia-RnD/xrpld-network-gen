@@ -632,9 +632,9 @@ _MAIN_YML = """- hosts: all
     docker_image:
       name: "{{ docker_image_name }}"
       source: pull
-  - name: Copy directory to the remote server
+  - name: Copy config files to the remote server
     copy:
-      src: "{{ config_path }}"
+      src: "{{ config_path }}/"
       dest: /opt/ripple/config/
   - name: Deploy Docker Image
     docker_container:

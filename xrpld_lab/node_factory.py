@@ -74,10 +74,11 @@ class NodeFactory:
         ips_fixed: Optional[List[str]] = None,
         log_level: str = "warning",
         node_db_type: NodeDbType = NodeDbType.NUDB,
+        ports: Optional[PortSet] = None,
     ) -> NodeConfig:
         """Create a NodeConfig for a validator node in a network."""
         spec = get_spec(protocol)
-        ports = PortSet.for_node(index, NodeRole.VALIDATOR)
+        ports = ports or PortSet.for_node(index, NodeRole.VALIDATOR)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.NETWORK)
         node_db.num_ledgers = 10000
 
@@ -131,10 +132,11 @@ class NodeFactory:
         ips_fixed: Optional[List[str]] = None,
         log_level: str = "warning",
         node_db_type: NodeDbType = NodeDbType.NUDB,
+        ports: Optional[PortSet] = None,
     ) -> NodeConfig:
         """Create a NodeConfig for a peer node in a network."""
         spec = get_spec(protocol)
-        ports = PortSet.for_node(index, NodeRole.PEER)
+        ports = ports or PortSet.for_node(index, NodeRole.PEER)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.NETWORK)
         node_db.num_ledgers = None  # Full history for peers
 

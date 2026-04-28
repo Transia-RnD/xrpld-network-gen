@@ -380,6 +380,7 @@ class LabConfig:
     public_vl_key: Optional[str] = None
     add_ipfs: bool = False
     ansible: Optional[AnsibleConfig] = None
+    key_algorithm: str = "ed25519"
     config_overrides: dict = field(default_factory=dict)
 
     @property
