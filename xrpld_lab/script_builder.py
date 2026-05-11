@@ -235,6 +235,7 @@ done
         num_validators: int,
         num_peers: int,
         binary_name: str = "xrpld",
+        genesis: bool = True,
     ) -> str:
         """Local multi-node start: binary discovery, copy, nohup + PID files.
 
@@ -300,6 +301,11 @@ done
             s += "fi\n"
         s += "\n"
 
+        # Build xrpld flags
+        genesis_flags = (
+            " --ledgerfile config/genesis.json --valid" if genesis else ""
+        )
+
         # Start validator nodes
         s += "# Start validator nodes in background\n"
         for i in range(1, num_validators + 1):
@@ -307,7 +313,7 @@ done
             s += f"cd \"$CLUSTER_DIR/vnode{i}\"\n"
             s += (
                 f"nohup ./{binary_name} --conf config/xrpld.cfg"
-                " --ledgerfile config/genesis.json"
+                f"{genesis_flags}"
                 " > /dev/null 2>&1 &\n"
             )
             s += f"echo $! > \"$CLUSTER_DIR/vnode{i}/xrpld.pid\"\n"
@@ -320,7 +326,7 @@ done
             s += f"cd \"$CLUSTER_DIR/pnode{i}\"\n"
             s += (
                 f"nohup ./{binary_name} --conf config/xrpld.cfg"
-                " --ledgerfile config/genesis.json"
+                f"{genesis_flags}"
                 " > /dev/null 2>&1 &\n"
             )
             s += f"echo $! > \"$CLUSTER_DIR/pnode{i}/xrpld.pid\"\n"
@@ -450,3 +456,21 @@ done
         s += "echo 'Local network stopped.'\n"
 
         return s
+
+    @staticmethod
+    def local_node_start_cmd(
+        node_name: str,
+        binary_name: str = "xrpld",
+        genesis: bool = False,
+    ) -> str:
+        """Return the shell command to start a single local node.
+
+        With ``genesis=False`` (default) the node syncs from peers.
+        With ``genesis=True`` it loads the genesis ledger and marks it valid.
+        """
+        flags = " --ledgerfile config/genesis.json --valid" if genesis else ""
+        return (
+            f"cd {node_name} && "
+            f"nohup ./{binary_name} --conf config/xrpld.cfg{flags}"
+            f" > /dev/null 2>&1 & echo $! > xrpld.pid && cd .."
+        )

@@ -28,7 +28,9 @@ from xrpld_lab.models import (
 )
 from xrpld_lab.operations import (
     enable_amendment,
+    node_stall,
     remove_network,
+    restart_local_node,
     run_start_script,
     run_stop_script,
     start_local,
@@ -190,6 +192,25 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--amendment_name", required=True)
     p.add_argument("--node_id", type=int, required=True)
     p.add_argument("--node_type", required=True, choices=["validator", "peer"])
+
+    # -- node:stall ----------------------------------------------------------
+    p = subparsers.add_parser("node:stall", help="Stall a node (pause consensus)")
+    p.add_argument("--name", required=True)
+    p.add_argument("--node_id", type=int, required=True)
+    p.add_argument("--node_type", required=True, choices=["validator", "peer"])
+    p.add_argument("--duration_ms", type=int, default=30000,
+                   help="Stall duration in ms (default: 30000)")
+    p.add_argument("--clear", action="store_true",
+                   help="Clear the stall immediately")
+
+    # -- node:restart --------------------------------------------------------
+    p = subparsers.add_parser(
+        "node:restart",
+        help="Restart a single local node (syncs from network)",
+    )
+    p.add_argument("node_name", help="Node directory name (e.g. vnode2)")
+    p.add_argument("--genesis", action="store_true",
+                   help="Start from genesis instead of syncing from network")
 
     # -- logs:local ----------------------------------------------------------
     p = subparsers.add_parser("logs:local", help="View local node logs")
@@ -516,6 +537,17 @@ def main() -> None:
             args.node_type,
             workspace,
         )
+    elif args.command == "node:stall":
+        node_stall(
+            args.name,
+            args.node_id,
+            args.node_type,
+            workspace,
+            args.duration_ms,
+            args.clear,
+        )
+    elif args.command == "node:restart":
+        restart_local_node(args.node_name, genesis=args.genesis)
     elif args.command == "logs:local":
         view_local_logs(args.node)
     elif args.command == "logs:standalone":

@@ -140,8 +140,17 @@ def update_genesis(
     json_dict = read_json(genesis_path)
     new_amendments: List[str] = convert_to_list_of_hashes(features)
 
+    if not new_amendments:
+        raise RuntimeError(
+            f"No features found for {protocol_name}. "
+            "Cannot generate genesis without amendments."
+        )
+
     for entry in json_dict["ledger"]["accountState"]:
-        if "Amendments" in entry:
+        if entry.get("LedgerEntryType") == "Amendments":
             entry["Amendments"] = new_amendments
+            break
+    else:
+        raise RuntimeError("Amendments entry not found in genesis template.")
 
     return json_dict

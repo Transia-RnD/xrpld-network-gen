@@ -527,8 +527,8 @@ class TestCreatePeer:
         assert node.ips_fixed_urls == three_ips_fixed
         assert len(node.ips_fixed_urls) == 3
 
-    def test_node_db_num_ledgers_is_none(self, three_validators):
-        """Peers keep full history -- num_ledgers should be None."""
+    def test_node_db_num_ledgers(self, three_validators):
+        """Peers prune old ledgers like validators."""
         node = NodeFactory.create_peer(
             index=1,
             protocol=Protocol.XRPL,
@@ -537,7 +537,7 @@ class TestCreatePeer:
             validators=three_validators,
             vl_key="VL_KEY",
         )
-        assert node.node_db.num_ledgers is None
+        assert node.node_db.num_ledgers == 10000
 
     def test_vl_sites_is_vl_json(self, three_validators):
         node = NodeFactory.create_peer(
@@ -796,8 +796,8 @@ class TestCreateLocalPeer:
         )
         assert node.ips_fixed_urls == three_ips_fixed
 
-    def test_node_db_num_ledgers_is_none(self, three_validators):
-        """Local peers also keep full history."""
+    def test_node_db_num_ledgers(self, three_validators):
+        """Local peers prune old ledgers like validators."""
         node = NodeFactory.create_local_peer(
             index=1,
             protocol=Protocol.XRPL,
@@ -806,7 +806,7 @@ class TestCreateLocalPeer:
             validators=three_validators,
             vl_key="VL_KEY",
         )
-        assert node.node_db.num_ledgers is None
+        assert node.node_db.num_ledgers == 10000
 
     def test_default_log_level_is_trace(self, three_validators):
         node = NodeFactory.create_local_peer(

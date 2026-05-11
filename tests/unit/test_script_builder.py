@@ -307,7 +307,7 @@ class TestScriptBuilderLocalNetwork:
         assert "cp \"$BINARY_PATH\" pnode1/xrpld" in result
         # nohup start
         assert "nohup ./xrpld --conf config/xrpld.cfg" in result
-        assert "--ledgerfile config/genesis.json" in result
+        assert "--ledgerfile config/genesis.json --valid" in result
         # PID files
         assert "xrpld.pid" in result
         assert 'echo $!' in result
@@ -315,6 +315,18 @@ class TestScriptBuilderLocalNetwork:
         assert "vnode1" in result
         assert "vnode2" in result
         assert "pnode1" in result
+
+    def test_local_network_start_no_genesis(self):
+        """Without genesis: no --ledgerfile or --valid flags."""
+        result = ScriptBuilder.local_network_start(
+            name="local-net",
+            num_validators=2,
+            num_peers=1,
+            genesis=False,
+        )
+        assert "--ledgerfile" not in result
+        assert "--valid" not in result
+        assert "nohup ./xrpld --conf config/xrpld.cfg" in result
 
     def test_local_network_start_custom_binary(self):
         """Custom binary name is used throughout."""
@@ -328,6 +340,19 @@ class TestScriptBuilderLocalNetwork:
         assert "command -v rippled" in result
         assert 'cp "$BINARY_PATH" vnode1/rippled' in result
         assert "nohup ./rippled" in result
+
+    def test_local_node_start_cmd_sync(self):
+        """Single node restart: syncs from network, no genesis flags."""
+        result = ScriptBuilder.local_node_start_cmd("vnode3")
+        assert "--conf config/xrpld.cfg" in result
+        assert "--ledgerfile" not in result
+        assert "--valid" not in result
+        assert "vnode3" in result
+
+    def test_local_node_start_cmd_genesis(self):
+        """Single node start with genesis."""
+        result = ScriptBuilder.local_node_start_cmd("vnode1", genesis=True)
+        assert "--ledgerfile config/genesis.json --valid" in result
 
     def test_local_network_stop(self):
         """PID kill, pkill fallback, Docker stop."""

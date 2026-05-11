@@ -763,9 +763,14 @@ _NGINX_SSL_TPL = """- hosts: {group}
     - vars.yml
 
   tasks:
+  - name: Check WSS cert exists
+    stat:
+      path: "{{{{ SSL_CERT }}}}"
+    register: wss_cert
   - name: Create WSS private key
     community.crypto.openssl_privatekey:
       path: "{{{{ SSL_KEY }}}}"
+    when: not wss_cert.stat.exists
   - name: Create WSS CSR
     community.crypto.openssl_csr_pipe:
       privatekey_path: "{{{{ SSL_KEY }}}}"
@@ -773,15 +778,22 @@ _NGINX_SSL_TPL = """- hosts: {group}
       organization_name: "{{{{ SSL_O }}}}"
       organizational_unit_name: "{{{{ SSL_OU }}}}"
     register: csr
+    when: not wss_cert.stat.exists
   - name: Create WSS self-signed certificate
     community.crypto.x509_certificate:
       path: "{{{{ SSL_CERT }}}}"
       csr_content: "{{{{ csr.csr }}}}"
       privatekey_path: "{{{{ SSL_KEY }}}}"
       provider: selfsigned
+    when: not wss_cert.stat.exists
+  - name: Check RPC cert exists
+    stat:
+      path: "{{{{ RPC_SSL_CERT }}}}"
+    register: rpc_cert
   - name: Create RPC private key
     community.crypto.openssl_privatekey:
       path: "{{{{ RPC_SSL_KEY }}}}"
+    when: not rpc_cert.stat.exists
   - name: Create RPC CSR
     community.crypto.openssl_csr_pipe:
       privatekey_path: "{{{{ RPC_SSL_KEY }}}}"
@@ -789,15 +801,22 @@ _NGINX_SSL_TPL = """- hosts: {group}
       organization_name: "{{{{ SSL_O }}}}"
       organizational_unit_name: "{{{{ SSL_OU }}}}"
     register: csr
+    when: not rpc_cert.stat.exists
   - name: Create RPC self-signed certificate
     community.crypto.x509_certificate:
       path: "{{{{ RPC_SSL_CERT }}}}"
       csr_content: "{{{{ csr.csr }}}}"
       privatekey_path: "{{{{ RPC_SSL_KEY }}}}"
       provider: selfsigned
+    when: not rpc_cert.stat.exists
+  - name: Check Faucet cert exists
+    stat:
+      path: "{{{{ FAUCET_SSL_CERT }}}}"
+    register: faucet_cert
   - name: Create Faucet private key
     community.crypto.openssl_privatekey:
       path: "{{{{ FAUCET_SSL_KEY }}}}"
+    when: not faucet_cert.stat.exists
   - name: Create Faucet CSR
     community.crypto.openssl_csr_pipe:
       privatekey_path: "{{{{ FAUCET_SSL_KEY }}}}"
@@ -805,15 +824,22 @@ _NGINX_SSL_TPL = """- hosts: {group}
       organization_name: "{{{{ SSL_O }}}}"
       organizational_unit_name: "{{{{ SSL_OU }}}}"
     register: csr
+    when: not faucet_cert.stat.exists
   - name: Create Faucet self-signed certificate
     community.crypto.x509_certificate:
       path: "{{{{ FAUCET_SSL_CERT }}}}"
       csr_content: "{{{{ csr.csr }}}}"
       privatekey_path: "{{{{ FAUCET_SSL_KEY }}}}"
       provider: selfsigned
+    when: not faucet_cert.stat.exists
+  - name: Check Debug cert exists
+    stat:
+      path: "{{{{ DEBUG_SSL_CERT }}}}"
+    register: debug_cert
   - name: Create Debug private key
     community.crypto.openssl_privatekey:
       path: "{{{{ DEBUG_SSL_KEY }}}}"
+    when: not debug_cert.stat.exists
   - name: Create Debug CSR
     community.crypto.openssl_csr_pipe:
       privatekey_path: "{{{{ DEBUG_SSL_KEY }}}}"
@@ -821,15 +847,22 @@ _NGINX_SSL_TPL = """- hosts: {group}
       organization_name: "{{{{ SSL_O }}}}"
       organizational_unit_name: "{{{{ SSL_OU }}}}"
     register: csr
+    when: not debug_cert.stat.exists
   - name: Create Debug self-signed certificate
     community.crypto.x509_certificate:
       path: "{{{{ DEBUG_SSL_CERT }}}}"
       csr_content: "{{{{ csr.csr }}}}"
       privatekey_path: "{{{{ DEBUG_SSL_KEY }}}}"
       provider: selfsigned
+    when: not debug_cert.stat.exists
+  - name: Check Compiler cert exists
+    stat:
+      path: "{{{{ COMPILER_SSL_CERT }}}}"
+    register: compiler_cert
   - name: Create Compiler private key
     community.crypto.openssl_privatekey:
       path: "{{{{ COMPILER_SSL_KEY }}}}"
+    when: not compiler_cert.stat.exists
   - name: Create Compiler CSR
     community.crypto.openssl_csr_pipe:
       privatekey_path: "{{{{ COMPILER_SSL_KEY }}}}"
@@ -837,12 +870,14 @@ _NGINX_SSL_TPL = """- hosts: {group}
       organization_name: "{{{{ SSL_O }}}}"
       organizational_unit_name: "{{{{ SSL_OU }}}}"
     register: csr
+    when: not compiler_cert.stat.exists
   - name: Create Compiler self-signed certificate
     community.crypto.x509_certificate:
       path: "{{{{ COMPILER_SSL_CERT }}}}"
       csr_content: "{{{{ csr.csr }}}}"
       privatekey_path: "{{{{ COMPILER_SSL_KEY }}}}"
       provider: selfsigned
+    when: not compiler_cert.stat.exists
 """
 
 _NGINX_MAIN_TPL = """- hosts: {group}

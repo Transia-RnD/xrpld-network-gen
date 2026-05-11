@@ -116,6 +116,46 @@ def stop_local() -> None:
     run_command(cwd, "bash stop.sh")
 
 
+def restart_local_node(
+    node_name: str,
+    binary_name: str = "xrpld",
+    genesis: bool = False,
+) -> None:
+    """Stop and restart a single local node.
+
+    With ``genesis=False`` (default) the node syncs from the network —
+    use this when restarting after a crash, stall, or attack simulation.
+    With ``genesis=True`` it loads the genesis ledger and marks it valid.
+    """
+    cwd = os.getcwd()
+    node_dir = os.path.join(cwd, node_name)
+    if not os.path.isdir(node_dir):
+        print(f"{bcolors.RED}Node directory not found: {node_dir}{bcolors.END}")
+        return
+
+    # Stop the node if running
+    pid_file = os.path.join(node_dir, "xrpld.pid")
+    if os.path.isfile(pid_file):
+        with open(pid_file) as f:
+            pid = f.read().strip()
+        if pid:
+            print(f"{bcolors.CYAN}Stopping {node_name} (PID {pid})...{bcolors.END}")
+            subprocess.run(["kill", pid], capture_output=True)
+            subprocess.run(["sleep", "2"], capture_output=True)
+            subprocess.run(["kill", "-9", pid], capture_output=True)
+        os.remove(pid_file)
+
+    # Start the node
+    from xrpld_lab.script_builder import ScriptBuilder
+
+    cmd = ScriptBuilder.local_node_start_cmd(
+        node_name, binary_name=binary_name, genesis=genesis
+    )
+    print(f"{bcolors.CYAN}Starting {node_name} (sync from network)...{bcolors.END}")
+    run_command(cwd, cmd)
+    print(f"{bcolors.GREEN}{node_name} started.{bcolors.END}")
+
+
 # ---------------------------------------------------------------------------
 # update:node
 # ---------------------------------------------------------------------------
@@ -256,6 +296,69 @@ def enable_amendment(
             check=True,
         )
         print(f"\n{bcolors.GREEN}Amendment enabled.{bcolors.END}")
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"{bcolors.RED}RPC request failed: {e}{bcolors.END}")
+
+
+# ---------------------------------------------------------------------------
+# node:stall
+# ---------------------------------------------------------------------------
+
+
+def node_stall(
+    name: str,
+    node_id: int,
+    node_type: str,
+    workspace: Workspace,
+    duration_ms: int = 30000,
+    clear: bool = False,
+) -> None:
+    """Stall or unstall a running node via the ``node_stall`` admin RPC.
+
+    When stalled, the node stops participating in consensus (no proposals,
+    no validations, no ledger closes).  After *duration_ms* the node
+    automatically resumes.  Pass ``clear=True`` to lift the stall early.
+    """
+    if node_type == "validator":
+        role = NodeRole.VALIDATOR
+    else:
+        role = NodeRole.PEER
+    ports = PortSet.for_node(node_id, role)
+    rpc_port = ports.rpc_admin
+
+    if clear:
+        params = {"clear": True}
+    else:
+        params = {"duration_ms": duration_ms}
+
+    payload = json.dumps({
+        "method": "node_stall",
+        "params": [params],
+    })
+
+    url = f"http://localhost:{rpc_port}"
+    action = "Clearing stall on" if clear else f"Stalling ({duration_ms}ms)"
+    print(
+        f"{bcolors.CYAN}{action} {node_type} {node_id} "
+        f"at {url}...{bcolors.END}"
+    )
+
+    try:
+        subprocess.run(
+            [
+                "curl",
+                "-s",
+                "-X",
+                "POST",
+                url,
+                "-H",
+                "Content-Type: application/json",
+                "-d",
+                payload,
+            ],
+            check=True,
+        )
+        print(f"\n{bcolors.GREEN}node_stall RPC sent.{bcolors.END}")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"{bcolors.RED}RPC request failed: {e}{bcolors.END}")
 

@@ -138,7 +138,7 @@ class NodeFactory:
         spec = get_spec(protocol)
         ports = ports or PortSet.for_node(index, NodeRole.PEER)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.NETWORK)
-        node_db.num_ledgers = None  # Full history for peers
+        node_db.num_ledgers = 10000
 
         return NodeConfig(
             name=name,
@@ -236,7 +236,7 @@ class NodeFactory:
         spec = get_spec(protocol)
         ports = PortSet.for_node(index, NodeRole.PEER)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.LOCAL)
-        node_db.num_ledgers = None  # Full history for peers
+        node_db.num_ledgers = 10000
 
         return NodeConfig(
             name=name,
