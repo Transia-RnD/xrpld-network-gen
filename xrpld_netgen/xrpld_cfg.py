@@ -162,10 +162,11 @@ def generate_xrpld_cfg(
 
         cfg_out += "[node_db]" + "\n"
         cfg_out += f"type={nodedb_type}" + "\n"
-        cfg_out += f"path={nodedb_path}" + "\n"
-        if num_ledgers:
-            cfg_out += "advisory_delete=0" + "\n"
-            cfg_out += f"online_delete={num_ledgers}" + "\n"
+        if nodedb_type != "rwdb":
+            cfg_out += f"path={nodedb_path}" + "\n"
+            if num_ledgers:
+                cfg_out += "advisory_delete=0" + "\n"
+                cfg_out += f"online_delete={num_ledgers}" + "\n"
         cfg_out += "\n"
 
         if relational_db:
