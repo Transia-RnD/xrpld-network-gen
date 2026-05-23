@@ -260,7 +260,9 @@ done
 
         # Binary discovery
         s += "# Locate xrpld binary\n"
-        s += f"if [ -f \"$CLUSTER_DIR/../{binary_name}\" ]; then\n"
+        s += f"if [ -f \"$CLUSTER_DIR/{binary_name}\" ]; then\n"
+        s += f"  BINARY_PATH=\"$CLUSTER_DIR/{binary_name}\"\n"
+        s += f"elif [ -f \"$CLUSTER_DIR/../{binary_name}\" ]; then\n"
         s += f"  BINARY_PATH=\"$CLUSTER_DIR/../{binary_name}\"\n"
         s += f"elif command -v {binary_name} &> /dev/null; then\n"
         s += f"  BINARY_PATH=$(command -v {binary_name})\n"
@@ -268,8 +270,8 @@ done
         s += f"  echo 'Error: {binary_name} binary not found!'\n"
         s += f"  echo 'Please ensure {binary_name} is either:'\n"
         s += (
-            "  echo '  1. In the parent directory:"
-            f" $CLUSTER_DIR/../{binary_name}'\n"
+            "  echo '  1. In the current directory:"
+            f" $CLUSTER_DIR/{binary_name}'\n"
         )
         s += (
             "  echo '  2. In your PATH"

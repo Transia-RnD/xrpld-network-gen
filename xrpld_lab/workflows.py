@@ -490,6 +490,17 @@ class LabRunner:
         protocol_name = lab.protocol.value
         cluster_dir = self.workspace.cluster_dir(name)
 
+        # 0. Copy binary into cluster dir so start.sh can find it
+        binary_name = lab.binary_name
+        binary_src = lab.build_source.binary_path or os.path.join(
+            os.getcwd(), binary_name
+        )
+        binary_src = os.path.abspath(binary_src)
+        binary_dest = os.path.join(cluster_dir, binary_name)
+        if os.path.isfile(binary_src):
+            shutil.copy2(binary_src, binary_dest)
+            os.chmod(binary_dest, 0o755)
+
         # 1. Resolve features from local source
         feature_lines: list = []
         for fpath in spec.feature_paths:

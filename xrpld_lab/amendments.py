@@ -32,7 +32,7 @@ def _amendment_name_hash(name: str) -> str:
 
 def parse_supported(value: str) -> bool:
     """Parse C++ Supported/DefaultVote value.  ``'no'`` -> False, else True."""
-    return value != "no"
+    return value.lower() != "no"
 
 
 def get_feature_lines_from_path(path: str) -> list[str]:
@@ -88,8 +88,10 @@ def parse_amendments(lines: list) -> Dict[str, str]:
         else:
             continue
 
-        supported_match = re.findall(r"Supported::(yes|no)", line)
-        default_vote_match = re.findall(r"DefaultVote::(yes|no)", line)
+        supported_match = re.findall(r"Supported::(yes|no)", line, re.IGNORECASE)
+        default_vote_match = re.findall(
+            r"(?:DefaultVote|VoteBehavior::Default)(yes|no)", line, re.IGNORECASE
+        )
 
         amendments[amendment_name] = {
             "supported": parse_supported(

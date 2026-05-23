@@ -170,7 +170,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--log_level", default="trace", choices=["warning", "debug", "trace"])
     p.add_argument("--public_key", default=_DEFAULT_VL_KEY)
     p.add_argument("--import_key", default=None)
-    p.add_argument("--protocol", default="xahau")
+    p.add_argument("--protocol", default="xrpl")
     p.add_argument("--network_type", default="standalone")
     p.add_argument("--network_id", type=int, default=21339)
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB"])
@@ -517,7 +517,15 @@ def main() -> None:
     elif args.command == "down:standalone":
         stop_standalone(workspace, args.name, args.protocol, args.version)
     elif args.command == "up:local":
-        start_local()
+        start_local(
+            protocol=args.protocol,
+            network_type=args.network_type,
+            network_id=args.network_id,
+            log_level=args.log_level,
+            nodedb_type=args.nodedb_type,
+            public_key=args.public_key,
+            import_key=args.import_key,
+        )
     elif args.command == "down:local":
         stop_local()
     elif args.command == "update:node":

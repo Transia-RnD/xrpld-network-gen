@@ -96,13 +96,114 @@ def stop_standalone(
 # ---------------------------------------------------------------------------
 
 
-def start_local() -> None:
-    """Start a local standalone by running ./start.sh in the current directory."""
+def start_local(
+    protocol: str = "xrpl",
+    network_type: str = "standalone",
+    network_id: int = 21339,
+    log_level: str = "trace",
+    nodedb_type: str = "NuDB",
+    public_key: str = None,
+    import_key: str = None,
+) -> None:
+    """Set up and start a local standalone node from the current directory.
+
+    Expects to be run from the build directory of a built xrpld/xahaud repo.
+    Generates config/, db/, log/ dirs, writes xrpld.cfg, validators.txt,
+    genesis.json, start.sh, and stop.sh, then launches the node.
+    """
+    from xrpld_lab.amendments import (
+        get_feature_lines_from_path,
+        parse_amendments,
+        update_genesis,
+    )
+    from xrpld_lab.config_builder import XrpldCfgBuilder, ValidatorsTxtBuilder
+    from xrpld_lab.models import DeployMode, NodeDbType, Protocol
+    from xrpld_lab.node_factory import NodeFactory
+    from xrpld_lab.protocol import get_spec
+    from xrpld_lab.utils import save_config, write_executable, write_file
+
     cwd = os.getcwd()
-    script = os.path.join(cwd, "start.sh")
-    if not os.path.isfile(script):
-        print(f"{bcolors.RED}start.sh not found in {cwd}{bcolors.END}")
+    protocol_enum = Protocol(protocol)
+    spec = get_spec(protocol_enum)
+    binary_name = spec.daemon_name
+    config_filename = f"{binary_name}.cfg"
+
+    # 1. Find binary in CWD
+    binary_path = os.path.join(cwd, binary_name)
+    if not os.path.isfile(binary_path):
+        print(f"{bcolors.RED}{binary_name} not found in {cwd}{bcolors.END}")
         return
+
+    # 2. Resolve features from source tree (CWD is build/, repo root is ../)
+    feature_lines: list = []
+    for fpath in spec.feature_paths:
+        candidate = os.path.join(cwd, "..", fpath)
+        if os.path.exists(candidate):
+            feature_lines = get_feature_lines_from_path(candidate)
+            print(f"{bcolors.CYAN}Resolved features from {candidate}{bcolors.END}")
+            break
+
+    if not feature_lines:
+        print(f"{bcolors.RED}Could not resolve features from source tree{bcolors.END}")
+        return
+
+    # 3. Create directories
+    config_dir = os.path.join(cwd, "config")
+    os.makedirs(config_dir, exist_ok=True)
+    os.makedirs(os.path.join(cwd, "db"), exist_ok=True)
+    os.makedirs(os.path.join(cwd, "log"), exist_ok=True)
+
+    # 4. Build NodeConfig for local standalone
+    node = NodeFactory.create_local_standalone(
+        protocol=protocol_enum,
+        name="local",
+        network_id=network_id,
+        log_level=log_level,
+        node_db_type=NodeDbType(nodedb_type),
+        vl_keys=[public_key] if public_key else [],
+        import_vl_keys=[import_key] if import_key else [],
+    )
+
+    # 5. Generate config files
+    cfg_content = XrpldCfgBuilder(node).build()
+    vl_content = ValidatorsTxtBuilder(node, genesis=True).build()
+    save_config(protocol, config_dir, cfg_content, vl_content)
+
+    # 6. Parse amendments and generate genesis
+    features = parse_amendments(feature_lines)
+    genesis = update_genesis(features, protocol)
+    write_file(
+        os.path.join(config_dir, "genesis.json"),
+        json.dumps(genesis, indent=4, sort_keys=True),
+    )
+
+    # 7. Generate start.sh and stop.sh
+    flag = "-a" if network_type == "standalone" else ""
+    start_content = (
+        "#!/bin/bash\n"
+        f"nohup ./{binary_name} {flag} --conf config/{config_filename}"
+        " --ledgerfile config/genesis.json"
+        " > /dev/null 2>&1 &\n"
+        "echo $! > xrpld.pid\n"
+        f'echo "{binary_name} started (PID $(cat xrpld.pid))"\n'
+    )
+    stop_content = (
+        "#!/bin/bash\n"
+        "if [ -f xrpld.pid ]; then\n"
+        "  kill $(cat xrpld.pid) 2>/dev/null\n"
+        "  rm -f xrpld.pid\n"
+        f'  echo "{binary_name} stopped"\n'
+        "else\n"
+        f'  echo "No PID file found"\n'
+        "fi\n"
+    )
+    write_executable(os.path.join(cwd, "start.sh"), start_content)
+    write_executable(os.path.join(cwd, "stop.sh"), stop_content)
+
+    print(f"{bcolors.CYAN}Generated config in {config_dir}{bcolors.END}")
+    print(f"{bcolors.CYAN}Starting {binary_name}...{bcolors.END}")
+
+    # 8. Launch
     run_command(cwd, "bash start.sh")
 
 

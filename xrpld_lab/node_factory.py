@@ -162,6 +162,40 @@ class NodeFactory:
         )
 
     @staticmethod
+    def create_local_standalone(
+        protocol: Protocol,
+        name: str,
+        network_id: int,
+        log_level: str = "trace",
+        node_db_type: NodeDbType = NodeDbType.NUDB,
+        vl_keys: Optional[List[str]] = None,
+        import_vl_keys: Optional[List[str]] = None,
+    ) -> NodeConfig:
+        """Create a NodeConfig for a local (native process) standalone node."""
+        spec = get_spec(protocol)
+        ports = PortSet.for_node(0, NodeRole.STANDALONE)
+        node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.LOCAL)
+        node_db.num_ledgers = 10000
+
+        return NodeConfig(
+            name=name,
+            index=0,
+            role=NodeRole.STANDALONE,
+            protocol=protocol,
+            network_id=network_id,
+            ports=ports,
+            server=ServerConfig(),
+            node_db=node_db,
+            db_path="db",
+            debug_path="log/debug.log",
+            size_node="huge",
+            log_level=log_level,
+            amendment_majority_time=spec.amendment_majority_time,
+            vl_keys=vl_keys or [],
+            import_vl_keys=import_vl_keys or [],
+        )
+
+    @staticmethod
     def create_local_validator(
         index: int,
         protocol: Protocol,
