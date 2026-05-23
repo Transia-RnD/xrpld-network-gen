@@ -1,23 +1,36 @@
-## Deployment
+# Contributing
 
-1. Signup for pypi
+## Setup
 
-https://pypi.org/account/register/
+```bash
+git clone https://github.com/Transia-RnD/xrpld-lab
+cd xrpld-lab
+poetry install
+```
 
-Account Settings -> Add Api Token
+## Development
 
-2. Get API Key
+TDD workflow: write tests first, then implement.
 
-Account Settings -> Add Api Token
+```bash
+# Run all tests
+poetry run pytest tests/ -v
 
-3. Configure Token
+# Run a specific test file
+poetry run pytest tests/unit/test_config_builder.py -v
 
-`poetry config pypi-token.pypi your-api-token`
+# Run with coverage
+poetry run pytest tests/ --cov=xrpld_lab
+```
 
-4. Build Project
+## Project structure
 
-`poetry build`
+Source code lives in `xrpld_lab/`. Tests live in `tests/unit/`. Each module has a corresponding test file.
 
-5. Publish 
+## Publishing
 
-`poetry publish`
+1. Bump version in `pyproject.toml`
+2. Build: `poetry build`
+3. Publish: `poetry publish`
+
+Requires a PyPI API token configured via `poetry config pypi-token.pypi <token>`.

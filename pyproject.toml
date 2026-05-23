@@ -1,8 +1,11 @@
 [tool.poetry]
-name = "xrpld-netgen"
-version = "2.0.1"
-description = "Xrpld network generator"
+name = "xrpld-lab"
+version = "3.1.2"
+description = "Build xrpld networks and standalone ledgers"
 authors = ["Denis Angell <dangell@transia.co>"]
+packages = [
+    { include = "xrpld_lab" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.9.6"
@@ -19,4 +22,4 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-xrpld-netgen = "xrpld_netgen.cli:main"
+xrpld-lab = "xrpld_lab.cli:main"

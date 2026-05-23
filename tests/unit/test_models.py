@@ -1,0 +1,285 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+import pytest
+from xrpld_lab.models import (
+    Protocol,
+    DeployMode,
+    NodeRole,
+    BuildType,
+    NodeDbType,
+    PortSet,
+    ServerConfig,
+    NodeDbConfig,
+    TransactionQueueConfig,
+    WorkerConfig,
+    VotingConfig,
+    ValidatorIdentity,
+    NodeConfig,
+    BuildSource,
+    LabConfig,
+)
+
+
+class TestPortSet:
+    """Test PortSet.for_node with various node roles and indices."""
+
+    def test_validator_index_1(self):
+        ports = PortSet.for_node(1, NodeRole.VALIDATOR)
+        assert ports.rpc_public == 5107
+        assert ports.rpc_admin == 5105
+        assert ports.ws_public == 6108
+        assert ports.ws_admin == 6106
+        assert ports.peer == 51335
+
+    def test_validator_index_2(self):
+        ports = PortSet.for_node(2, NodeRole.VALIDATOR)
+        assert ports.rpc_public == 5207
+        assert ports.rpc_admin == 5205
+        assert ports.ws_public == 6208
+        assert ports.ws_admin == 6206
+        assert ports.peer == 51435
+
+    def test_peer_index_1(self):
+        ports = PortSet.for_node(1, NodeRole.PEER)
+        assert ports.rpc_public == 5017
+        assert ports.rpc_admin == 5015
+        assert ports.ws_public == 6018
+        assert ports.ws_admin == 6016
+        assert ports.peer == 51245
+
+    def test_peer_index_2(self):
+        ports = PortSet.for_node(2, NodeRole.PEER)
+        assert ports.rpc_public == 5027
+        assert ports.rpc_admin == 5025
+        assert ports.ws_public == 6028
+        assert ports.ws_admin == 6026
+        assert ports.peer == 51255
+
+    def test_standalone(self):
+        ports = PortSet.for_node(0, NodeRole.STANDALONE)
+        assert ports.rpc_public == 5007
+        assert ports.rpc_admin == 5005
+        assert ports.ws_public == 6008
+        assert ports.ws_admin == 6006
+        assert ports.peer == 51235
+
+    def test_frozen_immutable(self):
+        ports = PortSet.for_node(1, NodeRole.VALIDATOR)
+        with pytest.raises(AttributeError):
+            ports.rpc_public = 9999
+
+
+class TestNodeDbConfig:
+    """Test NodeDbConfig.for_mode with different db types and deploy modes."""
+
+    def test_nudb_local(self):
+        cfg = NodeDbConfig.for_mode(NodeDbType.NUDB, DeployMode.LOCAL)
+        assert cfg.db_type == NodeDbType.NUDB
+        assert cfg.path == "db"
+        assert cfg.relational_db is None
+
+    def test_nudb_standalone(self):
+        cfg = NodeDbConfig.for_mode(NodeDbType.NUDB, DeployMode.STANDALONE)
+        assert cfg.db_type == NodeDbType.NUDB
+        assert cfg.path == "/opt/ripple/lib/db"
+        assert cfg.relational_db is None
+
+    def test_nudb_network(self):
+        cfg = NodeDbConfig.for_mode(NodeDbType.NUDB, DeployMode.NETWORK)
+        assert cfg.db_type == NodeDbType.NUDB
+        assert cfg.path == "/var/lib/xrpld/db"
+        assert cfg.relational_db is None
+
+    def test_memory(self):
+        cfg = NodeDbConfig.for_mode(NodeDbType.MEMORY, DeployMode.LOCAL)
+        assert cfg.db_type == NodeDbType.MEMORY
+        assert cfg.path == "./"
+        assert cfg.relational_db == "backend=memory"
+
+    def test_rwdb_network(self):
+        cfg = NodeDbConfig.for_mode(NodeDbType.RWDB, DeployMode.NETWORK)
+        assert cfg.db_type == NodeDbType.RWDB
+        assert cfg.path == "/var/lib/xrpld/db"
+        assert cfg.relational_db == "backend=rwdb"
+
+
+class TestLabConfig:
+    """Test LabConfig effective_quorum property."""
+
+    def test_effective_quorum_3_validators(self):
+        build = BuildSource(
+            protocol=Protocol.XRPL,
+            build_type=BuildType.IMAGE,
+            build_server="rippleci",
+            build_version="3.1.1",
+        )
+        lab = LabConfig(
+            protocol=Protocol.XRPL,
+            mode=DeployMode.NETWORK,
+            build_source=build,
+            network_id=21337,
+            num_validators=3,
+        )
+        assert lab.effective_quorum == 2
+
+    def test_effective_quorum_explicit_override(self):
+        build = BuildSource(
+            protocol=Protocol.XRPL,
+            build_type=BuildType.IMAGE,
+            build_server="rippleci",
+            build_version="3.1.1",
+        )
+        lab = LabConfig(
+            protocol=Protocol.XRPL,
+            mode=DeployMode.NETWORK,
+            build_source=build,
+            network_id=21337,
+            num_validators=3,
+            quorum=1,
+        )
+        assert lab.effective_quorum == 1
+
+    def test_effective_quorum_1_validator(self):
+        build = BuildSource(
+            protocol=Protocol.XAHAU,
+            build_type=BuildType.BINARY,
+            build_server="https://build.xahau.tech",
+            build_version="2025.7.9-release+1951",
+        )
+        lab = LabConfig(
+            protocol=Protocol.XAHAU,
+            mode=DeployMode.STANDALONE,
+            build_source=build,
+            network_id=21339,
+            num_validators=1,
+        )
+        # max(1 - 1, 1) == 1
+        assert lab.effective_quorum == 1
+
+
+class TestNodeConfig:
+    """Test NodeConfig default factories produce independent instances."""
+
+    def test_default_lists_not_shared(self):
+        ports = PortSet.for_node(0, NodeRole.STANDALONE)
+        node_a = NodeConfig(
+            name="node_a",
+            index=0,
+            role=NodeRole.STANDALONE,
+            protocol=Protocol.XRPL,
+            network_id=1,
+            ports=ports,
+        )
+        node_b = NodeConfig(
+            name="node_b",
+            index=1,
+            role=NodeRole.STANDALONE,
+            protocol=Protocol.XRPL,
+            network_id=1,
+            ports=ports,
+        )
+        node_a.validators.append("some_key")
+        assert node_b.validators == []
+
+    def test_default_lists_empty(self):
+        ports = PortSet.for_node(0, NodeRole.STANDALONE)
+        node = NodeConfig(
+            name="node",
+            index=0,
+            role=NodeRole.STANDALONE,
+            protocol=Protocol.XRPL,
+            network_id=1,
+            ports=ports,
+        )
+        assert node.validators == []
+        assert node.cluster_nodes == []
+        assert node.ips_urls == []
+        assert node.ips_fixed_urls == []
+        assert node.vl_sites == []
+        assert node.vl_keys == []
+        assert node.import_vl_keys == []
+        assert node.amendments == {}
+
+
+class TestEnums:
+    """Test enum values are correct."""
+
+    def test_protocol_values(self):
+        assert Protocol.XRPL.value == "xrpl"
+        assert Protocol.XAHAU.value == "xahau"
+
+    def test_deploy_mode_values(self):
+        assert DeployMode.STANDALONE.value == "standalone"
+        assert DeployMode.NETWORK.value == "network"
+        assert DeployMode.LOCAL.value == "local"
+
+    def test_node_role_values(self):
+        assert NodeRole.VALIDATOR.value == "validator"
+        assert NodeRole.PEER.value == "peer"
+        assert NodeRole.STANDALONE.value == "standalone"
+
+    def test_build_type_values(self):
+        assert BuildType.IMAGE.value == "image"
+        assert BuildType.BINARY.value == "binary"
+
+    def test_nodedb_type_values(self):
+        assert NodeDbType.NUDB.value == "NuDB"
+        assert NodeDbType.MEMORY.value == "Memory"
+        assert NodeDbType.RWDB.value == "rwdb"
+
+
+class TestServerConfig:
+    """Test ServerConfig defaults."""
+
+    def test_defaults(self):
+        cfg = ServerConfig()
+        assert cfg.rpc_public is True
+        assert cfg.rpc_admin is True
+        assert cfg.ws_public is True
+        assert cfg.ws_admin is True
+        assert cfg.peer is True
+        assert cfg.ssl_verify is False
+        assert cfg.ssl_key_path is None
+        assert cfg.ssl_cert_path is None
+        assert cfg.send_queue_limit == 65535
+
+
+class TestTransactionQueueConfig:
+    """Test TransactionQueueConfig defaults match xrpld_cfg.py."""
+
+    def test_defaults(self):
+        cfg = TransactionQueueConfig()
+        assert cfg.ledgers_in_queue == 20
+        assert cfg.minimum_queue_size == 2000
+        assert cfg.retry_sequence_percent == 25
+        assert cfg.minimum_escalation_multiplier == 500
+        assert cfg.minimum_txn_in_ledger == 5
+        assert cfg.minimum_txn_in_ledger_standalone == 5
+        assert cfg.target_txn_in_ledger == 100
+        assert cfg.maximum_txn_in_ledger == 10000
+        assert cfg.normal_consensus_increase_percent == 20
+        assert cfg.slow_consensus_decrease_percent == 50
+        assert cfg.maximum_txn_per_account == 100000
+        assert cfg.minimum_last_ledger_buffer == 2
+        assert cfg.zero_basefee_transaction_feelevel == 256000
+
+
+class TestWorkerConfig:
+    """Test WorkerConfig defaults."""
+
+    def test_defaults(self):
+        cfg = WorkerConfig()
+        assert cfg.workers == 10
+        assert cfg.io_workers == 10
+        assert cfg.prefetch_workers == 10
+
+
+class TestVotingConfig:
+    """Test VotingConfig defaults match xrpld_cfg.py."""
+
+    def test_defaults(self):
+        cfg = VotingConfig()
+        assert cfg.account_reserve == 1000000
+        assert cfg.owner_reserve == 200000
+        assert cfg.reference_fee == 10
