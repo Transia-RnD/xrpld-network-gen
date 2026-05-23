@@ -210,8 +210,8 @@ xrpld_lab/
 ## Development
 
 ```bash
-git clone https://github.com/Transia-RnD/xrpld-network-gen
-cd xrpld-network-gen
+git clone https://github.com/Transia-RnD/xrpld-lab
+cd xrpld-lab
 poetry install
 poetry run pytest tests/ -v
 ```
