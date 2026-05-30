@@ -71,6 +71,7 @@ class XrpldCfgBuilder:
         out += self._sntp_servers_section()
         out += self._ips_section()
         out += self._ips_fixed_section()
+        out += self._datagram_monitor_section()
         out += self._network_id_section()
         out += self._peer_private_section()
         out += self._validators_file_section()
@@ -242,6 +243,18 @@ class XrpldCfgBuilder:
             out = "[ips_fixed]\n"
             for url in urls:
                 out += f"{url}\n"
+            out += "\n"
+            return out
+        return ""
+
+    # -- datagram_monitor -----------------------------------------------------
+
+    def _datagram_monitor_section(self) -> str:
+        endpoints = self.config.datagram_monitor
+        if endpoints and len(endpoints) > 0:
+            out = "[datagram_monitor]\n"
+            for ep in endpoints:
+                out += f"{ep}\n"
             out += "\n"
             return out
         return ""

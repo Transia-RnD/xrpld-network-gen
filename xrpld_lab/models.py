@@ -223,6 +223,9 @@ class NodeConfig:
     cluster_nodes: List[str] = field(default_factory=list)
     ips_urls: List[str] = field(default_factory=list)
     ips_fixed_urls: List[str] = field(default_factory=list)
+    # [datagram_monitor] endpoint lines ("<ip> <port>", space-separated to match the
+    # node's parseEndpoint). Each measured node fires XDGM here — the perf-server sink.
+    datagram_monitor: List[str] = field(default_factory=list)
     vl_sites: List[str] = field(default_factory=list)
     vl_keys: List[str] = field(default_factory=list)
     import_vl_keys: List[str] = field(default_factory=list)
@@ -359,6 +362,73 @@ class AnsibleConfig:
 
 
 # ---------------------------------------------------------------------------
+# GCP provisioning (multi-region)
+# ---------------------------------------------------------------------------
+
+# Default zones spread the cluster across continents so the measured TPS knee
+# reflects real cross-region consensus latency (method-comparable to perf-iac,
+# not number-comparable to a single-region/LAN run). Validators land in 5
+# regions, P2P nodes in 4 others — every node on its own ephemeral-IP VM.
+_DEFAULT_VALIDATOR_ZONES: List[str] = [
+    "us-central1-a",
+    "europe-west1-b",
+    "asia-east1-a",
+    "us-east1-b",
+    "australia-southeast1-a",
+]
+_DEFAULT_PEER_ZONES: List[str] = [
+    "us-west1-a",
+    "europe-west2-a",
+    "asia-southeast1-a",
+    "southamerica-east1-a",
+]
+
+
+@dataclass
+class GcpConfig:
+    """GCP multi-region provisioning for an xrpld perf cluster.
+
+    Terraform stands up one VM per node (ephemeral external IP). The harvested
+    IPs feed straight into the existing ansible pipeline as ``vips``/``pips`` —
+    GCP is a provisioning front-end to NETWORK mode, not a separate deploy path.
+    """
+
+    project: str
+    validator_zones: List[str] = field(default_factory=lambda: list(_DEFAULT_VALIDATOR_ZONES))
+    peer_zones: List[str] = field(default_factory=lambda: list(_DEFAULT_PEER_ZONES))
+    machine_type: str = "n2-standard-8"
+    disk_gb: int = 100
+    image: str = "ubuntu-os-cloud/ubuntu-2204-lts"
+    ssh_user: str = "ubuntu"
+    # Public key uploaded to instance metadata; private half is used by ansible.
+    ssh_pubkey_path: str = "~/.ssh/id_rsa.pub"
+    ssh_key_path: str = "~/.ssh/id_rsa"
+    ssh_port: int = 22
+    network_tag: str = "xrpld-perf"
+    # Firewall source ranges. 0.0.0.0/0 is fine for a throwaway perf net; lock
+    # this down to your load-gen / collector IPs for anything longer-lived.
+    allowed_source_ranges: List[str] = field(default_factory=lambda: ["0.0.0.0/0"])
+    # Peer (51235+), public RPC/WS, and ssh. Admin ports stay node-local.
+    open_tcp_ports: List[str] = field(
+        default_factory=lambda: ["22", "5007-5520", "6008-6520", "51235-51740"]
+    )
+
+    @property
+    def region(self) -> str:
+        """Provider region derived from the first validator zone (us-central1-a → us-central1)."""
+        zone = self.validator_zones[0]
+        return zone.rsplit("-", 1)[0]
+
+    @property
+    def num_validators(self) -> int:
+        return len(self.validator_zones)
+
+    @property
+    def num_peers(self) -> int:
+        return len(self.peer_zones)
+
+
+# ---------------------------------------------------------------------------
 # Top-level lab configuration
 # ---------------------------------------------------------------------------
 
@@ -376,10 +446,14 @@ class LabConfig:
     quorum: Optional[int] = None
     node_db_type: NodeDbType = NodeDbType.NUDB
     binary_name: str = "xrpld"
+    # Perf-server XDGM sink as "<ip> <port>" (e.g. "10.128.0.2 9876"); None disables the
+    # [datagram_monitor] stanza. Must be the server's INTERNAL IP (firewall is VPC-only).
+    datagram_monitor: Optional[str] = None
     import_vl_key: Optional[str] = None
     public_vl_key: Optional[str] = None
     add_ipfs: bool = False
     ansible: Optional[AnsibleConfig] = None
+    gcp: Optional[GcpConfig] = None
     key_algorithm: str = "ed25519"
     config_overrides: dict = field(default_factory=dict)
     # Prefunded genesis (perf-iac style): inject N AccountRoot + M RippleState

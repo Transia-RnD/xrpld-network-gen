@@ -141,6 +141,7 @@ class LabRunner:
             network_id=lab.network_id,
             log_level=lab.log_level,
             node_db_type=lab.node_db_type,
+            datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
         )
 
         # 3. Build config files
@@ -290,7 +291,11 @@ class LabRunner:
         # 4-7. Create nodes, configs, genesis, dockerfiles
         compose = ComposeBuilder(f"{name}-network")
         image_name = source.image or "ubuntu:noble"
-        ansible_image = f"transia/cluster:{source.commit_hash or source.build_version}"
+        # A supplied --image (create:gcp) is the node image ansible pulls; otherwise the
+        # default transia/cluster tag built from this source.
+        ansible_image = source.image or (
+            f"transia/cluster:{source.commit_hash or source.build_version}"
+        )
 
         for i in range(1, lab.num_validators + 1):
             node_name = f"vnode{i}"
@@ -306,6 +311,7 @@ class LabRunner:
                 ips_fixed=ips_fixed,
                 log_level=lab.log_level,
                 node_db_type=lab.node_db_type,
+                datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
             )
 
             node_dir = self.workspace.node_dir(cluster_dir, node_name)
@@ -369,6 +375,7 @@ class LabRunner:
                 ips_fixed=ips_fixed,
                 log_level=lab.log_level,
                 node_db_type=lab.node_db_type,
+                datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
             )
 
             node_dir = self.workspace.node_dir(cluster_dir, node_name)

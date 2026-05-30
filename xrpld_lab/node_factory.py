@@ -33,6 +33,7 @@ class NodeFactory:
         import_vl_keys: Optional[List[str]] = None,
         ips_urls: Optional[List[str]] = None,
         ips_fixed_urls: Optional[List[str]] = None,
+        datagram_monitor: Optional[List[str]] = None,
     ) -> NodeConfig:
         """Create a NodeConfig for a standalone node."""
         spec = get_spec(protocol)
@@ -59,6 +60,7 @@ class NodeFactory:
             import_vl_keys=import_vl_keys or [],
             ips_urls=ips_urls or [],
             ips_fixed_urls=ips_fixed_urls or [],
+            datagram_monitor=datagram_monitor or [],
         )
 
     @staticmethod
@@ -75,6 +77,7 @@ class NodeFactory:
         log_level: str = "warning",
         node_db_type: NodeDbType = NodeDbType.NUDB,
         ports: Optional[PortSet] = None,
+        datagram_monitor: Optional[List[str]] = None,
     ) -> NodeConfig:
         """Create a NodeConfig for a validator node in a network."""
         spec = get_spec(protocol)
@@ -118,6 +121,7 @@ class NodeFactory:
             import_vl_keys=[ivl_key] if ivl_key else [],
             ips_fixed_urls=ips_fixed_urls,
             amendment_majority_time=spec.amendment_majority_time,
+            datagram_monitor=datagram_monitor or [],
         )
 
     @staticmethod
@@ -133,6 +137,7 @@ class NodeFactory:
         log_level: str = "warning",
         node_db_type: NodeDbType = NodeDbType.NUDB,
         ports: Optional[PortSet] = None,
+        datagram_monitor: Optional[List[str]] = None,
     ) -> NodeConfig:
         """Create a NodeConfig for a peer node in a network."""
         spec = get_spec(protocol)
@@ -159,6 +164,7 @@ class NodeFactory:
             import_vl_keys=[ivl_key] if ivl_key else [],
             ips_fixed_urls=list(ips_fixed) if ips_fixed else [],
             amendment_majority_time=spec.amendment_majority_time,
+            datagram_monitor=datagram_monitor or [],
         )
 
     @staticmethod

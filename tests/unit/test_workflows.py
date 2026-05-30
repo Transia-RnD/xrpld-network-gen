@@ -341,6 +341,7 @@ class TestRunStandalone:
             network_id=1,
             log_level="trace",
             node_db_type=NodeDbType.NUDB,
+            datagram_monitor=None,
         )
 
     def test_builds_cfg_with_xrpld_cfg_builder(self):

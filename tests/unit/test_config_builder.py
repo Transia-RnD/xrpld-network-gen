@@ -346,6 +346,30 @@ class TestXrpldCfgBuilderIps:
         assert "[ips_fixed]" not in output
 
 
+class TestXrpldCfgBuilderDatagramMonitor:
+    """Test the [datagram_monitor] section (XDGM emission to the perf-server)."""
+
+    def test_datagram_monitor_present(self):
+        cfg = _make_standalone_config(datagram_monitor=["10.128.0.2 9876"])
+        output = XrpldCfgBuilder(cfg).build()
+        assert "[datagram_monitor]\n" in output
+        # Endpoint line is space-separated "ip port" (matches DatagramMonitor.h parseEndpoint).
+        assert "10.128.0.2 9876\n" in output
+
+    def test_datagram_monitor_multiple_endpoints(self):
+        cfg = _make_standalone_config(
+            datagram_monitor=["10.128.0.2 9876", "10.128.0.3 9876"]
+        )
+        output = XrpldCfgBuilder(cfg).build()
+        assert "10.128.0.2 9876\n" in output
+        assert "10.128.0.3 9876\n" in output
+
+    def test_datagram_monitor_absent(self):
+        cfg = _make_standalone_config()
+        output = XrpldCfgBuilder(cfg).build()
+        assert "[datagram_monitor]" not in output
+
+
 class TestXrpldCfgBuilderNetworkId:
     """Test [network_id] conditional rendering."""
 
