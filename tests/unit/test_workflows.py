@@ -369,7 +369,7 @@ class TestRunStandalone:
     def test_calls_update_genesis(self):
         self.runner._run_standalone()
         self.mocks["update_genesis"].assert_called_once_with(
-            {"Feature1": "HASH1"}, "xrpl"
+            {"Feature1": "HASH1"}, "xrpl", preload_entries=None
         )
 
     def test_writes_genesis_json(self):

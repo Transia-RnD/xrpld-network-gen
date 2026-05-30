@@ -262,8 +262,8 @@ class TestUpdateGenesis:
         else:
             pytest.fail("No Amendments entry found in accountState")
 
-    def test_handles_missing_amendments_key(self, tmp_path):
-        """If no accountState entry has 'Amendments', nothing crashes."""
+    def test_raises_when_no_amendments_entry(self, tmp_path):
+        """A genesis template with no Amendments entry is malformed -> fail loud."""
         genesis = {
             "ledger": {
                 "accountState": [
@@ -277,10 +277,8 @@ class TestUpdateGenesis:
         path = tmp_path / "genesis.xrpl.json"
         path.write_text(json.dumps(genesis))
         features = {"Feature1": "HASH1"}
-        # Should not raise
-        result = update_genesis(features, "xrpl", genesis_path=str(path))
-        # accountState unchanged (no Amendments key to update)
-        assert len(result["ledger"]["accountState"]) == 1
+        with pytest.raises(RuntimeError, match="Amendments entry not found"):
+            update_genesis(features, "xrpl", genesis_path=str(path))
 
     def test_preserves_other_account_state_entries(self, tmp_path):
         genesis_path = self._make_genesis(tmp_path)
@@ -303,8 +301,15 @@ class TestUpdateGenesis:
 
     def test_default_genesis_path(self):
         """When no genesis_path is provided, falls back to package default."""
-        features = {}
+        # Non-empty features: update_genesis refuses to build a genesis with no
+        # amendments; here we exercise path defaulting, not the empty-features guard.
+        features = {"Feature1": "HASH1"}
         # Should load genesis.xrpl.json from the xrpld_lab package directory
         result = update_genesis(features, "xrpl")
         assert "ledger" in result
         assert "accountState" in result["ledger"]
+
+    def test_rejects_empty_features(self):
+        """No amendments at all is an error -> fail loud, never a silent empty genesis."""
+        with pytest.raises(RuntimeError, match="No features found"):
+            update_genesis({}, "xrpl")
