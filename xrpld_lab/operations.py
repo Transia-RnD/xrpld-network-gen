@@ -181,30 +181,22 @@ def start_local(
     flag = "-a" if network_type == "standalone" else ""
     start_content = (
         "#!/bin/bash\n"
-        f"nohup ./{binary_name} {flag} --conf config/{config_filename}"
-        " --ledgerfile config/genesis.json"
-        " > /dev/null 2>&1 &\n"
-        "echo $! > xrpld.pid\n"
-        f'echo "{binary_name} started (PID $(cat xrpld.pid))"\n'
+        f"exec ./{binary_name} {flag} --conf config/{config_filename}"
+        " --ledgerfile config/genesis.json\n"
     )
     stop_content = (
         "#!/bin/bash\n"
-        "if [ -f xrpld.pid ]; then\n"
-        "  kill $(cat xrpld.pid) 2>/dev/null\n"
-        "  rm -f xrpld.pid\n"
-        f'  echo "{binary_name} stopped"\n'
-        "else\n"
-        f'  echo "No PID file found"\n'
-        "fi\n"
+        f"pkill -f './{binary_name}' && echo \"{binary_name} stopped\""
+        f' || echo "No running {binary_name} found"\n'
     )
     write_executable(os.path.join(cwd, "start.sh"), start_content)
     write_executable(os.path.join(cwd, "stop.sh"), stop_content)
 
     print(f"{bcolors.CYAN}Generated config in {config_dir}{bcolors.END}")
-    print(f"{bcolors.CYAN}Starting {binary_name}...{bcolors.END}")
+    print(f"{bcolors.CYAN}Starting {binary_name} (Ctrl+C to stop)...{bcolors.END}")
 
-    # 8. Launch
-    run_command(cwd, "bash start.sh")
+    # 8. Launch in foreground — stdout/stderr stream to this terminal
+    subprocess.run(["bash", "start.sh"], cwd=cwd)
 
 
 def stop_local() -> None:

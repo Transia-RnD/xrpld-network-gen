@@ -56,7 +56,7 @@ class TestXrplSpec:
         assert XRPL.default_build_server == "rippleci"
 
     def test_default_build_version(self):
-        assert XRPL.default_build_version == "3.1.1"
+        assert XRPL.default_build_version == "3.2.0-rc2"
 
     def test_default_network_id(self):
         assert XRPL.default_network_id == 21337

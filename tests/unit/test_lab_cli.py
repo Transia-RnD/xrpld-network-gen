@@ -50,8 +50,8 @@ class TestBuildParser:
         assert args.build_type == "binary"
         assert args.public_key == _DEFAULT_VL_KEY
         assert args.import_key is None
-        assert args.protocol == "xahau"
-        assert args.network_id == 21339
+        assert args.protocol == "xrpl"
+        assert args.network_id == 21337
         assert args.network_type == "standalone"
         assert args.server is None
         assert args.version is None
@@ -63,10 +63,10 @@ class TestBuildParser:
         args = parser.parse_args(["create:network"])
         assert args.command == "create:network"
         assert args.log_level == "trace"
-        assert args.protocol == "xahau"
+        assert args.protocol == "xrpl"
         assert args.num_validators == 3
         assert args.num_peers == 1
-        assert args.network_id == 21339
+        assert args.network_id == 21337
         assert args.build_server is None
         assert args.build_version is None
         assert args.genesis is False
@@ -97,7 +97,7 @@ class TestBuildParser:
         args = parser.parse_args(["down:standalone"])
         assert args.command == "down:standalone"
         assert args.name is None
-        assert args.protocol == "xahau"
+        assert args.protocol == "xrpl"
         assert args.version is None
 
     def test_down_standalone_with_name(self):
@@ -109,7 +109,7 @@ class TestBuildParser:
         parser = _build_parser()
         args = parser.parse_args(["down:standalone", "--version", "1.0.0"])
         assert args.version == "1.0.0"
-        assert args.protocol == "xahau"
+        assert args.protocol == "xrpl"
 
     def test_up_local_defaults(self):
         parser = _build_parser()
@@ -118,9 +118,9 @@ class TestBuildParser:
         assert args.log_level == "trace"
         assert args.public_key == _DEFAULT_VL_KEY
         assert args.import_key is None
-        assert args.protocol == "xahau"
+        assert args.protocol == "xrpl"
         assert args.network_type == "standalone"
-        assert args.network_id == 21339
+        assert args.network_id == 21337
         assert args.nodedb_type == "NuDB"
 
     def test_down_local_exists(self):
@@ -199,7 +199,7 @@ class TestBuildParser:
         parser = _build_parser()
         args = parser.parse_args(["logs:standalone"])
         assert args.command == "logs:standalone"
-        assert args.protocol == "xahau"
+        assert args.protocol == "xrpl"
 
     def test_logs_standalone_with_protocol(self):
         parser = _build_parser()
@@ -225,7 +225,7 @@ class TestBuildParser:
         assert args.command == "create:ansible"
         assert args.vips == ["10.0.0.1"]
         assert args.pips == ["10.0.0.2"]
-        assert args.protocol == "xahau"
+        assert args.protocol == "xrpl"
         assert args.num_validators == 3
 
     def test_create_ansible_with_ssh_args(self):
@@ -487,10 +487,16 @@ class TestBuildLabConfigNetwork:
         cfg = build_lab_config(args)
         assert cfg.binary_name == "my-xrpld"
 
-    def test_import_vl_key_is_default(self):
+    def test_import_vl_key_none_for_xrpl(self):
+        # XRPL spec has no import VL key; XRPL networks must emit no [import_vl_keys].
         args = self._parse()
         cfg = build_lab_config(args)
-        assert cfg.import_vl_key == _DEFAULT_VL_KEY
+        assert cfg.import_vl_key is None
+
+    def test_import_vl_key_for_xahau(self):
+        args = self._parse("--protocol", "xahau")
+        cfg = build_lab_config(args)
+        assert cfg.import_vl_key == _XAHAU_IMPORT_VL_KEY
 
     def test_network_id_from_spec_when_default(self):
         """When network_id is the CLI default (21339) and protocol is xrpl,
@@ -941,7 +947,7 @@ class TestMain:
                                   "--name", "my-standalone"]):
             main()
 
-        mock_run.assert_called_once_with(mock_ws, "my-standalone", "xahau", None)
+        mock_run.assert_called_once_with(mock_ws, "my-standalone", "xrpl", None)
 
     @patch("xrpld_lab.cli.stop_standalone")
     @patch("xrpld_lab.cli.Workspace")
@@ -1029,7 +1035,7 @@ class TestMain:
         with patch("sys.argv", ["xrpld-lab", "logs:standalone"]):
             main()
 
-        mock_run.assert_called_once_with("xahau")
+        mock_run.assert_called_once_with("xrpl")
 
     @patch("xrpld_lab.cli.view_standalone_logs")
     @patch("xrpld_lab.cli.Workspace")

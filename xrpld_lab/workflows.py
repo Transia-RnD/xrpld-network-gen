@@ -50,6 +50,44 @@ class LabRunner:
         self.spec = get_spec(lab.protocol)
         self.workspace = workspace or Workspace()
         self.resolver = SourceResolver()
+        self._cached_preload = None
+        self._cached_preload_seeds = None
+
+    # ------------------------------------------------------------------
+    # Genesis (with optional perf-iac prefunded state)
+    # ------------------------------------------------------------------
+
+    def _genesis(self, features, protocol_name):
+        """Build the genesis dict, merging prefunded accounts/trustlines when configured."""
+        return update_genesis(features, protocol_name, preload_entries=self._preload_entries())
+
+    def _preload_entries(self):
+        if not getattr(self.lab, "preload_accounts", 0):
+            return None
+        if self._cached_preload is None:
+            from xrpld_lab.ledger_generator import generate
+
+            entries, seeds = generate(
+                self.lab.preload_accounts,
+                self.lab.preload_balance,
+                self.lab.preload_trustlines,
+                self.lab.preload_currency,
+            )
+            self._cached_preload = entries
+            self._cached_preload_seeds = seeds
+            print(f"  [xrpld-lab] preloading genesis with {self.lab.preload_accounts} "
+                  f"accounts + {self.lab.preload_trustlines} trustlines")
+        return self._cached_preload
+
+    def _write_preload_wallets(self, out_dir):
+        """Write prefunded account seeds in the loadtester's wallets.sub.<node> format."""
+        if self._cached_preload_seeds:
+            write_file(
+                os.path.join(out_dir, "wallets.sub.1.json"),
+                json.dumps(self._cached_preload_seeds),
+            )
+            print(f"  [xrpld-lab] wrote {len(self._cached_preload_seeds)} prefunded "
+                  f"seeds -> {os.path.join(out_dir, 'wallets.sub.1.json')}")
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -115,7 +153,7 @@ class LabRunner:
 
         # 4. Amendments + genesis
         features = parse_amendments(feature_lines)
-        genesis = update_genesis(features, protocol_name)
+        genesis = self._genesis(features, protocol_name)
         write_file(
             os.path.join(base_dir, "genesis.json"),
             json.dumps(genesis, indent=4, sort_keys=True),
@@ -231,7 +269,7 @@ class LabRunner:
                 key_path = f"keystore/{node_name}/key.json"
                 if not os.path.exists(key_path):
                     vc.create_keys()
-                    vc.set_domain(f"xahau.{node_name}.transia.co")
+                    vc.set_domain(f"{protocol_name}.{node_name}.transia.co")
                     vc.create_token()
                 keys = vc.get_keys()
                 token = vc.read_token()
@@ -283,7 +321,7 @@ class LabRunner:
             features = parse_amendments(feature_lines)
             if not lab.genesis:
                 features = {}
-            genesis = update_genesis(features, protocol_name)
+            genesis = self._genesis(features, protocol_name)
             write_file(
                 os.path.join(node_dir, "genesis.json"),
                 json.dumps(genesis, indent=4, sort_keys=True),
@@ -344,7 +382,7 @@ class LabRunner:
 
             # Amendments + genesis (peers always get all amendments)
             features = parse_amendments(feature_lines)
-            genesis = update_genesis(features, protocol_name)
+            genesis = self._genesis(features, protocol_name)
             write_file(
                 os.path.join(node_dir, "genesis.json"),
                 json.dumps(genesis, indent=4, sort_keys=True),
@@ -417,6 +455,9 @@ class LabRunner:
                 name, lab.num_validators, lab.num_peers
             ),
         )
+
+        # 10b. Prefunded wallet seeds for the loadtester (perf-iac genesis)
+        self._write_preload_wallets(cluster_dir)
 
         # 11. Ansible deployment (if configured)
         if lab.ansible:
@@ -533,7 +574,7 @@ class LabRunner:
                 key_path = f"keystore/{node_name}/key.json"
                 if not os.path.exists(key_path):
                     vc.create_keys()
-                    vc.set_domain(f"xahau.{node_name}.transia.co")
+                    vc.set_domain(f"{protocol_name}.{node_name}.transia.co")
                     vc.create_token()
                 keys = vc.get_keys()
                 token = vc.read_token()
@@ -574,7 +615,7 @@ class LabRunner:
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             features = parse_amendments(feature_lines)
-            genesis = update_genesis(features, protocol_name)
+            genesis = self._genesis(features, protocol_name)
             write_file(
                 os.path.join(cfg_path, "genesis.json"),
                 json.dumps(genesis, indent=4, sort_keys=True),
@@ -604,7 +645,7 @@ class LabRunner:
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             features = parse_amendments(feature_lines)
-            genesis = update_genesis(features, protocol_name)
+            genesis = self._genesis(features, protocol_name)
             write_file(
                 os.path.join(cfg_path, "genesis.json"),
                 json.dumps(genesis, indent=4, sort_keys=True),

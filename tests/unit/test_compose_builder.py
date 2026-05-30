@@ -36,10 +36,10 @@ def _peer_ports(index: int = 1) -> PortSet:
 class TestBuildEmpty:
     """Test building a compose dict with no services."""
 
-    def test_build_empty_has_version(self):
+    def test_build_empty_has_no_version(self):
         builder = ComposeBuilder("test-network")
         result = builder.build()
-        assert result["version"] == "3.9"
+        assert "version" not in result
 
     def test_build_empty_has_networks(self):
         builder = ComposeBuilder("test-network")
@@ -54,7 +54,7 @@ class TestBuildEmpty:
     def test_build_empty_keys(self):
         builder = ComposeBuilder("mynet")
         result = builder.build()
-        assert set(result.keys()) == {"version", "services", "networks"}
+        assert set(result.keys()) == {"services", "networks"}
 
 
 # ===========================================================================
@@ -584,7 +584,7 @@ class TestRender:
         builder.add_standalone_service("xrpl", _default_ports())
         rendered = builder.render()
         parsed = yaml.safe_load(rendered)
-        assert parsed["version"] == "3.9"
+        assert "version" not in parsed
         assert "xrpl" in parsed["services"]
 
     def test_render_matches_build(self):
@@ -620,7 +620,7 @@ class TestWrite:
         with open(output_file) as f:
             parsed = yaml.safe_load(f)
 
-        assert parsed["version"] == "3.9"
+        assert "version" not in parsed
         assert "xrpl" in parsed["services"]
         assert "explorer" in parsed["services"]
         assert parsed["networks"] == {"test-network": {"driver": "bridge"}}

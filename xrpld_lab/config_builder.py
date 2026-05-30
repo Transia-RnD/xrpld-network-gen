@@ -174,13 +174,16 @@ class XrpldCfgBuilder:
         return f"\n[node_size]\n{self.config.size_node}\n\n"
 
     def _node_db_section(self) -> str:
+        from xrpld_lab.models import NodeDbType
+
         ndb = self.config.node_db
         out = f"[node_db]\n"
         out += f"type={ndb.db_type.value}\n"
-        out += f"path={ndb.path}\n"
-        if ndb.num_ledgers:
-            out += f"advisory_delete=0\n"
-            out += f"online_delete={ndb.num_ledgers}\n"
+        if ndb.db_type != NodeDbType.RWDB:
+            out += f"path={ndb.path}\n"
+            if ndb.num_ledgers:
+                out += f"advisory_delete=0\n"
+                out += f"online_delete={ndb.num_ledgers}\n"
         out += "\n"
         return out
 

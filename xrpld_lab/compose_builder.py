@@ -198,7 +198,6 @@ class ComposeBuilder:
     def build(self) -> dict:
         """Return the full docker-compose dict."""
         return {
-            "version": "3.9",
             "services": self.services,
             "networks": {self.network_name: {"driver": "bridge"}},
         }

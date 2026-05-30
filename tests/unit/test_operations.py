@@ -154,21 +154,14 @@ class TestStopStandalone:
 class TestLocalScripts:
     """Test local standalone start/stop."""
 
-    @patch("xrpld_lab.operations.run_command")
-    @patch("os.path.isfile", return_value=True)
-    @patch("os.getcwd", return_value="/my/project")
-    def test_start_local_runs_start_sh(self, mock_cwd, mock_isfile, mock_run):
-        start_local()
-        mock_run.assert_called_once_with("/my/project", "bash start.sh")
-
-    @patch("xrpld_lab.operations.run_command")
+    @patch("xrpld_lab.operations.subprocess.run")
     @patch("os.path.isfile", return_value=False)
     @patch("os.getcwd", return_value="/my/project")
-    def test_start_local_missing_script(self, mock_cwd, mock_isfile, mock_run, capsys):
+    def test_start_local_missing_binary(self, mock_cwd, mock_isfile, mock_run, capsys):
         start_local()
         mock_run.assert_not_called()
         captured = capsys.readouterr()
-        assert "start.sh not found" in captured.out
+        assert "not found in /my/project" in captured.out
 
     @patch("xrpld_lab.operations.run_command")
     @patch("os.path.isfile", return_value=True)

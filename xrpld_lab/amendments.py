@@ -118,6 +118,7 @@ def update_genesis(
     features: Dict[str, str],
     protocol_name: str,
     genesis_path: str = None,
+    preload_entries: List[dict] = None,
 ) -> dict:
     """Update a genesis JSON file with amendment hashes.
 
@@ -154,5 +155,10 @@ def update_genesis(
             break
     else:
         raise RuntimeError("Amendments entry not found in genesis template.")
+
+    if preload_entries:
+        from xrpld_lab.ledger_generator import merge_into_genesis
+
+        merge_into_genesis(json_dict, preload_entries)
 
     return json_dict

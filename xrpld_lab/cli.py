@@ -48,7 +48,7 @@ from xrpld_lab.workflows import LabRunner
 # Fallback versions (used when no --version / --build_version is provided)
 # ---------------------------------------------------------------------------
 
-_XRPL_RELEASE_FALLBACK: str = "3.1.1"
+_XRPL_RELEASE_FALLBACK: str = "3.2.0-rc2"
 _XAHAU_RELEASE_FALLBACK: str = "2025.7.9-release+1951"
 
 # ---------------------------------------------------------------------------
@@ -71,10 +71,10 @@ _XAHAU_IMPORT_VL_KEY: str = (
 def _add_network_args(p: argparse.ArgumentParser) -> None:
     """Add arguments shared by create:network and create:ansible."""
     p.add_argument("--log_level", default="trace", choices=["warning", "debug", "trace"])
-    p.add_argument("--protocol", default="xahau")
+    p.add_argument("--protocol", default="xrpl")
     p.add_argument("--num_validators", type=int, default=3)
     p.add_argument("--num_peers", type=int, default=1)
-    p.add_argument("--network_id", type=int, default=21339)
+    p.add_argument("--network_id", type=int, default=21337)
     p.add_argument("--build_server", default=None)
     p.add_argument("--build_version", default=None)
     p.add_argument("--genesis", type=bool, default=False)
@@ -86,6 +86,14 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
                    help="Path to pre-built binary (skips download)")
     p.add_argument("--quantum", action="store_true",
                    help="Use dilithium (post-quantum) keys for validators and publisher")
+    p.add_argument("--preload_accounts", type=int, default=0,
+                   help="Prefund N accounts directly in genesis (perf-iac style)")
+    p.add_argument("--preload_trustlines", type=int, default=0,
+                   help="Create N trustlines from account 0 (issuer hub) in genesis")
+    p.add_argument("--preload_balance", default="1000000000",
+                   help="Drops per prefunded account (default 1000 XRP)")
+    p.add_argument("--preload_currency", default="USD",
+                   help="Currency code for preloaded trustlines")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -101,13 +109,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--build_type", default="binary", choices=["image", "binary"])
     p.add_argument("--public_key", default=_DEFAULT_VL_KEY)
     p.add_argument("--import_key", default=None)
-    p.add_argument("--protocol", default="xahau")
-    p.add_argument("--network_id", type=int, default=21339)
+    p.add_argument("--protocol", default="xrpl")
+    p.add_argument("--network_id", type=int, default=21337)
     p.add_argument("--network_type", default="standalone")
     p.add_argument("--server", default=None)
     p.add_argument("--version", default=None)
     p.add_argument("--ipfs", type=bool, default=False)
-    p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB"])
+    p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
     p.add_argument("--config_overrides", type=str, default=None,
                    help="Path to YAML/JSON file with config overrides")
 
@@ -162,7 +170,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # -- down:standalone -----------------------------------------------------
     p = subparsers.add_parser("down:standalone", help="Stop and remove standalone ledger")
     p.add_argument("--name", default=None)
-    p.add_argument("--protocol", default="xahau")
+    p.add_argument("--protocol", default="xrpl")
     p.add_argument("--version", default=None)
 
     # -- up:local ------------------------------------------------------------
@@ -172,8 +180,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--import_key", default=None)
     p.add_argument("--protocol", default="xrpl")
     p.add_argument("--network_type", default="standalone")
-    p.add_argument("--network_id", type=int, default=21339)
-    p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB"])
+    p.add_argument("--network_id", type=int, default=21337)
+    p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
 
     # -- down:local ----------------------------------------------------------
     p = subparsers.add_parser("down:local", help="Stop local standalone")
@@ -218,7 +226,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # -- logs:standalone -----------------------------------------------------
     p = subparsers.add_parser("logs:standalone", help="View standalone Docker logs")
-    p.add_argument("--protocol", default="xahau")
+    p.add_argument("--protocol", default="xrpl")
 
     return parser
 
@@ -476,10 +484,14 @@ def _build_network_config(args, protocol, spec):
         quorum=args.quorum,
         node_db_type=NodeDbType(args.nodedb_type),
         binary_name=args.binary_name,
-        import_vl_key=_DEFAULT_VL_KEY,
+        import_vl_key=spec.default_import_vl_key,
         key_algorithm=key_algorithm,
         config_overrides=config_overrides,
         ansible=ansible,
+        preload_accounts=getattr(args, "preload_accounts", 0),
+        preload_trustlines=getattr(args, "preload_trustlines", 0),
+        preload_balance=getattr(args, "preload_balance", "1000000000"),
+        preload_currency=getattr(args, "preload_currency", "USD"),
     )
 
 

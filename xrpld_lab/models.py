@@ -382,6 +382,12 @@ class LabConfig:
     ansible: Optional[AnsibleConfig] = None
     key_algorithm: str = "ed25519"
     config_overrides: dict = field(default_factory=dict)
+    # Prefunded genesis (perf-iac style): inject N AccountRoot + M RippleState
+    # entries directly into genesis so the network starts with realistic state.
+    preload_accounts: int = 0
+    preload_trustlines: int = 0
+    preload_balance: str = "1000000000"
+    preload_currency: str = "USD"
 
     @property
     def effective_quorum(self) -> int:
