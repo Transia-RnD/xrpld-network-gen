@@ -69,7 +69,7 @@ def check_consensus(
             first_seq.setdefault(node_id, seq)
             advanced = seq > first_seq[node_id]
             ok = state in _HEALTHY_STATES and advanced
-            mark = (bcolors.GREEN + "OK") if ok else (bcolors.YELLOW + str(state))
+            mark = (bcolors.GREEN + "OK") if ok else (bcolors.PURPLE + str(state))
             print(f"  vnode{node_id} state={state} seq={seq} "
                   f"{'(advanced)' if advanced else '(waiting)'} {mark}{bcolors.END}")
             if ok:

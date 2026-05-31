@@ -316,8 +316,8 @@ def update_node_binary(
         import re
 
         content = re.sub(
-            r"COPY xrpld\.\S+ /app/xrpld",
-            f"COPY xrpld.{build_version} /app/xrpld",
+            r"COPY xrpld\.\S+ /opt/xrpld/bin/xrpld",
+            f"COPY xrpld.{build_version} /opt/xrpld/bin/xrpld",
             content,
         )
         with open(dockerfile_path, "w") as f:

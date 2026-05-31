@@ -525,9 +525,9 @@ class TestXrpldCfgBuilderTransactionQueue:
         assert "minimum_queue_size = 2000\n" in output
         assert "retry_sequence_percent = 25\n" in output
         assert "minimum_escalation_multiplier = 500\n" in output
-        assert "minimum_txn_in_ledger = 5\n" in output
-        assert "minimum_txn_in_ledger_standalone = 5\n" in output
-        assert "target_txn_in_ledger = 100\n" in output
+        assert "minimum_txn_in_ledger = 10000\n" in output
+        assert "minimum_txn_in_ledger_standalone = 10000\n" in output
+        assert "target_txn_in_ledger = 10000\n" in output
         assert "maximum_txn_in_ledger = 10000\n" in output
         assert "normal_consensus_increase_percent = 20\n" in output
         assert "slow_consensus_decrease_percent = 50\n" in output
@@ -659,7 +659,7 @@ class TestXrpldCfgBuilderFullStandalone:
         assert "[validators_file]\nvalidators.txt\n" in output
         assert "[rpc_startup]\n" in output
         assert "[ssl_verify]\n0\n" in output
-        assert "[max_transactions]\n10000\n" in output
+        assert "[max_transactions]\n100000\n" in output
         assert "[transaction_queue]\n" in output
         assert "[voting]\n" in output
         assert "[dex_feed]\n" in output

@@ -18,7 +18,6 @@ from xrpld_lab.models import (
     DebugConfig,
     DeployMode,
     FaucetConfig,
-    GcpConfig,
     LabConfig,
     NginxConfig,
     NodeDbType,
@@ -27,7 +26,6 @@ from xrpld_lab.models import (
     ServicesHost,
     StreamConfig,
 )
-from xrpld_lab.models import _DEFAULT_PEER_ZONES, _DEFAULT_VALIDATOR_ZONES
 from xrpld_lab.operations import (
     enable_amendment,
     node_stall,
@@ -80,6 +78,9 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--build_server", default=None)
     p.add_argument("--build_version", default=None)
     p.add_argument("--genesis", type=bool, default=False)
+    p.add_argument("--genesis_file", default=None,
+                   help="Custom genesis JSON (e.g. prefunded accounts). Default: xrpld-lab's "
+                        "bundled genesis; the resolved amendments are merged into it.")
     p.add_argument("--quorum", type=int, default=None)
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
     p.add_argument("--config_overrides", type=str, default=None,
@@ -156,35 +157,26 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ssh_port", type=int, default=20)
     p.add_argument("--ssh_user", default="ubuntu")
     p.add_argument("--ssh_key", default="~/.ssh/id_rsa")
+    p.add_argument("--cluster", default=None,
+                   help="Cluster name (workspace dir). Pass the same name to deploy:ansible.")
+    p.add_argument("--image", default=None,
+                   help="Prebuilt node image to deploy (the image IS the binary, built "
+                        "elsewhere). Skips the local-binary path; build_type becomes IMAGE.")
     p.add_argument("--ansible_config", type=str, default=None,
                    help="Path to YAML file with full ansible config (services, etc.)")
-
-    # -- create:gcp ----------------------------------------------------------
-    p = subparsers.add_parser(
-        "create:gcp",
-        help="Provision GCP VMs (terraform), deploy via ansible, verify consensus",
-    )
-    _add_network_args(p)
-    p.add_argument("--project", required=True, help="GCP project ID")
-    p.add_argument("--cluster", default=None, help="Cluster name (default gcp-<protocol>)")
-    p.add_argument("--machine_type", default="n2-standard-8")
-    p.add_argument("--binary_name", default="xrpld")
-    p.add_argument("--ssh_port", type=int, default=22)
-    p.add_argument("--ssh_user", default="ubuntu")
-    p.add_argument("--ssh_key", default="~/.ssh/id_rsa")
-    p.add_argument("--ssh_pubkey", default="~/.ssh/id_rsa.pub")
-    p.add_argument("--image", default=None,
-                   help="Prebuilt node image to deploy (e.g. <region>-docker.pkg.dev/"
-                        "<proj>/xrpld/xrpld:<tag>). Built elsewhere (loadtester build/).")
-    p.add_argument("--no_apply", action="store_true",
-                   help="Generate the terraform module only; don't apply or deploy")
-    # perf-cluster defaults: 4 validators + 3 P2P peers
-    p.set_defaults(num_validators=4, num_peers=3)
 
     # -- deploy:ansible ------------------------------------------------------
     p = subparsers.add_parser("deploy:ansible",
                               help="Run ansible deployment for an existing cluster")
     p.add_argument("--name", required=True, help="Cluster name")
+
+    # -- health --------------------------------------------------------------
+    p = subparsers.add_parser("health",
+                              help="Poll validators until they reach consensus")
+    p.add_argument("--vips", nargs="+", required=True,
+                   help="Validator external IPs, in node order")
+    p.add_argument("--timeout", type=int, default=300, help="Overall deadline (seconds)")
+    p.add_argument("--interval", type=int, default=10, help="Seconds between polls")
 
     # -- Operational commands ------------------------------------------------
     p = subparsers.add_parser("up", help="Start network")
@@ -418,8 +410,8 @@ def _build_standalone_config(args, protocol, spec):
 
 
 def _build_network_config(args, protocol, spec):
-    """Build LabConfig for create:network, create:ansible, create:gcp commands."""
-    is_ansible = args.command in ("create:ansible", "create:gcp")
+    """Build LabConfig for create:network and create:ansible commands."""
+    is_ansible = args.command == "create:ansible"
     has_local = hasattr(args, "local") and args.local
     mode = DeployMode.LOCAL if has_local else DeployMode.NETWORK
     server = args.build_server
@@ -459,6 +451,16 @@ def _build_network_config(args, protocol, spec):
             server = server or spec.default_build_server
             version = version or _XRPL_RELEASE_FALLBACK
 
+    # Explicit cluster name (workspace dir) overrides the branch-derived one.
+    if getattr(args, "cluster", None):
+        cluster_name = args.cluster
+
+    # A prebuilt image IS the binary: deploy it directly, skip the local-binary path.
+    image = getattr(args, "image", None) or ""
+    if image:
+        build_type = BuildType.IMAGE
+        binary_path = ""
+
     source = BuildSource(
         protocol=protocol,
         build_type=build_type,
@@ -469,6 +471,7 @@ def _build_network_config(args, protocol, spec):
         cluster_name=cluster_name,
         commit_hash=commit_hash,
         binary_path=binary_path,
+        image=image,
     )
 
     # Ansible config
@@ -511,6 +514,7 @@ def _build_network_config(args, protocol, spec):
         num_validators=num_validators,
         num_peers=num_peers,
         genesis=args.genesis,
+        genesis_file=getattr(args, "genesis_file", None),
         quorum=args.quorum,
         node_db_type=NodeDbType(args.nodedb_type),
         binary_name=args.binary_name,
@@ -540,11 +544,6 @@ def main() -> None:
         parser.print_help()
         return
 
-    # create:gcp orchestrates provision -> deploy -> health (its own flow)
-    if args.command == "create:gcp":
-        _create_gcp(args)
-        return
-
     # Commands that need LabConfig -> LabRunner
     if args.command in ("up:standalone", "create:network", "create:ansible"):
         lab = build_lab_config(args)
@@ -554,7 +553,11 @@ def main() -> None:
     # Operational commands (scripts, logs, etc.)
     workspace = Workspace()
 
-    if args.command == "deploy:ansible":
+    if args.command == "health":
+        from xrpld_lab.health import check_consensus
+        ok = check_consensus(args.vips, timeout_s=args.timeout, interval_s=args.interval)
+        raise SystemExit(0 if ok else 1)
+    elif args.command == "deploy:ansible":
         _deploy_ansible(workspace, args.name)
     elif args.command == "up":
         run_start_script(workspace, args.name)
@@ -626,106 +629,3 @@ def _deploy_ansible(workspace: Workspace, name: str) -> None:
 
     subprocess.run(["bash", run_sh], cwd=ansible_dir, check=False)
 
-
-# ---------------------------------------------------------------------------
-# create:gcp  (terraform -> deploy -> health_check)
-# ---------------------------------------------------------------------------
-
-
-def _slice_zones(pool: List[str], n: int) -> List[str]:
-    """Return n zones, cycling the default pool if n exceeds its length."""
-    return [pool[i % len(pool)] for i in range(n)]
-
-
-def _build_gcp_config(args) -> GcpConfig:
-    return GcpConfig(
-        project=args.project,
-        validator_zones=_slice_zones(_DEFAULT_VALIDATOR_ZONES, args.num_validators),
-        peer_zones=_slice_zones(_DEFAULT_PEER_ZONES, args.num_peers),
-        machine_type=args.machine_type,
-        ssh_user=args.ssh_user,
-        ssh_key_path=args.ssh_key,
-        ssh_pubkey_path=args.ssh_pubkey,
-        ssh_port=args.ssh_port,
-    )
-
-
-def _write_endpoints(cluster_dir: str, vips: List[str], pips: List[str],
-                     network_id: int) -> str:
-    """Drop the raw endpoints the loadtester normalizes into its manifest."""
-    import json
-    import os
-    from xrpld_lab.models import NodeRole, PortSet
-
-    def _node(name, ip, role, idx):
-        ports = PortSet.for_node(idx, role)
-        return {"name": name, "ip": ip,
-                "ws": f"ws://{ip}:{ports.ws_public}",
-                "rpc": f"http://{ip}:{ports.rpc_public}",
-                "peer": ports.peer}
-
-    data = {
-        "network_id": network_id,
-        "validators": [_node(f"vnode{i+1}", ip, NodeRole.VALIDATOR, i + 1)
-                       for i, ip in enumerate(vips)],
-        "peers": [_node(f"pnode{i+1}", ip, NodeRole.PEER, i + 1)
-                  for i, ip in enumerate(pips)],
-    }
-    path = os.path.join(cluster_dir, "endpoints.json")
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-    return path
-
-
-def _create_gcp(args) -> None:
-    """Provision GCP VMs, deploy xrpld via ansible, verify consensus."""
-    import os
-
-    from xrpld_lab.infra import GcpProvisioner, check_consensus
-
-    protocol = Protocol(args.protocol)
-    spec = get_spec(protocol)
-    gcp = _build_gcp_config(args)
-    cluster = args.cluster or f"gcp-{protocol.value}"
-    workspace = Workspace()
-    cluster_dir = workspace.cluster_dir(cluster)
-
-    prov = GcpProvisioner(gcp, cluster, os.path.join(cluster_dir, "infra"))
-
-    # 1. terraform
-    if args.no_apply:
-        work = prov.write()
-        print(f"[gcp] terraform module written to {work}")
-        print(f"[gcp] apply manually:  terraform -chdir={work} init && "
-              f"terraform -chdir={work} apply")
-        return
-
-    print(f"[gcp] provisioning {gcp.num_validators} validators + "
-          f"{gcp.num_peers} peers across {gcp.validator_zones + gcp.peer_zones}…")
-    vips, pips = prov.provision()
-    print(f"[gcp] validators={vips}")
-    print(f"[gcp] peers={pips}")
-
-    # 2. generate node configs + ansible (reuse the network workflow)
-    args.vips, args.pips = vips, pips
-    args.ssh_user, args.ssh_key, args.ssh_port = gcp.ssh_user, gcp.ssh_key_path, gcp.ssh_port
-    args.ansible_config = None
-    lab = _build_network_config(args, protocol, spec)
-    lab.build_source.cluster_name = cluster  # pin the cluster dir name
-    if getattr(args, "image", None):
-        # Deploy a prebuilt image (Cloud Build output). The image IS the binary, so skip the
-        # local-binary copy / download — but keep build_server+build_version so features/
-        # amendments are still resolved from the source at that commit (sentinel's pattern).
-        lab.build_source.image = args.image
-        lab.build_source.binary_path = ""
-        lab.build_source.build_type = BuildType.IMAGE
-        print(f"[gcp] deploying supplied image {args.image}")
-    LabRunner(lab, workspace).run()
-
-    # 3. deploy (ansible run.sh) + 4. health
-    _deploy_ansible(workspace, cluster)
-    check_consensus(vips)
-
-    # 5. endpoints for the loadtester
-    path = _write_endpoints(cluster_dir, vips, pips, lab.network_id)
-    print(f"[gcp] network running. endpoints → {path}")

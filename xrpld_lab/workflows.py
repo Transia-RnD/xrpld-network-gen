@@ -59,7 +59,9 @@ class LabRunner:
 
     def _genesis(self, features, protocol_name):
         """Build the genesis dict, merging prefunded accounts/trustlines when configured."""
-        return update_genesis(features, protocol_name, preload_entries=self._preload_entries())
+        return update_genesis(features, protocol_name,
+                              genesis_path=getattr(self.lab, "genesis_file", None),
+                              preload_entries=self._preload_entries())
 
     def _preload_entries(self):
         if not getattr(self.lab, "preload_accounts", 0):

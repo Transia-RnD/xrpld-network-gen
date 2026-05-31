@@ -39,4 +39,4 @@ else
 fi
 
 # Start xahaud with or without ledgerfile and quorum
-exec /app/xahaud $ledgerfile $quorum $standalone --conf /etc/opt/xahau/xahaud.cfg
+exec /opt/xahaud/bin/xahaud $ledgerfile $quorum $standalone --conf /etc/opt/xahau/xahaud.cfg

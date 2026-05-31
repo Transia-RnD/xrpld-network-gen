@@ -160,9 +160,9 @@ class TransactionQueueConfig:
     minimum_queue_size: int = 2000
     retry_sequence_percent: int = 25
     minimum_escalation_multiplier: int = 500
-    minimum_txn_in_ledger: int = 5
-    minimum_txn_in_ledger_standalone: int = 5
-    target_txn_in_ledger: int = 100
+    minimum_txn_in_ledger: int = 10000
+    minimum_txn_in_ledger_standalone: int = 10000
+    target_txn_in_ledger: int = 10000
     maximum_txn_in_ledger: int = 10000
     normal_consensus_increase_percent: int = 20
     slow_consensus_decrease_percent: int = 50
@@ -217,7 +217,7 @@ class NodeConfig:
     size_node: str = "huge"
     log_level: str = "trace"
     private_peer: bool = False
-    max_transactions: int = 10000
+    max_transactions: int = 100000  # JobQueue JtTransaction cap; raised kMaxJobQueueTx clamps to [100,100000]
     validator: Optional[ValidatorIdentity] = None
     validators: List[str] = field(default_factory=list)
     cluster_nodes: List[str] = field(default_factory=list)
@@ -443,6 +443,9 @@ class LabConfig:
     num_validators: int = 1
     num_peers: int = 0
     genesis: bool = False
+    # Custom genesis JSON (e.g. prefunded accounts). None = xrpld-lab's bundled
+    # genesis.<protocol>.json. The resolved amendments are merged into whichever is used.
+    genesis_file: Optional[str] = None
     quorum: Optional[int] = None
     node_db_type: NodeDbType = NodeDbType.NUDB
     binary_name: str = "xrpld"

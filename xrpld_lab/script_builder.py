@@ -78,7 +78,9 @@ class DockerfileBuilder:
             dockerfile += "COPY genesis.json /genesis.json\n"
 
         if binary:
-            dockerfile += f"COPY {protocol}d.{version} /app/{protocol}d\n"
+            dockerfile += (
+                f"COPY {protocol}d.{version} /opt/{protocol}d/bin/{protocol}d\n"
+            )
 
         if network:
             dockerfile += f"""

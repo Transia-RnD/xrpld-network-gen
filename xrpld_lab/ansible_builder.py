@@ -129,6 +129,13 @@ class AnsibleBuilder:
         for node in self._nodes:
             data = {
                 "config_path": node.config_path,
+                # Node build context (Dockerfile + entrypoint + genesis.json) — the parent of
+                # the config dir. The deploy builds this wrapper on the host, like standalone.
+                "build_context": os.path.dirname(node.config_path),
+                # Tag the wrapper by the base image's tag so each build gets a distinct
+                # name and the container RECREATES on a new image (a constant tag makes
+                # docker_container see "same image" and merely restart the stale one).
+                "docker_build_tag": f"{node.name}:{self.image_name.rsplit(':', 1)[-1]}",
                 "docker_container_name": node.name,
                 "docker_container_ports": [
                     f"{node.ports.rpc_public}:{node.ports.rpc_public}",
@@ -154,11 +161,12 @@ class AnsibleBuilder:
                 ],
                 "peer_port": node.ports.peer,
                 "ssh_port": self.config.ssh_port,
+                # /var/lib/xrpld/db is a Local NVMe mountpoint — excluded from the cleanup
+                # rmtree (can't delete a live mount; it's ephemeral and fresh on boot anyway).
                 "volumes": [
                     "/opt/ripple/config",
                     "/opt/ripple/log",
                     "/opt/ripple/lib",
-                    "/var/lib/xrpld/db",
                 ],
                 "ws_port": node.ports.ws_public,
             }
@@ -225,7 +233,8 @@ class AnsibleBuilder:
     def _write_run_sh(self) -> None:
         lines = [
             "#!/bin/bash",
-            "set -e",
+            "# Best-effort deploy: a failing host or playbook is logged but does NOT abort the",
+            "# run, so the remaining nodes still deploy and the run reaches the end.",
             "",
             'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
             'cd "$SCRIPT_DIR"',
@@ -271,12 +280,15 @@ class AnsibleBuilder:
             'eval "$(ssh-agent -s)"',
             "ssh-add --apple-use-keychain $SSH_PATH",
             "",
-            "# Ping all hosts",
-            "ansible -i hosts.txt all -u ubuntu -m ping",
+            "# Ping all hosts (informational — unreachable hosts must not abort the run)",
+            "ansible -i hosts.txt all -u ubuntu -m ping || true",
+            "",
+            "# Short-lived operator token so each node's docker can pull the private AR image.",
+            'AR_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"',
             "",
             "# --- Core playbooks ---",
             "run_once deps deps.yml",
-            "run_always main.yml",
+            'run_always main.yml -e ar_token="$AR_TOKEN"',
         ]
 
         for host in self.config.services:
@@ -493,109 +505,40 @@ _DEPS_YML = """---
   become: true
   remote_user: root
   tasks:
-  - name: Install packages that allow apt to be used over HTTPS
+  - name: Install apt prerequisites for the Docker repo
     apt:
-      name: "{{ packages }}"
-      state: present
-      update_cache: yes
-    vars:
-      packages:
+      name:
       - apt-transport-https
       - ca-certificates
       - curl
-      - gnupg-agent
-      - software-properties-common
-  - name: Add an apt signing key for Docker
+      - gnupg
+      state: present
+      update_cache: yes
+  - name: Add Docker apt signing key
     apt_key:
       url: https://download.docker.com/linux/ubuntu/gpg
       state: present
-  - name: Add apt repository for stable version
+  - name: Add Docker apt repository (jammy)
     apt_repository:
-      repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+      repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
       state: present
-  - name: install nodejs prerequisites
+      update_cache: yes
+  - name: Install Docker
     apt:
       name:
-        - apt-transport-https
-        - gcc
-        - g++
-        - make
-      state: present
-  - name: add nodejs apt key
-    apt_key:
-      url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
-      state: present
-  - name: add nodejs repository
-    apt_repository:
-      repo: deb https://deb.nodesource.com/node_16.x focal main
-      state: present
-      update_cache: yes
-  - name: install nodejs
-    apt:
-      name: nodejs
-      state: present
-  - name: Install docker and its dependencies
-    apt:
-      name: "{{ packages }}"
-      state: present
-      update_cache: yes
-    vars:
-      packages:
       - docker-ce
       - docker-ce-cli
       - containerd.io
-  - name: verify docker installed, enabled, and started
+      state: present
+  - name: Ensure Docker is started and enabled
     service:
       name: docker
       state: started
       enabled: yes
-  - name: Remove swapfile from /etc/fstab
-    mount:
-      name: "{{ item }}"
-      fstype: swap
-      state: absent
-    with_items:
-      - swap
-      - none
-  - name: Disable swap
-    command: swapoff -a
-    when: ansible_swaptotal_mb >= 0
-  - name: add ubuntu user to docker
+  - name: Add ubuntu user to the docker group
     user:
       name: ubuntu
       group: docker
-  - name: Ensure UFW is installed
-    apt:
-      name: ufw
-      state: present
-  - name: Enable UFW
-    ufw:
-      state: enabled
-      policy: allow
-      direction: incoming
-  - name: Enable SSH
-    ufw:
-      rule: limit
-      port: "{{ ssh_port }}"
-      proto: tcp
-  - name: Enable WS
-    ufw:
-      rule: allow
-      port: "{{ ws_port }}"
-      proto: tcp
-  - name: Enable Peer
-    ufw:
-      rule: allow
-      port: "{{ peer_port }}"
-      proto: tcp
-  - name: Stop and disable the unattended-upgrades service
-    service:
-      name: unattended-upgrades
-      state: stopped
-      enabled: no
-  - name: reboot to apply swap disable
-    reboot:
-      reboot_timeout: 180
 """
 
 _MAIN_YML = """- hosts: all
@@ -624,22 +567,44 @@ _MAIN_YML = """- hosts: all
       path: "{{ item }}"
       state: absent
     loop: "{{ volumes }}"
+  - name: Stop the running node container so its NVMe DB can be reset cleanly
+    docker_container:
+      name: "{{ docker_container_name }}"
+      state: stopped
+    ignore_errors: yes
+  - name: Reset node DB for a fresh genesis (Local NVMe persists across redeploys)
+    shell: rm -rf /var/lib/xrpld/db/* 2>/dev/null || true
   - name: Create Docker Network
     docker_network:
       name: "{{ docker_network_name }}"
       state: present
-  - name: Pull Docker Image
+  - name: Authenticate Docker to Artifact Registry (operator token, refreshed each deploy)
+    shell: echo "{{ ar_token }}" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
+    when: ar_token | default('') | length > 0
+  - name: Pull base image (the binary-in-an-image)
     docker_image:
       name: "{{ docker_image_name }}"
       source: pull
+  - name: Copy node build context (Dockerfile, entrypoint, genesis) to the remote server
+    copy:
+      src: "{{ build_context }}/"
+      dest: /opt/ripple/build/
   - name: Copy config files to the remote server
     copy:
       src: "{{ config_path }}/"
       dest: /opt/ripple/config/
+  - name: Build node image (wrap the binary image with the entrypoint, like standalone)
+    docker_image:
+      name: "{{ docker_build_tag }}"
+      source: build
+      force_source: yes
+      build:
+        path: /opt/ripple/build
+        pull: no
   - name: Deploy Docker Image
     docker_container:
       name: "{{ docker_container_name }}"
-      image: "{{ docker_image_name }}"
+      image: "{{ docker_build_tag }}"
       ports: "{{ docker_container_ports }}"
       volumes: "{{ docker_volumes }}"
       env: "{{ docker_env_variables }}"
