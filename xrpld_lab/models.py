@@ -160,10 +160,14 @@ class TransactionQueueConfig:
     minimum_queue_size: int = 2000
     retry_sequence_percent: int = 25
     minimum_escalation_multiplier: int = 500
-    minimum_txn_in_ledger: int = 10000
-    minimum_txn_in_ledger_standalone: int = 10000
-    target_txn_in_ledger: int = 10000
-    maximum_txn_in_ledger: int = 10000
+    # Open-ledger caps raised so the fee market stays FLAT for perf runs: the open ledger
+    # accepts every txn at base fee up to 100k/ledger, so nothing escalates or queues, and the
+    # measured bottleneck is the node's apply rate (real capacity) not a fee-market artifact.
+    # (A hard cap of 10k was filling at peak load and queueing every overflow regardless of fee.)
+    minimum_txn_in_ledger: int = 100000
+    minimum_txn_in_ledger_standalone: int = 100000
+    target_txn_in_ledger: int = 100000
+    maximum_txn_in_ledger: int = 100000
     normal_consensus_increase_percent: int = 20
     slow_consensus_decrease_percent: int = 50
     maximum_txn_per_account: int = 100000
