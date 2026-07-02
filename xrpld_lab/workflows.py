@@ -63,6 +63,23 @@ class LabRunner:
                               genesis_path=getattr(self.lab, "genesis_file", None),
                               preload_entries=self._preload_entries())
 
+    def _resolve_feature_lines(self, source, spec):
+        """Return features.macro lines for amendment parsing.
+
+        Prefers a local ``--features_file`` so the enabled amendment set exactly
+        matches the local binary (and never fetches from GitHub) -- required when
+        the binary is built from an unpushed commit, and safer regardless since a
+        mismatched remote macro can enable amendments the binary lacks, which
+        amendment-blocks the node. Falls back to downloading the macro from the
+        repo at the resolved commit.
+        """
+        local = getattr(self.lab, "features_file", None)
+        if local:
+            print(f"  [xrpld-lab] reading features from local file {local}")
+            return get_feature_lines_from_path(local)
+        feature_content = self.resolver.resolve_features(source, spec)
+        return get_feature_lines_from_content(feature_content)
+
     def _preload_entries(self):
         if not getattr(self.lab, "preload_accounts", 0):
             return None
@@ -129,8 +146,7 @@ class LabRunner:
         base_dir = self.workspace.standalone_dir(protocol_name, name)
 
         # 1. Resolve features
-        feature_content = self.resolver.resolve_features(source, spec)
-        feature_lines = get_feature_lines_from_content(feature_content)
+        feature_lines = self._resolve_feature_lines(source, spec)
 
         # 1b. Resolve repo config and merge with overrides
         repo_config = self.resolver.resolve_repo_config(source, spec)
@@ -155,7 +171,7 @@ class LabRunner:
         save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
         # 4. Amendments + genesis
-        features = parse_amendments(feature_lines)
+        features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
         genesis = self._genesis(features, protocol_name)
         write_file(
             os.path.join(base_dir, "genesis.json"),
@@ -229,8 +245,7 @@ class LabRunner:
         cluster_dir = self.workspace.cluster_dir(name)
 
         # 1. Resolve features
-        feature_content = self.resolver.resolve_features(source, spec)
-        feature_lines = get_feature_lines_from_content(feature_content)
+        feature_lines = self._resolve_feature_lines(source, spec)
 
         # 1b. Resolve repo config and merge with overrides
         repo_config = self.resolver.resolve_repo_config(source, spec)
@@ -326,7 +341,7 @@ class LabRunner:
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             # Amendments + genesis
-            features = parse_amendments(feature_lines)
+            features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
             if not lab.genesis:
                 features = {}
             genesis = self._genesis(features, protocol_name)
@@ -390,7 +405,7 @@ class LabRunner:
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             # Amendments + genesis (peers always get all amendments)
-            features = parse_amendments(feature_lines)
+            features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
             genesis = self._genesis(features, protocol_name)
             write_file(
                 os.path.join(node_dir, "genesis.json"),
@@ -623,7 +638,7 @@ class LabRunner:
             vl_content = ValidatorsTxtBuilder(node, genesis=True).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
-            features = parse_amendments(feature_lines)
+            features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
             genesis = self._genesis(features, protocol_name)
             write_file(
                 os.path.join(cfg_path, "genesis.json"),
@@ -653,7 +668,7 @@ class LabRunner:
             vl_content = ValidatorsTxtBuilder(node, genesis=True).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
-            features = parse_amendments(feature_lines)
+            features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
             genesis = self._genesis(features, protocol_name)
             write_file(
                 os.path.join(cfg_path, "genesis.json"),

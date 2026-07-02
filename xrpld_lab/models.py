@@ -447,6 +447,14 @@ class LabConfig:
     num_validators: int = 1
     num_peers: int = 0
     genesis: bool = False
+    # Pre-enable EVERY amendment in genesis, ignoring the Supported::yes/no flag
+    # in features.macro. Requires a binary built with those amendments supported
+    # (else it amendment-blocks). For perf/test networks only.
+    all_amendments: bool = False
+    # Read features.macro from this local path instead of fetching from GitHub at
+    # the build commit. Use when the binary is built from an unpushed commit, so
+    # the enabled amendment set exactly matches the binary. None = fetch remotely.
+    features_file: Optional[str] = None
     # Custom genesis JSON (e.g. prefunded accounts). None = xrpld-lab's bundled
     # genesis.<protocol>.json. The resolved amendments are merged into whichever is used.
     genesis_file: Optional[str] = None

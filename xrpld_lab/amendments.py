@@ -46,7 +46,9 @@ def get_feature_lines_from_content(content: bytes) -> list[str]:
     return content.decode("utf-8").splitlines()
 
 
-def parse_amendments(lines: list) -> Dict[str, str]:
+def parse_amendments(
+    lines: list, include_unsupported: bool = False
+) -> Dict[str, str]:
     """Parse C++ macro lines into ``{amendment_name: sha512_half_hash}``.
 
     Handles four macro styles:
@@ -56,9 +58,14 @@ def parse_amendments(lines: list) -> Dict[str, str]:
     * ``REGISTER_FEATURE(Name, ...)``
     * ``REGISTER_FIX(Name, ...)``
 
-    Only amendments marked ``Supported::yes`` (or any value other than ``no``)
-    are included.  The hash is the first 64 hex characters of the SHA-512
-    digest of the UTF-8 encoded amendment name.
+    By default only amendments marked ``Supported::yes`` (or any value other
+    than ``no``) are included.  Pass ``include_unsupported=True`` to include
+    every amendment regardless of its ``Supported`` flag -- the amendment
+    name -> hash mapping is identical either way, only the flag differs. This
+    is used to pre-enable all amendments in a test genesis; the running binary
+    must itself support them (built ``Supported::Yes``) or it amendment-blocks.
+    The hash is the first 64 hex characters of the SHA-512 digest of the UTF-8
+    encoded amendment name.
     """
     amendments: Dict[str, dict] = {}
 
@@ -105,7 +112,7 @@ def parse_amendments(lines: list) -> Dict[str, str]:
     return {
         k: _amendment_name_hash(k)
         for k, v in amendments.items()
-        if v["supported"] is True
+        if include_unsupported or v["supported"] is True
     }
 
 

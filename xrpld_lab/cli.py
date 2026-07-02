@@ -92,6 +92,14 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
                    help="Path to pre-built binary (skips download)")
     p.add_argument("--quantum", action="store_true",
                    help="Use dilithium (post-quantum) keys for validators and publisher")
+    p.add_argument("--all-amendments", dest="all_amendments", action="store_true",
+                   help="Pre-enable EVERY amendment in genesis, ignoring the "
+                        "Supported flag. Requires a binary built with those "
+                        "amendments supported (else it amendment-blocks).")
+    p.add_argument("--features_file", default=None,
+                   help="Read features.macro from this local path instead of "
+                        "fetching from GitHub. Use with a binary built from an "
+                        "unpushed commit so the amendment set matches the binary.")
     p.add_argument("--preload_accounts", type=int, default=0,
                    help="Prefund N accounts directly in genesis (perf-iac style)")
     p.add_argument("--preload_trustlines", type=int, default=0,
@@ -126,6 +134,14 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="Path to YAML/JSON file with config overrides")
     p.add_argument("--datagram_monitor", type=str, default=None,
                    help="Perf-server XDGM sink as 'HOST PORT' (e.g. '10.128.0.2 9876')")
+    p.add_argument("--all-amendments", dest="all_amendments", action="store_true",
+                   help="Pre-enable EVERY amendment in genesis, ignoring the "
+                        "Supported flag. Requires a binary built with those "
+                        "amendments supported (else it amendment-blocks).")
+    p.add_argument("--features_file", default=None,
+                   help="Read features.macro from this local path instead of "
+                        "fetching from GitHub. Use with a binary built from an "
+                        "unpushed commit so the amendment set matches the binary.")
 
     # -- create:network ------------------------------------------------------
     p = subparsers.add_parser("create:network", help="Create a multi-node network")
@@ -406,6 +422,8 @@ def _build_standalone_config(args, protocol, spec):
         import_vl_key=import_key,
         config_overrides=config_overrides,
         datagram_monitor=getattr(args, "datagram_monitor", None),
+        all_amendments=getattr(args, "all_amendments", False),
+        features_file=getattr(args, "features_file", None),
     )
 
 
@@ -514,6 +532,8 @@ def _build_network_config(args, protocol, spec):
         num_validators=num_validators,
         num_peers=num_peers,
         genesis=args.genesis,
+        all_amendments=getattr(args, "all_amendments", False),
+        features_file=getattr(args, "features_file", None),
         genesis_file=getattr(args, "genesis_file", None),
         quorum=args.quorum,
         node_db_type=NodeDbType(args.nodedb_type),
