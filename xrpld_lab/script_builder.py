@@ -80,6 +80,9 @@ class DockerfileBuilder:
         if binary:
             dockerfile += (
                 f"COPY {protocol}d.{version} /opt/{protocol}d/bin/{protocol}d\n"
+                # The execute bit is not reliably preserved through the ansible
+                # copy → docker COPY layers, so set it explicitly in-image.
+                f"RUN chmod +x /opt/{protocol}d/bin/{protocol}d\n"
             )
 
         if network:
@@ -109,7 +112,10 @@ class DockerfileBuilder:
             )
 
         if include_genesis:
-            parts = ['"/entrypoint.sh"', '"/genesis.json"', f'"{quorum}"']
+            # A single-node standalone has no quorum; render empty (not "None")
+            # so the entrypoint omits --quorum instead of passing --quorum=None.
+            quorum_arg = "" if quorum is None else str(quorum)
+            parts = ['"/entrypoint.sh"', '"/genesis.json"', f'"{quorum_arg}"']
             if standalone:
                 parts.append(f'"{standalone}"')
             dockerfile += f'ENTRYPOINT [ {", ".join(parts)} ]'
