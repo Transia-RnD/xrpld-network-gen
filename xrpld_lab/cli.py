@@ -7,6 +7,7 @@ and passes the config to LabRunner.run().
 from __future__ import annotations
 
 import argparse
+import re
 from typing import List, Optional
 
 from xrpld_lab.config import load_ansible_config, load_overrides_file
@@ -128,6 +129,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--network_type", default="standalone")
     p.add_argument("--server", default=None)
     p.add_argument("--version", default=None)
+    p.add_argument("--commit", default=None,
+                   help="Commit sha OR release version (e.g. 3.2.0) of an "
+                        "all-amendments 'supported' build: pulls "
+                        "ghcr.io/xrplf/xrpld/supported:<sha-short|version> and "
+                        "resolves the amendment set from that ref.")
     p.add_argument("--ipfs", type=bool, default=False)
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
     p.add_argument("--config_overrides", type=str, default=None,
@@ -386,15 +392,32 @@ def _build_standalone_config(args, protocol, spec):
     if args.config_overrides:
         config_overrides = load_overrides_file(args.config_overrides)
 
+    commit_hash = ""
+    image = ""
     if protocol == Protocol.XAHAU:
         server = server or spec.default_build_server
         version = version or _XAHAU_RELEASE_FALLBACK
         build_type = BuildType.BINARY
         import_key = import_key or _XAHAU_IMPORT_VL_KEY
     elif protocol == Protocol.XRPL:
-        server = server or "rippleci"
-        version = version or _XRPL_RELEASE_FALLBACK
         build_type = BuildType.IMAGE
+        if args.commit:
+            # Run an "all amendments Supported::Yes" image published by CI, and
+            # resolve the amendment set from that same ref on GitHub. A semver
+            # ref (e.g. 3.2.0) maps to the version tag; anything else is treated
+            # as a commit sha -> sha-<short>.
+            ref = args.commit
+            if re.match(r"^v?\d+\.\d+", ref):
+                tag = ref.lstrip("v")
+            else:
+                tag = f"sha-{ref[:7]}"
+            image = f"ghcr.io/xrplf/xrpld/supported:{tag}"
+            version = ref
+            commit_hash = ref
+        else:
+            server = server or "rippleci"
+            version = version or _XRPL_RELEASE_FALLBACK
+            image = f"{server}/xrpld:{version}"
 
     source = BuildSource(
         protocol=protocol,
@@ -403,11 +426,8 @@ def _build_standalone_config(args, protocol, spec):
         build_version=version,
         owner=spec.github_owner,
         repo=spec.github_repo,
-        image=(
-            f"{server}/xrpld:{version}"
-            if build_type == BuildType.IMAGE
-            else "ubuntu:jammy"
-        ),
+        commit_hash=commit_hash,
+        image=image or "ubuntu:jammy",
     )
 
     return LabConfig(
