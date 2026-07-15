@@ -213,9 +213,7 @@ done
 """
         content += "\n"
         content += 'if [ "$REMOVE_FLAG" = true ]; then \n'
-
-        if num_validators > 0 and num_peers > 0:
-            content += "docker compose -f docker-compose.yml down --remove-orphans\n"
+        content += "docker compose -f docker-compose.yml down --remove-orphans\n"
 
         for i in range(1, num_validators + 1):
             content += f"rm -r vnode{i}/lib\n"
@@ -228,10 +226,7 @@ done
             content += f"rm -r pnode{i}/xrpld.{name}\n"
 
         content += "else \n"
-
-        if num_validators > 0 and num_peers > 0:
-            content += "docker compose -f docker-compose.yml down\n"
-
+        content += "docker compose -f docker-compose.yml down\n"
         content += "fi \n"
         return content
 
