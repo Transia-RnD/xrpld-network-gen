@@ -447,6 +447,9 @@ class LabConfig:
     num_validators: int = 1
     num_peers: int = 0
     genesis: bool = False
+    # Boot nodes with --load from a snapshot-restored database directory instead of
+    # a genesis JSON (large prefunded state, see loadtester snapshot_push.sh).
+    db_seed: bool = False
     # Pre-enable EVERY amendment in genesis, ignoring the Supported::yes/no flag
     # in features.macro. Requires a binary built with those amendments supported
     # (else it amendment-blocks). For perf/test networks only.

@@ -361,6 +361,7 @@ class LabRunner:
                 include_genesis=True,
                 quorum=lab.effective_quorum,
                 standalone="--valid" if lab.genesis else None,
+                db_seed=lab.db_seed,
             )
             write_file(os.path.join(node_dir, "Dockerfile"), dockerfile)
 
@@ -423,6 +424,7 @@ class LabRunner:
                 include_genesis=True,
                 quorum=lab.effective_quorum,
                 standalone="--valid" if lab.genesis else None,
+                db_seed=lab.db_seed,
             )
             write_file(os.path.join(node_dir, "Dockerfile"), dockerfile)
 

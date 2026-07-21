@@ -79,6 +79,9 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--build_server", default=None)
     p.add_argument("--build_version", default=None)
     p.add_argument("--genesis", type=bool, default=False)
+    p.add_argument("--db_seed", action="store_true",
+                   help="Boot nodes with --load from a snapshot-restored db dir "
+                        "(no genesis.json baked into the image)")
     p.add_argument("--genesis_file", default=None,
                    help="Custom genesis JSON (e.g. prefunded accounts). Default: xrpld-lab's "
                         "bundled genesis; the resolved amendments are merged into it.")
@@ -552,6 +555,7 @@ def _build_network_config(args, protocol, spec):
         num_validators=num_validators,
         num_peers=num_peers,
         genesis=args.genesis,
+        db_seed=getattr(args, "db_seed", False),
         all_amendments=getattr(args, "all_amendments", False),
         features_file=getattr(args, "features_file", None),
         genesis_file=getattr(args, "genesis_file", None),

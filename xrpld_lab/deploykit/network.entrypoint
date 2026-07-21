@@ -2,8 +2,11 @@
 # ./entrypoint.sh ledgerfile quorum
 # ./entrypoint.sh /genesis.json 5
 
-# Check if $1 is passed
-if [[ -n "$1" ]]; then
+# Check if $1 is passed. "--load" is the db-seed sentinel: boot from the node's
+# own database directory (restored from a state snapshot) instead of a genesis file.
+if [[ "$1" == "--load" ]]; then
+    ledgerfile="--load"
+elif [[ -n "$1" ]]; then
     ledgerfile="--ledgerfile $1"
 else
     ledgerfile=""

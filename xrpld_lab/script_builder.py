@@ -33,6 +33,7 @@ class DockerfileBuilder:
         quorum: Optional[int] = None,
         standalone: Optional[str] = None,
         data_port: int = 12345,
+        db_seed: bool = False,
     ) -> str:
         """Generate Dockerfile content.
 
@@ -52,6 +53,10 @@ class DockerfileBuilder:
             Binary version suffix (used with *binary*).
         include_genesis:
             If *True* add COPY genesis.json and genesis ENTRYPOINT.
+        db_seed:
+            If *True* boot with ``--load`` from the node's (snapshot-restored)
+            database directory: no genesis.json in the image, entrypoint's
+            first arg is the ``--load`` sentinel. Overrides *include_genesis*.
         quorum:
             Quorum value passed to the entrypoint when *include_genesis*.
         standalone:
@@ -74,7 +79,7 @@ class DockerfileBuilder:
         if not network:
             dockerfile += "COPY config /config\n"
 
-        if include_genesis:
+        if include_genesis and not db_seed:
             dockerfile += "COPY genesis.json /genesis.json\n"
 
         if binary:
@@ -111,11 +116,14 @@ class DockerfileBuilder:
                 f" {ports.peer} {ports.peer}/udp\n"
             )
 
-        if include_genesis:
+        if include_genesis or db_seed:
             # A single-node standalone has no quorum; render empty (not "None")
             # so the entrypoint omits --quorum instead of passing --quorum=None.
             quorum_arg = "" if quorum is None else str(quorum)
-            parts = ['"/entrypoint.sh"', '"/genesis.json"', f'"{quorum_arg}"']
+            # db-seed: no genesis file in the image — the node boots with --load
+            # from its (snapshot-restored) database directory.
+            first = '"--load"' if db_seed else '"/genesis.json"'
+            parts = ['"/entrypoint.sh"', first, f'"{quorum_arg}"']
             if standalone:
                 parts.append(f'"{standalone}"')
             dockerfile += f'ENTRYPOINT [ {", ".join(parts)} ]'

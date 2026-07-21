@@ -46,6 +46,20 @@ class TestDockerfileBuilder:
         # Should have ENTRYPOINT with genesis
         assert 'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", "1", "true" ]' in result
 
+    def test_db_seed_dockerfile(self):
+        """db-seed mode: no genesis.json in the image; ENTRYPOINT boots with --load."""
+        result = DockerfileBuilder.build(
+            protocol="xrpl",
+            ports=_default_ports(),
+            image_name="xrpld-base:latest",
+            network=True,
+            include_genesis=True,
+            quorum=3,
+            db_seed=True,
+        )
+        assert "COPY genesis.json" not in result
+        assert 'ENTRYPOINT [ "/entrypoint.sh", "--load", "3" ]' in result
+
     def test_network_dockerfile(self):
         """Network mode: ENV vars, $VAR EXPOSE, COPY entrypoint, no COPY config."""
         ports = _default_ports()
