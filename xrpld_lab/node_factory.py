@@ -39,7 +39,7 @@ class NodeFactory:
         spec = get_spec(protocol)
         ports = PortSet.for_node(0, NodeRole.STANDALONE)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.STANDALONE)
-        node_db.num_ledgers = 10000
+        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
 
         return NodeConfig(
             name=name,
@@ -83,7 +83,7 @@ class NodeFactory:
         spec = get_spec(protocol)
         ports = ports or PortSet.for_node(index, NodeRole.VALIDATOR)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.NETWORK)
-        node_db.num_ledgers = 10000
+        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
 
         # Validator identity: own public key from all_validators (1-based index)
         self_key = all_validators[index - 1]
@@ -143,7 +143,7 @@ class NodeFactory:
         spec = get_spec(protocol)
         ports = ports or PortSet.for_node(index, NodeRole.PEER)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.NETWORK)
-        node_db.num_ledgers = 10000
+        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
 
         return NodeConfig(
             name=name,
@@ -181,7 +181,7 @@ class NodeFactory:
         spec = get_spec(protocol)
         ports = PortSet.for_node(0, NodeRole.STANDALONE)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.LOCAL)
-        node_db.num_ledgers = 10000
+        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
 
         return NodeConfig(
             name=name,
@@ -219,7 +219,7 @@ class NodeFactory:
         spec = get_spec(protocol)
         ports = PortSet.for_node(index, NodeRole.VALIDATOR)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.LOCAL)
-        node_db.num_ledgers = 10000
+        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
 
         # Validator identity: own public key from all_validators (1-based index)
         self_key = all_validators[index - 1]
@@ -276,7 +276,7 @@ class NodeFactory:
         spec = get_spec(protocol)
         ports = PortSet.for_node(index, NodeRole.PEER)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.LOCAL)
-        node_db.num_ledgers = 10000
+        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
 
         return NodeConfig(
             name=name,
