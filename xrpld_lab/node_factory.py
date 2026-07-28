@@ -78,12 +78,14 @@ class NodeFactory:
         node_db_type: NodeDbType = NodeDbType.NUDB,
         ports: Optional[PortSet] = None,
         datagram_monitor: Optional[List[str]] = None,
+        num_ledgers: Optional[int] = 256,
     ) -> NodeConfig:
         """Create a NodeConfig for a validator node in a network."""
         spec = get_spec(protocol)
         ports = ports or PortSet.for_node(index, NodeRole.VALIDATOR)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.NETWORK)
-        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
+        # None = online_delete off, [ledger_history] full (growth-study setting)
+        node_db.num_ledgers = num_ledgers
 
         # Validator identity: own public key from all_validators (1-based index)
         self_key = all_validators[index - 1]
@@ -138,12 +140,14 @@ class NodeFactory:
         node_db_type: NodeDbType = NodeDbType.NUDB,
         ports: Optional[PortSet] = None,
         datagram_monitor: Optional[List[str]] = None,
+        num_ledgers: Optional[int] = 256,
     ) -> NodeConfig:
         """Create a NodeConfig for a peer node in a network."""
         spec = get_spec(protocol)
         ports = ports or PortSet.for_node(index, NodeRole.PEER)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.NETWORK)
-        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
+        # None = online_delete off, [ledger_history] full (growth-study setting)
+        node_db.num_ledgers = num_ledgers
 
         return NodeConfig(
             name=name,

@@ -86,6 +86,9 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
                    help="Custom genesis JSON (e.g. prefunded accounts). Default: xrpld-lab's "
                         "bundled genesis; the resolved amendments are merged into it.")
     p.add_argument("--quorum", type=int, default=None)
+    p.add_argument("--online_delete", type=int, default=256,
+                   help="online_delete ledger count for network nodes; "
+                        "0 = disabled ([ledger_history] full — growth-study setting)")
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
     p.add_argument("--config_overrides", type=str, default=None,
                    help="Path to YAML/JSON file with config overrides")
@@ -561,6 +564,7 @@ def _build_network_config(args, protocol, spec):
         genesis_file=getattr(args, "genesis_file", None),
         quorum=args.quorum,
         node_db_type=NodeDbType(args.nodedb_type),
+        online_delete=getattr(args, "online_delete", 256) or None,
         binary_name=args.binary_name,
         import_vl_key=spec.default_import_vl_key,
         key_algorithm=key_algorithm,

@@ -463,6 +463,8 @@ class LabConfig:
     genesis_file: Optional[str] = None
     quorum: Optional[int] = None
     node_db_type: NodeDbType = NodeDbType.NUDB
+    # online_delete ledger count for network nodes; None = disabled (full history).
+    online_delete: Optional[int] = 256
     binary_name: str = "xrpld"
     # Perf-server XDGM sink as "<ip> <port>" (e.g. "10.128.0.2 9876"); None disables the
     # [datagram_monitor] stanza. Must be the server's INTERNAL IP (firewall is VPC-only).
