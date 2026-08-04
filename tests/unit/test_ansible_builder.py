@@ -429,6 +429,107 @@ class TestNginx:
         content = open(path).read()
         assert "hosts: proxy" in content
 
+    def test_ssl_all_selfsigned_by_default(self, tmp_path):
+        builder = self._builder_with_nginx(tmp_path)
+        builder.write()
+        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml")
+        content = open(path).read()
+        assert "certbot" not in content
+        for label in ("WSS", "RPC", "Faucet", "Debug", "Compiler"):
+            assert f"Create {label} self-signed certificate" in content
+
+
+class TestNginxLetsEncrypt:
+    def _builder(self, tmp_path, **nginx_kwargs):
+        cluster_dir = str(tmp_path / "test-cluster")
+        os.makedirs(cluster_dir, exist_ok=True)
+        config = AnsibleConfig(
+            vips=["10.0.0.1"],
+            pips=["10.0.0.10"],
+            services=[
+                ServicesHost(
+                    name="proxy",
+                    ip="10.0.0.10",
+                    nginx=NginxConfig(
+                        domain="test.example.com",
+                        ssl_org="TestOrg",
+                        ssl_ou="TestOU",
+                        **nginx_kwargs,
+                    ),
+                ),
+            ],
+        )
+        builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
+        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
+        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        return builder
+
+    def test_ssl_yml_issues_letsencrypt_for_selected_services(self, tmp_path):
+        builder = self._builder(
+            tmp_path,
+            letsencrypt_services=["rpc", "faucet"],
+            letsencrypt_email="ops@example.com",
+        )
+        builder.write()
+        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml")
+        content = open(path).read()
+        assert "Install certbot" in content
+        assert "-m ops@example.com --cert-name rpc.test.example.com -d rpc.test.example.com" in content
+        assert "--cert-name faucet.test.example.com -d faucet.test.example.com" in content
+        # LE services get no self-signed cert; the rest keep theirs
+        assert "Create RPC self-signed certificate" not in content
+        assert "Create Faucet self-signed certificate" not in content
+        assert "Create WSS self-signed certificate" in content
+        assert "Create Debug self-signed certificate" in content
+        assert "Create Compiler self-signed certificate" in content
+
+    def test_vars_point_at_letsencrypt_paths(self, tmp_path):
+        builder = self._builder(tmp_path, letsencrypt_services=["rpc", "faucet"])
+        builder.write()
+        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "vars.yml")
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        assert data["RPC_SSL_CERT"] == "/etc/letsencrypt/live/rpc.test.example.com/fullchain.pem"
+        assert data["RPC_SSL_KEY"] == "/etc/letsencrypt/live/rpc.test.example.com/privkey.pem"
+        assert data["FAUCET_SSL_CERT"] == "/etc/letsencrypt/live/faucet.test.example.com/fullchain.pem"
+        assert data["FAUCET_SSL_KEY"] == "/etc/letsencrypt/live/faucet.test.example.com/privkey.pem"
+        # untouched services keep self-signed paths
+        assert data["SSL_CERT"] == "/etc/ssl/certs/test.example.com.csr.pem"
+        assert data["DEBUG_SSL_CERT"] == "/etc/ssl/certs/debug.test.example.com.csr.pem"
+
+    def test_no_email_registers_unsafely(self, tmp_path):
+        builder = self._builder(tmp_path, letsencrypt_services=["rpc"])
+        builder.write()
+        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml")
+        content = open(path).read()
+        assert "--register-unsafely-without-email" in content
+
+    def test_wss_uses_bare_domain(self, tmp_path):
+        builder = self._builder(tmp_path, letsencrypt_services=["wss"])
+        builder.write()
+        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "vars.yml")
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        assert data["SSL_CERT"] == "/etc/letsencrypt/live/test.example.com/fullchain.pem"
+
+    def test_unknown_service_raises(self, tmp_path):
+        builder = self._builder(tmp_path, letsencrypt_services=["bogus"])
+        with pytest.raises(ValueError, match="bogus"):
+            builder.write()
+
+    def test_ssl_yml_is_valid_yaml(self, tmp_path):
+        builder = self._builder(
+            tmp_path,
+            letsencrypt_services=["rpc", "faucet"],
+            letsencrypt_email="ops@example.com",
+        )
+        builder.write()
+        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml")
+        with open(path) as f:
+            plays = yaml.safe_load(f)
+        assert plays[0]["hosts"] == "proxy"
+        assert any("certbot" in str(t.get("command", "")) for t in plays[0]["tasks"])
+
 
 # ===========================================================================
 # Optional: Redis
