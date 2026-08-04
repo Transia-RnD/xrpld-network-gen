@@ -624,12 +624,12 @@ class TestFullDeployment:
                     name="proxy",
                     ip="79.110.60.105",
                     nginx=NginxConfig(
-                        domain="alphanet.nerdnest.xyz",
+                        domain="alphanet.xrpl.org",
                         ssl_org="Transia LLC.",
                         ssl_ou="Transia RnD",
                     ),
                     faucet=FaucetConfig(
-                        ws_url="wss://alphanet.nerdnest.xyz",
+                        ws_url="wss://alphanet.xrpl.org",
                         network_id="21565",
                         seed="sEdTest",
                     ),

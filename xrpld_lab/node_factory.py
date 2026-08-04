@@ -79,6 +79,7 @@ class NodeFactory:
         ports: Optional[PortSet] = None,
         datagram_monitor: Optional[List[str]] = None,
         num_ledgers: Optional[int] = 256,
+        tree_cache_target_entries: int = 0,
     ) -> NodeConfig:
         """Create a NodeConfig for a validator node in a network."""
         spec = get_spec(protocol)
@@ -124,6 +125,7 @@ class NodeFactory:
             ips_fixed_urls=ips_fixed_urls,
             amendment_majority_time=spec.amendment_majority_time,
             datagram_monitor=datagram_monitor or [],
+            tree_cache_target_entries=tree_cache_target_entries,
         )
 
     @staticmethod
@@ -141,6 +143,7 @@ class NodeFactory:
         ports: Optional[PortSet] = None,
         datagram_monitor: Optional[List[str]] = None,
         num_ledgers: Optional[int] = 256,
+        tree_cache_target_entries: int = 0,
     ) -> NodeConfig:
         """Create a NodeConfig for a peer node in a network."""
         spec = get_spec(protocol)
@@ -169,6 +172,7 @@ class NodeFactory:
             ips_fixed_urls=list(ips_fixed) if ips_fixed else [],
             amendment_majority_time=spec.amendment_majority_time,
             datagram_monitor=datagram_monitor or [],
+            tree_cache_target_entries=tree_cache_target_entries,
         )
 
     @staticmethod

@@ -62,6 +62,9 @@ class XrpldCfgBuilder:
         out += self._server_section()
         out += self._port_sections()
         out += self._node_size_section()
+        out += self._tree_cache_ram_percent_section()
+        out += self._tree_cache_target_entries_section()
+        out += self._consensus_reserve_threads_section()
         out += self._node_db_section()
         out += self._relational_db_section()
         out += self._fee_reserves_section()
@@ -173,6 +176,17 @@ class XrpldCfgBuilder:
 
     def _node_size_section(self) -> str:
         return f"\n[node_size]\n{self.config.size_node}\n\n"
+
+    def _tree_cache_ram_percent_section(self) -> str:
+        return f"[tree_cache_ram_percent]\n{self.config.tree_cache_ram_percent}\n\n"
+
+    def _tree_cache_target_entries_section(self) -> str:
+        if self.config.tree_cache_target_entries > 0:
+            return f"[tree_cache_target_entries]\n{self.config.tree_cache_target_entries}\n\n"
+        return ""
+
+    def _consensus_reserve_threads_section(self) -> str:
+        return f"[consensus_reserve_threads]\n{self.config.consensus_reserve_threads}\n\n"
 
     def _node_db_section(self) -> str:
         from xrpld_lab.models import NodeDbType

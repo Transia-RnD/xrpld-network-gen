@@ -219,6 +219,12 @@ class NodeConfig:
     db_path: str = "/opt/ripple/lib/db"
     debug_path: str = "/opt/ripple/log/debug.log"
     size_node: str = "huge"
+    tree_cache_ram_percent: int = 50
+    # Explicit tree-cache entry target ([tree_cache_target_entries]); 0 = omit
+    # the stanza (node_size preset + RAM guardrail decide). Set when the cache
+    # must hold the whole expected live tree (e.g. 25M-account growth study).
+    tree_cache_target_entries: int = 0
+    consensus_reserve_threads: int = 2
     log_level: str = "trace"
     private_peer: bool = False
     max_transactions: int = 100000  # JobQueue JtTransaction cap; raised kMaxJobQueueTx clamps to [100,100000]
@@ -273,6 +279,11 @@ class NginxConfig:
     faucet_port: str = "8080"
     debug_port: str = "8081"
     compiler_port: str = "9000"
+    # Services issued publicly-trusted Let's Encrypt certs instead of
+    # self-signed ones (for DNS-only hostnames that clients hit directly).
+    # Valid entries: wss, rpc, faucet, debug, compiler.
+    letsencrypt_services: list = field(default_factory=list)
+    letsencrypt_email: str = ""
 
 
 @dataclass
@@ -465,6 +476,8 @@ class LabConfig:
     node_db_type: NodeDbType = NodeDbType.NUDB
     # online_delete ledger count for network nodes; None = disabled (full history).
     online_delete: Optional[int] = 256
+    # Explicit tree-cache entry target for network nodes; 0 = preset sizing.
+    tree_cache_target_entries: int = 0
     binary_name: str = "xrpld"
     # Perf-server XDGM sink as "<ip> <port>" (e.g. "10.128.0.2 9876"); None disables the
     # [datagram_monitor] stanza. Must be the server's INTERNAL IP (firewall is VPC-only).

@@ -9,6 +9,7 @@ already-completed playbook stages on rebuild.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import List
 
@@ -373,6 +374,435 @@ class AnsibleBuilder:
         self._file_write(
             os.path.join(nginx_dir, "main.yml"),
             _NGINX_MAIN_TPL.format(group=host.name),
+        )
+
+    def _write_redis(self, host_dir: str, host: ServicesHost) -> None:
+        svc_dir = os.path.join(host_dir, "redis")
+        os.makedirs(svc_dir, exist_ok=True)
+        cfg = host.redis
+        self._write_vars(os.path.join(svc_dir, "vars.yml"), {
+            "docker_network_name": cfg.network_name,
+            "docker_image_name": cfg.image,
+            "docker_container_name": cfg.container_name,
+            "docker_container_ports": ["6379:6379"],
+        })
+        self._file_write(
+            os.path.join(svc_dir, "main.yml"),
+            _REDIS_MAIN_TPL.format(group=host.name),
+        )
+
+    def _write_faucet(self, host_dir: str, host: ServicesHost) -> None:
+        svc_dir = os.path.join(host_dir, "faucet")
+        os.makedirs(svc_dir, exist_ok=True)
+        cfg = host.faucet
+        self._write_vars(os.path.join(svc_dir, "vars.yml"), {
+            "docker_image_name": cfg.image,
+            "docker_container_name": "faucet",
+            "docker_container_ports": [f"{cfg.port}:{cfg.port}"],
+            "docker_env_variables": {
+                "XRPL_FAUCET_URL": cfg.ws_url,
+                "XRPL_NETWORK_ID": cfg.network_id,
+                "XRPL_FAUCET_SEED": cfg.seed,
+            },
+        })
+        self._file_write(
+            os.path.join(svc_dir, "main.yml"),
+            _FAUCET_MAIN_TPL.format(group=host.name),
+        )
+
+    def _write_stream(self, host_dir: str, host: ServicesHost) -> None:
+        svc_dir = os.path.join(host_dir, "stream")
+        os.makedirs(svc_dir, exist_ok=True)
+        cfg = host.stream
+        self._write_vars(os.path.join(svc_dir, "vars.yml"), {
+            "websocketd_port": cfg.port,
+            "docker_container_name": cfg.container_name,
+            "log_path": cfg.log_path,
+        })
+        self._file_write(
+            os.path.join(svc_dir, "main.yml"),
+            _STREAM_MAIN_TPL.format(group=host.name),
+        )
+
+    def _write_debug(self, host_dir: str, host: ServicesHost) -> None:
+        svc_dir = os.path.join(host_dir, "debug")
+        os.makedirs(svc_dir, exist_ok=True)
+        cfg = host.debug
+        endpoint = cfg.endpoint
+        if not endpoint:
+            stream_port = host.stream.port if host.stream else 1400
+            endpoint = f"ws://{host.ip}:{stream_port}/"
+        self._write_vars(os.path.join(svc_dir, "vars.yml"), {
+            "docker_network_name": cfg.network_name,
+            "docker_image_name": cfg.image,
+            "docker_container_name": "debugstream",
+            "docker_container_ports": [f"{cfg.port}:{cfg.port}"],
+            "docker_env_variables": {
+                "PORT": str(cfg.port),
+                "ENDPOINT": endpoint,
+                "DEBUG": "stream*",
+                "REDIS_HOST": cfg.redis_host,
+                "REDIS_PORT": cfg.redis_port,
+            },
+        })
+        self._file_write(
+            os.path.join(svc_dir, "main.yml"),
+            _DEBUG_MAIN_TPL.format(group=host.name),
+        )
+
+    def _write_compiler(self, host_dir: str, host: ServicesHost) -> None:
+        svc_dir = os.path.join(host_dir, "compiler")
+        os.makedirs(svc_dir, exist_ok=True)
+        cfg = host.compiler
+        data: dict = {
+            "docker_image_name": cfg.image,
+            "docker_container_name": "compiler-api",
+            "docker_container_ports": [f"{cfg.port}:{cfg.port}"],
+            "docker_env_variables": {"PORT": str(cfg.port)},
+            "compiler_repo": cfg.repo,
+            "compiler_branch": cfg.branch,
+        }
+        if cfg.volumes:
+            data["docker_volumes"] = cfg.volumes
+        self._write_vars(os.path.join(svc_dir, "vars.yml"), data)
+        self._file_write(
+            os.path.join(svc_dir, "main.yml"),
+            _COMPILER_MAIN_TPL.format(group=host.name),
+        )
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _node_for_ip(self, ip: str) -> AnsibleNode | None:
+        for n in self._nodes:
+            if n.ip == ip:
+                return n
+        return None
+
+    @staticmethod
+    def _write_vars(path: str, data: dict) -> None:
+        with open(path, "w") as f:
+            yaml.dump(data, f, explicit_start=True, default_flow_style=False)
+
+    @staticmethod
+    def _file_write(path: str, content: str) -> None:
+        with open(path, "w") as f:
+            f.write(content)
+
+    @staticmethod
+    def _file_write_executable(path: str, content: str) -> None:
+        with open(path, "w") as f:
+            f.write(content)
+        os.chmod(path, 0o755)
+
+
+# ======================================================================
+# Static playbook templates
+# ======================================================================
+
+_DEPS_YML = """---
+- hosts: all
+  become: true
+  remote_user: root
+  tasks:
+  - name: Install apt prerequisites for the Docker repo
+    apt:
+      name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      state: present
+      update_cache: yes
+  - name: Add Docker apt signing key
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+  - name: Add Docker apt repository (jammy)
+    apt_repository:
+      repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
+      state: present
+      update_cache: yes
+  - name: Install Docker
+    apt:
+      name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      state: present
+  - name: Ensure Docker is started and enabled
+    service:
+      name: docker
+      state: started
+      enabled: yes
+  - name: Add ubuntu user to the docker group
+    user:
+      name: ubuntu
+      group: docker
+"""
+
+_MAIN_YML = """- hosts: all
+  become: true
+  remote_user: root
+
+  tasks:
+  - name: set docker to use systemd cgroups driver
+    copy:
+      dest: "/etc/docker/daemon.json"
+      content: |
+        {
+          "exec-opts": ["native.cgroupdriver=systemd"]
+        }
+  - name: restart docker
+    service:
+      name: docker
+      state: restarted
+  - name: Remove Docker cache
+    command: docker system prune --all --volumes --force
+  - name: Remove Docker image
+    command: docker rmi -f "{{ docker_image_name }}"
+    ignore_errors: yes
+  - name: Delete folders
+    file:
+      path: "{{ item }}"
+      state: absent
+    loop: "{{ volumes }}"
+  - name: Stop the running node container so its NVMe DB can be reset cleanly
+    docker_container:
+      name: "{{ docker_container_name }}"
+      state: stopped
+    ignore_errors: yes
+  - name: Reset node DB for a fresh genesis (Local NVMe persists across redeploys)
+    shell: rm -rf /var/lib/xrpld/db/* 2>/dev/null || true
+  - name: Create Docker Network
+    docker_network:
+      name: "{{ docker_network_name }}"
+      state: present
+  - name: Authenticate Docker to Artifact Registry (operator token, refreshed each deploy)
+    shell: echo "{{ ar_token }}" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
+    when: ar_token | default('') | length > 0
+  - name: Pull base image (the binary-in-an-image)
+    docker_image:
+      name: "{{ docker_image_name }}"
+      source: pull
+  - name: Copy node build context (Dockerfile, entrypoint, genesis) to the remote server
+    copy:
+      src: "{{ build_context }}/"
+      dest: /opt/ripple/build/
+  - name: Copy config files to the remote server
+    copy:
+      src: "{{ config_path }}/"
+      dest: /opt/ripple/config/
+  - name: Build node image (wrap the binary image with the entrypoint, like standalone)
+    docker_image:
+      name: "{{ docker_build_tag }}"
+      source: build
+      force_source: yes
+      build:
+        path: /opt/ripple/build
+        pull: no
+  - name: Deploy Docker Image
+    docker_container:
+      name: "{{ docker_container_name }}"
+      image: "{{ docker_build_tag }}"
+      ports: "{{ docker_container_ports }}"
+      volumes: "{{ docker_volumes }}"
+      env: "{{ docker_env_variables }}"
+      networks:
+        - name: "{{ docker_network_name }}"
+      state: started
+      restart_policy: always
+      image_name_mismatch: recreate
+"""
+
+_CLEAN_YML = """- hosts: all
+  become: true
+  remote_user: root
+
+  tasks:
+  - name: Stop Docker Container
+    docker_container:
+      name: "{{ docker_container_name }}"
+      state: stopped
+    ignore_errors: yes
+  - name: Remove Docker cache
+    command: docker system prune --all --volumes --force
+  - name: Remove Docker image
+    command: docker rmi -f "{{ docker_image_name }}"
+    ignore_errors: yes
+  - name: Remove Docker network
+    docker_network:
+      name: "{{ docker_network_name }}"
+      state: absent
+  - name: Delete folders
+    file:
+      path: "{{ item }}"
+      state: absent
+    loop: "{{ volumes }}"
+"""
+
+# --- Nginx templates (use {group} and {ssh_port} placeholders) ---
+
+_NGINX_DEPS_TPL = """---
+- hosts: {group}
+  become: true
+  remote_user: root
+  tasks:
+  - name: Install NGINX
+    apt:
+      name: nginx
+      state: present
+  - name: Disable NGINX Default Virtual Host
+    command:
+      cmd: unlink /etc/nginx/sites-enabled/default
+    ignore_errors: yes
+  - name: Ensure UFW is installed
+    apt:
+      name: ufw
+      state: present
+  - name: Enable UFW
+    ufw:
+      state: enabled
+      policy: allow
+      direction: incoming
+  - name: Enable SSH
+    ufw:
+      rule: limit
+      port: {ssh_port}
+      proto: tcp
+  - name: Enable 80
+    ufw:
+      rule: allow
+      port: 80
+      proto: tcp
+  - name: Enable 443
+    ufw:
+      rule: allow
+      port: 443
+      proto: tcp
+  - name: Stop and disable the unattended-upgrades service
+    service:
+      name: unattended-upgrades
+      state: stopped
+      enabled: no
+  - name: Generate dhparam
+    command: openssl dhparam -out /etc/ssl/dhparam.pem 2048
+    args:
+      creates: "/etc/ssl/dhparam.pem"
+    become_user: root
+  - name: Delete existing ssl-params
+    file:
+      path: /etc/nginx/snippets/ssl-params.conf
+      state: absent
+  - name: Create NGINX SSL Params File
+    file:
+      path: /etc/nginx/snippets/ssl-params.conf
+      state: touch
+  - name: Write NGINX SSL Params
+    blockinfile:
+        path: /etc/nginx/snippets/ssl-params.conf
+        marker: ""
+        block: |
+          ssl_protocols TLSv1.2 TLSv1.3;
+          ssl_prefer_server_ciphers on;
+          ssl_ciphers "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH";
+          ssl_ecdh_curve secp384r1;
+          ssl_session_cache shared:SSL:10m;
+          add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
+          add_header X-Frame-Options DENY;
+          add_header X-Content-Type-Options nosniff;
+          add_header X-XSS-Protection "1; mode=block";
+          ssl_dhparam /etc/ssl/dhparam.pem;
+  - name: Restart NGINX
+    service:
+      name: nginx
+      state: restarted
+      enabled: yes
+"""
+
+_NGINX_SSL_HEADER_TPL = """- hosts: {group}
+  become: true
+  remote_user: root
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+"""
+
+# TLS-terminated nginx services: key -> (task label, vars prefix). The bare
+# domain ("wss") has no host label prefix; every other cn is <key>.<domain>.
+NGINX_TLS_SERVICES = {
+    "wss": ("WSS", "SSL"),
+    "rpc": ("RPC", "RPC_SSL"),
+    "faucet": ("Faucet", "FAUCET_SSL"),
+    "debug": ("Debug", "DEBUG_SSL"),
+    "compiler": ("Compiler", "COMPILER_SSL"),
+}
+
+
+def _nginx_tls_cn(service: str, domain: str) -> str:
+    return domain if service == "wss" else f"{service}.{domain}"
+
+
+def _ssl_selfsigned_tasks(label: str, var: str) -> str:
+    reg = f"{label.lower()}_cert"
+    return f"""  - name: Check {label} cert exists
+    stat:
+      path: "{{{{ {var}_CERT }}}}"
+    register: {reg}
+  - name: Create {label} private key
+    community.crypto.openssl_privatekey:
+      path: "{{{{ {var}_KEY }}}}"
+    when: not {reg}.stat.exists
+  - name: Create {label} CSR
+    community.crypto.openssl_csr_pipe:
+      privatekey_path: "{{{{ {var}_KEY }}}}"
+      common_name: "{{{{ {var}_CN }}}}"
+      organization_name: "{{{{ SSL_O }}}}"
+      organizational_unit_name: "{{{{ SSL_OU }}}}"
+    register: csr
+    when: not {reg}.stat.exists
+  - name: Create {label} self-signed certificate
+    community.crypto.x509_certificate:
+      path: "{{{{ {var}_CERT }}}}"
+      csr_content: "{{{{ csr.csr }}}}"
+      privatekey_path: "{{{{ {var}_KEY }}}}"
+      provider: selfsigned
+    when: not {reg}.stat.exists
+"""
+
+
+def _ssl_letsencrypt_tasks(cns: list, email: str) -> str:
+    # Publicly-trusted certs for DNS-only (unproxied) hostnames. Standalone
+    # HTTP-01 needs port 80, so nginx is stopped around issuance; the hooks
+    # are persisted into the renewal config for the certbot systemd timer.
+    email_arg = f"-m {email}" if email else "--register-unsafely-without-email"
+    parts = ["""  - name: Install certbot
+    apt:
+      name: certbot
+      state: present
+      update_cache: yes
+"""]
+    for cn in cns:
+        reg = "le_" + re.sub(r"[^a-z0-9]", "_", cn.lower())
+        parts.append(f"""  - name: Check Let's Encrypt cert for {cn}
+    stat:
+      path: /etc/letsencrypt/live/{cn}/fullchain.pem
+    register: {reg}
+  - name: Issue Let's Encrypt certificate for {cn}
+    command: >-
+      certbot certonly --standalone --non-interactive --agree-tos
+      {email_arg} --cert-name {cn} -d {cn}
+      --pre-hook "systemctl stop nginx || true"
+      --post-hook "systemctl start nginx || true"
+    when: not {reg}.stat.exists
+""")
+    return "".join(parts)
+
+
+_NGINX_MAIN_TPL.format(group=host.name),
         )
 
     def _write_redis(self, host_dir: str, host: ServicesHost) -> None:

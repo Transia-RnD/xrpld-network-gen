@@ -330,6 +330,7 @@ class LabRunner:
                 node_db_type=lab.node_db_type,
                 datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
                 num_ledgers=lab.online_delete,
+                tree_cache_target_entries=lab.tree_cache_target_entries,
             )
 
             node_dir = self.workspace.node_dir(cluster_dir, node_name)
@@ -396,6 +397,7 @@ class LabRunner:
                 node_db_type=lab.node_db_type,
                 datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
                 num_ledgers=lab.online_delete,
+                tree_cache_target_entries=lab.tree_cache_target_entries,
             )
 
             node_dir = self.workspace.node_dir(cluster_dir, node_name)
