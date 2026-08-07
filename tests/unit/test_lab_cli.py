@@ -1095,3 +1095,28 @@ class TestFlattenIps:
         assert _flatten_ips(None) == []
         assert _flatten_ips([]) == []
         assert _flatten_ips(["", "  "]) == []
+
+
+class TestGenesisFlagParsing:
+    """--genesis must accept true/false values, not truthy strings."""
+
+    def _parse(self, value):
+        parser = _build_parser()
+        return parser.parse_args(["create:network", "--genesis", value]).genesis
+
+    def test_false_strings_parse_false(self):
+        for v in ("False", "false", "0", "no"):
+            assert self._parse(v) is False
+
+    def test_true_strings_parse_true(self):
+        for v in ("True", "true", "1", "yes"):
+            assert self._parse(v) is True
+
+    def test_default_is_false(self):
+        parser = _build_parser()
+        assert parser.parse_args(["create:network"]).genesis is False
+
+    def test_garbage_rejected(self):
+        parser = _build_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["create:network", "--genesis", "maybe"])

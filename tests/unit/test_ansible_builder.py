@@ -821,3 +821,55 @@ class TestChaining:
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
         result = builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
         assert result is builder
+
+
+# ---------------------------------------------------------------------------
+# Genesis vs rolling main.yml
+# ---------------------------------------------------------------------------
+
+
+class TestMainYmlGenesisModes:
+    def _main_yml(self, tmp_path, genesis: bool) -> str:
+        cluster_dir = str(tmp_path / "cluster")
+        os.makedirs(cluster_dir, exist_ok=True)
+        builder = AnsibleBuilder(
+            cluster_dir=cluster_dir,
+            config=_basic_config(),
+            image_name="transia/cluster:abc123",
+            genesis=genesis,
+        )
+        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
+        builder.write()
+        with open(os.path.join(builder.ansible_dir, "main.yml")) as f:
+            return f.read()
+
+    def test_genesis_main_yml_resets_state(self, tmp_path):
+        content = self._main_yml(tmp_path, genesis=True)
+        assert "rm -rf /var/lib/xrpld/db/*" in content
+        assert "docker system prune" in content
+        assert "serial:" not in content
+
+    def test_genesis_main_yml_is_valid_yaml(self, tmp_path):
+        plays = yaml.safe_load(self._main_yml(tmp_path, genesis=True))
+        assert plays[0]["hosts"] == "all"
+        names = [t["name"] for t in plays[0]["tasks"]]
+        assert "Deploy Docker Image" in names
+
+    def test_rolling_main_yml_preserves_state(self, tmp_path):
+        content = self._main_yml(tmp_path, genesis=False)
+        assert "rm -rf /var/lib/xrpld/db/*" not in content
+        assert "docker system prune" not in content
+        assert "Delete folders" not in content
+
+    def test_rolling_main_yml_is_serial_and_valid(self, tmp_path):
+        plays = yaml.safe_load(self._main_yml(tmp_path, genesis=False))
+        assert plays[0]["serial"] == 1
+        names = [t["name"] for t in plays[0]["tasks"]]
+        assert "Deploy Docker Image" in names
+        assert "restart docker" not in names
+
+    def test_default_is_genesis(self, tmp_path):
+        cluster_dir = str(tmp_path / "cluster-default")
+        os.makedirs(cluster_dir, exist_ok=True)
+        builder = AnsibleBuilder(cluster_dir, _basic_config(), "transia/cluster:abc")
+        assert builder.genesis is True

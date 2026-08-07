@@ -50,11 +50,15 @@ class AnsibleBuilder:
         config: AnsibleConfig,
         image_name: str,
         network_name: str = "loadnet",
+        genesis: bool = True,
     ):
         self.cluster_dir = cluster_dir
         self.config = config
         self.image_name = image_name
         self.network_name = network_name
+        # genesis=True: reset every node's state for a fresh chain, all hosts in parallel.
+        # genesis=False: preserve db/config and roll one host at a time (live network).
+        self.genesis = genesis
         self.ansible_dir = os.path.join(cluster_dir, "ansible")
         self._nodes: List[AnsibleNode] = []
 
@@ -187,7 +191,11 @@ class AnsibleBuilder:
     # ------------------------------------------------------------------
 
     def _write_main_yml(self) -> None:
-        self._file_write(os.path.join(self.ansible_dir, "main.yml"), _MAIN_YML)
+        if self.genesis:
+            content = _MAIN_HEADER + _MAIN_RESET_TASKS + _MAIN_DEPLOY_TASKS
+        else:
+            content = _MAIN_HEADER_ROLLING + _MAIN_DEPLOY_TASKS
+        self._file_write(os.path.join(self.ansible_dir, "main.yml"), content)
 
     # ------------------------------------------------------------------
     # clean.yml / clean.sh
@@ -558,7 +566,7 @@ _DEPS_YML = """---
       group: docker
 """
 
-_MAIN_YML = """- hosts: all
+_MAIN_HEADER = """- hosts: all
   become: true
   remote_user: root
 
@@ -574,7 +582,19 @@ _MAIN_YML = """- hosts: all
     service:
       name: docker
       state: restarted
-  - name: Remove Docker cache
+"""
+
+# Rolling variant: one host at a time so the network keeps quorum, no docker daemon
+# restart (it would bounce the running node), no state reset.
+_MAIN_HEADER_ROLLING = """- hosts: all
+  become: true
+  remote_user: root
+  serial: 1
+
+  tasks:
+"""
+
+_MAIN_RESET_TASKS = """  - name: Remove Docker cache
     command: docker system prune --all --volumes --force
   - name: Remove Docker image
     command: docker rmi -f "{{ docker_image_name }}"
@@ -591,7 +611,9 @@ _MAIN_YML = """- hosts: all
     ignore_errors: yes
   - name: Reset node DB for a fresh genesis (Local NVMe persists across redeploys)
     shell: rm -rf /var/lib/xrpld/db/* 2>/dev/null || true
-  - name: Create Docker Network
+"""
+
+_MAIN_DEPLOY_TASKS = """  - name: Create Docker Network
     docker_network:
       name: "{{ docker_network_name }}"
       state: present
@@ -848,8 +870,8 @@ _NGINX_MAIN_TPL = """- hosts: {group}
           server {{
               listen 443 ssl;
               server_name "{{{{ SSL_CN }}}}";
-              ssl_certificate "/etc/ssl/certs/{{{{ SSL_CN }}}}.csr.pem";
-              ssl_certificate_key "/etc/ssl/private/{{{{ SSL_CN }}}}.pem";
+              ssl_certificate "{{{{ SSL_CERT }}}}";
+              ssl_certificate_key "{{{{ SSL_KEY }}}}";
               include /etc/nginx/snippets/ssl-params.conf;
               access_log /var/log/nginx/access.log;
               location / {{
@@ -896,8 +918,8 @@ _NGINX_MAIN_TPL = """- hosts: {group}
           server {{
               listen 443 ssl;
               server_name "{{{{ RPC_SSL_CN }}}}";
-              ssl_certificate "/etc/ssl/certs/{{{{ RPC_SSL_CN }}}}.csr.pem";
-              ssl_certificate_key "/etc/ssl/private/{{{{ RPC_SSL_CN }}}}.pem";
+              ssl_certificate "{{{{ RPC_SSL_CERT }}}}";
+              ssl_certificate_key "{{{{ RPC_SSL_KEY }}}}";
               include /etc/nginx/snippets/ssl-params.conf;
               access_log /var/log/nginx/access.log;
               location / {{
@@ -944,8 +966,8 @@ _NGINX_MAIN_TPL = """- hosts: {group}
           server {{
               listen 443 ssl;
               server_name "{{{{ FAUCET_SSL_CN }}}}";
-              ssl_certificate "/etc/ssl/certs/{{{{ FAUCET_SSL_CN }}}}.csr.pem";
-              ssl_certificate_key "/etc/ssl/private/{{{{ FAUCET_SSL_CN }}}}.pem";
+              ssl_certificate "{{{{ FAUCET_SSL_CERT }}}}";
+              ssl_certificate_key "{{{{ FAUCET_SSL_KEY }}}}";
               include /etc/nginx/snippets/ssl-params.conf;
               access_log /var/log/nginx/access.log;
               location / {{
@@ -991,8 +1013,8 @@ _NGINX_MAIN_TPL = """- hosts: {group}
           server {{
               listen 443 ssl;
               server_name "{{{{ DEBUG_SSL_CN }}}}";
-              ssl_certificate "/etc/ssl/certs/{{{{ DEBUG_SSL_CN }}}}.csr.pem";
-              ssl_certificate_key "/etc/ssl/private/{{{{ DEBUG_SSL_CN }}}}.pem";
+              ssl_certificate "{{{{ DEBUG_SSL_CERT }}}}";
+              ssl_certificate_key "{{{{ DEBUG_SSL_KEY }}}}";
               include /etc/nginx/snippets/ssl-params.conf;
               access_log /var/log/nginx/access.log;
               location / {{
@@ -1038,8 +1060,8 @@ _NGINX_MAIN_TPL = """- hosts: {group}
           server {{
               listen 443 ssl;
               server_name "{{{{ COMPILER_SSL_CN }}}}";
-              ssl_certificate "/etc/ssl/certs/{{{{ COMPILER_SSL_CN }}}}.csr.pem";
-              ssl_certificate_key "/etc/ssl/private/{{{{ COMPILER_SSL_CN }}}}.pem";
+              ssl_certificate "{{{{ COMPILER_SSL_CERT }}}}";
+              ssl_certificate_key "{{{{ COMPILER_SSL_KEY }}}}";
               include /etc/nginx/snippets/ssl-params.conf;
               access_log /var/log/nginx/access.log;
               location / {{

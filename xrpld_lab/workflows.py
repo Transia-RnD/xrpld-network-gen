@@ -269,6 +269,14 @@ class LabRunner:
             publisher = PublisherClient()
             vl_keys = publisher.get_keys()
             if not vl_keys:
+                # Fresh VL keys change the network identity — never mint them
+                # silently for a network being preserved.
+                if not lab.genesis:
+                    raise RuntimeError(
+                        "non-genesis deploy but no VL publisher keys in this "
+                        "workspace — run from the workspace that created the "
+                        "network (or restore its keystore/)"
+                    )
                 publisher.create_keys()
                 vl_keys = publisher.get_keys()
 
@@ -286,6 +294,12 @@ class LabRunner:
                 vc = ValidatorClient(node_name)
                 key_path = f"keystore/{node_name}/key.json"
                 if not os.path.exists(key_path):
+                    if not lab.genesis:
+                        raise RuntimeError(
+                            f"non-genesis deploy but {key_path} is missing — "
+                            "a regenerated validator key would change the "
+                            "network identity"
+                        )
                     vc.create_keys()
                     vc.set_domain(f"{protocol_name}.{node_name}.transia.co")
                     vc.create_token()
@@ -361,7 +375,9 @@ class LabRunner:
                 network=True,
                 binary=source.build_type == BuildType.BINARY,
                 version=name,
-                include_genesis=True,
+                # Non-genesis: no genesis.json in the image and a plain entrypoint —
+                # the node boots from its preserved db and syncs with its peers.
+                include_genesis=lab.genesis or lab.db_seed,
                 quorum=lab.effective_quorum,
                 standalone="--valid" if lab.genesis else None,
                 db_seed=lab.db_seed,
@@ -427,7 +443,9 @@ class LabRunner:
                 network=True,
                 binary=source.build_type == BuildType.BINARY,
                 version=name,
-                include_genesis=True,
+                # Non-genesis: no genesis.json in the image and a plain entrypoint —
+                # the node boots from its preserved db and syncs with its peers.
+                include_genesis=lab.genesis or lab.db_seed,
                 quorum=lab.effective_quorum,
                 standalone="--valid" if lab.genesis else None,
                 db_seed=lab.db_seed,
@@ -507,6 +525,7 @@ class LabRunner:
             cluster_dir=cluster_dir,
             config=lab.ansible,
             image_name=image_name,
+            genesis=lab.genesis,
         )
 
         for i in range(1, lab.num_validators + 1):

@@ -69,6 +69,18 @@ _XAHAU_IMPORT_VL_KEY: str = (
 # ---------------------------------------------------------------------------
 
 
+def _parse_bool(value: str) -> bool:
+    """argparse type for boolean values: 1/true/yes and 0/false/no (any case)."""
+    if isinstance(value, bool):
+        return value
+    lowered = value.strip().lower()
+    if lowered in ("1", "true", "yes", "y"):
+        return True
+    if lowered in ("0", "false", "no", "n"):
+        return False
+    raise argparse.ArgumentTypeError(f"expected a boolean, got {value!r}")
+
+
 def _add_network_args(p: argparse.ArgumentParser) -> None:
     """Add arguments shared by create:network and create:ansible."""
     p.add_argument("--log_level", default="trace", choices=["warning", "debug", "trace"])
@@ -78,7 +90,10 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--network_id", type=int, default=21337)
     p.add_argument("--build_server", default=None)
     p.add_argument("--build_version", default=None)
-    p.add_argument("--genesis", type=bool, default=False)
+    p.add_argument("--genesis", type=_parse_bool, default=False,
+                   help="True: fresh chain from a generated genesis (deploy wipes node "
+                        "state). False: join/preserve — nodes keep their db and boot "
+                        "normally.")
     p.add_argument("--db_seed", action="store_true",
                    help="Boot nodes with --load from a snapshot-restored db dir "
                         "(no genesis.json baked into the image)")
