@@ -332,14 +332,25 @@ def _resolve_service_dependencies(
     return ansible, log_level
 
 
+def _flatten_ips(seq) -> List[str]:
+    """Normalise an IP arg into a flat list. Accepts pre-split tokens
+    (--vips a b c) or a single whitespace/comma-joined string (--vips "a b c"),
+    so a shell that doesn't word-split (zsh) or a joined $VAR can't collapse the
+    fleet into one host (which silently made num_validators=1)."""
+    out: List[str] = []
+    for item in seq or []:
+        out.extend(tok for tok in str(item).replace(",", " ").split() if tok)
+    return out
+
+
 def _build_ansible_config_from_args(args) -> AnsibleConfig:
     """Build AnsibleConfig from CLI args (--vips, --pips, --ssh_*)."""
     return AnsibleConfig(
         ssh_port=args.ssh_port,
         ssh_user=args.ssh_user,
         ssh_key_path=args.ssh_key,
-        vips=args.vips or [],
-        pips=args.pips or [],
+        vips=_flatten_ips(args.vips),
+        pips=_flatten_ips(args.pips),
     )
 
 
@@ -365,8 +376,8 @@ def _build_ansible_config_from_file(path: str, args) -> AnsibleConfig:
         ssh_port=data.get("ssh_port", args.ssh_port),
         ssh_user=data.get("ssh_user", args.ssh_user),
         ssh_key_path=data.get("ssh_key_path", args.ssh_key),
-        vips=data.get("vips", args.vips or []),
-        pips=data.get("pips", args.pips or []),
+        vips=_flatten_ips(data.get("vips", args.vips)),
+        pips=_flatten_ips(data.get("pips", args.pips)),
         services=services,
     )
 

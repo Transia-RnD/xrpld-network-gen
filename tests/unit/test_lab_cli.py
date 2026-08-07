@@ -17,6 +17,7 @@ from xrpld_lab.cli import (
     _build_parser,
     build_lab_config,
     main,
+    _flatten_ips,
     _DEFAULT_VL_KEY,
     _XAHAU_IMPORT_VL_KEY,
     _XRPL_RELEASE_FALLBACK,
@@ -1074,3 +1075,23 @@ class TestMain:
             main()
 
         mock_deploy.assert_called_once_with(mock_ws, "my-cluster")
+
+
+class TestFlattenIps:
+    """_flatten_ips normalises IP args so a joined string can't collapse the fleet."""
+
+    def test_pre_split_tokens(self):
+        assert _flatten_ips(["a", "b", "c"]) == ["a", "b", "c"]
+
+    def test_single_joined_string(self):
+        # nargs="+" caller passing --vips "a b c d" (or zsh no-word-split)
+        assert _flatten_ips(["10.0.0.1 10.0.0.2 10.0.0.3 10.0.0.4"]) == \
+            ["10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"]
+
+    def test_comma_and_mixed(self):
+        assert _flatten_ips(["a,b", "c d"]) == ["a", "b", "c", "d"]
+
+    def test_empty_and_none(self):
+        assert _flatten_ips(None) == []
+        assert _flatten_ips([]) == []
+        assert _flatten_ips(["", "  "]) == []
