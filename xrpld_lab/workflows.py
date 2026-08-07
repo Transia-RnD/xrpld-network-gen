@@ -346,6 +346,7 @@ class LabRunner:
                 num_ledgers=lab.online_delete,
                 tree_cache_target_entries=lab.tree_cache_target_entries,
                 memory_limit=lab.memory_limit,
+                database_path=lab.database_path,
             )
 
             node_dir = self.workspace.node_dir(cluster_dir, node_name)
@@ -416,6 +417,7 @@ class LabRunner:
                 num_ledgers=lab.online_delete,
                 tree_cache_target_entries=lab.tree_cache_target_entries,
                 memory_limit=lab.memory_limit,
+                database_path=lab.database_path,
             )
 
             node_dir = self.workspace.node_dir(cluster_dir, node_name)

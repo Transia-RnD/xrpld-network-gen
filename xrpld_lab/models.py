@@ -480,6 +480,10 @@ class LabConfig:
     node_db_type: NodeDbType = NodeDbType.NUDB
     # online_delete ledger count for network nodes; None = disabled (full history).
     online_delete: Optional[int] = 256
+    # [database_path] (SQLite) for network nodes. Defaults to the node-db volume so a
+    # large tx history stays off the boot disk; pin it for a network already running
+    # elsewhere, or its relational db is stranded on redeploy.
+    database_path: str = "/var/lib/xrpld/db/rdb"
     # Explicit tree-cache entry target for network nodes; 0 = preset sizing.
     tree_cache_target_entries: int = 0
     # RAM budget in GB for the memory-pressure binary ([memory_limit]); None =

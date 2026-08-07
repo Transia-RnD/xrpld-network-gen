@@ -872,7 +872,8 @@ class TestMain:
             main()
 
         mock_build.assert_called_once()
-        mock_runner_cls.assert_called_once_with(mock_config)
+        assert mock_runner_cls.call_count == 1
+        assert mock_runner_cls.call_args.args[0] is mock_config
         mock_runner.run.assert_called_once()
 
     @patch("xrpld_lab.cli.LabRunner")
@@ -887,7 +888,8 @@ class TestMain:
             main()
 
         mock_build.assert_called_once()
-        mock_runner_cls.assert_called_once_with(mock_config)
+        assert mock_runner_cls.call_count == 1
+        assert mock_runner_cls.call_args.args[0] is mock_config
         mock_runner.run.assert_called_once()
 
     @patch("xrpld_lab.cli._build_parser")
@@ -1061,7 +1063,8 @@ class TestMain:
             main()
 
         mock_build.assert_called_once()
-        mock_runner_cls.assert_called_once_with(mock_config)
+        assert mock_runner_cls.call_count == 1
+        assert mock_runner_cls.call_args.args[0] is mock_config
         mock_runner.run.assert_called_once()
 
     @patch("xrpld_lab.cli._deploy_ansible")
@@ -1120,3 +1123,36 @@ class TestGenesisFlagParsing:
         parser = _build_parser()
         with pytest.raises(SystemExit):
             parser.parse_args(["create:network", "--genesis", "maybe"])
+
+
+class TestWorkspaceOverride:
+    """--workspace points at an existing network's keystore instead of copying it."""
+
+    def test_defaults_to_none(self):
+        parser = _build_parser()
+        args = parser.parse_args(["create:ansible", "--vips", "10.0.0.1",
+                                  "--pips", "10.0.0.2"])
+        assert args.workspace is None
+
+    def test_parsed_on_create_ansible(self):
+        parser = _build_parser()
+        args = parser.parse_args(["create:ansible", "--vips", "10.0.0.1",
+                                  "--pips", "10.0.0.2", "--workspace", "/srv/ws"])
+        assert args.workspace == "/srv/ws"
+
+    def test_parsed_on_deploy_ansible(self):
+        parser = _build_parser()
+        args = parser.parse_args(["deploy:ansible", "--name", "alphanet",
+                                  "--workspace", "/srv/ws"])
+        assert args.workspace == "/srv/ws"
+
+    @patch("xrpld_lab.cli.LabRunner")
+    @patch("xrpld_lab.cli.build_lab_config")
+    def test_workspace_passed_to_runner(self, mock_build, mock_runner_cls, tmp_path):
+        mock_build.return_value = MagicMock()
+        base = str(tmp_path / "ws")
+        with patch("sys.argv", ["xrpld-lab", "create:ansible", "--vips", "10.0.0.1",
+                                "--pips", "10.0.0.2", "--workspace", base]):
+            main()
+        passed = mock_runner_cls.call_args.args[1]
+        assert passed.base == base

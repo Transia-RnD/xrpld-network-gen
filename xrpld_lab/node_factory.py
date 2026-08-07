@@ -34,6 +34,7 @@ class NodeFactory:
         ips_urls: Optional[List[str]] = None,
         ips_fixed_urls: Optional[List[str]] = None,
         datagram_monitor: Optional[List[str]] = None,
+        database_path: str = "/var/lib/xrpld/db/rdb",
     ) -> NodeConfig:
         """Create a NodeConfig for a standalone node."""
         spec = get_spec(protocol)
@@ -50,7 +51,7 @@ class NodeFactory:
             ports=ports,
             server=ServerConfig(),
             node_db=node_db,
-            db_path="/var/lib/xrpld/db/rdb",
+            db_path=database_path,
             debug_path="/opt/ripple/log/debug.log",
             size_node="huge",
             log_level=log_level,
@@ -81,6 +82,7 @@ class NodeFactory:
         num_ledgers: Optional[int] = 256,
         tree_cache_target_entries: int = 0,
         memory_limit: Optional[int] = None,
+        database_path: str = "/var/lib/xrpld/db/rdb",
     ) -> NodeConfig:
         """Create a NodeConfig for a validator node in a network."""
         spec = get_spec(protocol)
@@ -114,7 +116,7 @@ class NodeFactory:
             ports=ports,
             server=ServerConfig(),
             node_db=node_db,
-            db_path="/var/lib/xrpld/db/rdb",
+            db_path=database_path,
             debug_path="/opt/ripple/log/debug.log",
             size_node="huge",
             log_level=log_level,
@@ -147,6 +149,7 @@ class NodeFactory:
         num_ledgers: Optional[int] = 256,
         tree_cache_target_entries: int = 0,
         memory_limit: Optional[int] = None,
+        database_path: str = "/var/lib/xrpld/db/rdb",
     ) -> NodeConfig:
         """Create a NodeConfig for a peer node in a network."""
         spec = get_spec(protocol)
@@ -164,7 +167,7 @@ class NodeFactory:
             ports=ports,
             server=ServerConfig(),
             node_db=node_db,
-            db_path="/var/lib/xrpld/db/rdb",
+            db_path=database_path,
             debug_path="/opt/ripple/log/debug.log",
             size_node="huge",
             log_level=log_level,

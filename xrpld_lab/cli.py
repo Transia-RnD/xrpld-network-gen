@@ -113,6 +113,9 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--online_delete", type=int, default=256,
                    help="online_delete ledger count for network nodes; "
                         "0 = disabled ([ledger_history] full — growth-study setting)")
+    p.add_argument("--database_path", default="/var/lib/xrpld/db/rdb",
+                   help="[database_path] (SQLite) for network nodes. Pin to the running "
+                        "network's existing path on a preserve deploy.")
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
     p.add_argument("--config_overrides", type=str, default=None,
                    help="Path to YAML/JSON file with config overrides")
@@ -139,6 +142,10 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
                    help="Drops per prefunded account (default 1000 XRP)")
     p.add_argument("--preload_currency", default="USD",
                    help="Currency code for preloaded trustlines")
+    p.add_argument("--workspace", default=None,
+                   help="Workspace root holding <cluster>-cluster and its keystore "
+                        "(default: ./workspace). Point at an existing network's "
+                        "workspace to reuse its identity instead of copying keys.")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -223,6 +230,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p = subparsers.add_parser("deploy:ansible",
                               help="Run ansible deployment for an existing cluster")
     p.add_argument("--name", required=True, help="Cluster name")
+    p.add_argument("--workspace", default=None,
+                   help="Workspace root holding <name>-cluster (default: ./workspace)")
 
     # -- health --------------------------------------------------------------
     p = subparsers.add_parser("health",
@@ -604,6 +613,7 @@ def _build_network_config(args, protocol, spec):
         quorum=args.quorum,
         node_db_type=NodeDbType(args.nodedb_type),
         online_delete=getattr(args, "online_delete", 256) or None,
+        database_path=getattr(args, "database_path", "/var/lib/xrpld/db/rdb"),
         tree_cache_target_entries=getattr(args, "tree_cache_target_entries", 0),
         memory_limit=getattr(args, "memory_limit", None),
         binary_name=args.binary_name,
@@ -633,14 +643,16 @@ def main() -> None:
         parser.print_help()
         return
 
+    # Workspace root holds each cluster's keystore — the network's identity. Point it at
+    # the canonical location for a live network instead of copying keys around.
+    ws_base = getattr(args, "workspace", None)
+    workspace = Workspace(ws_base) if ws_base else Workspace()
+
     # Commands that need LabConfig -> LabRunner
     if args.command in ("up:standalone", "create:network", "create:ansible"):
         lab = build_lab_config(args)
-        LabRunner(lab).run()
+        LabRunner(lab, workspace).run()
         return
-
-    # Operational commands (scripts, logs, etc.)
-    workspace = Workspace()
 
     if args.command == "health":
         from xrpld_lab.health import check_consensus
