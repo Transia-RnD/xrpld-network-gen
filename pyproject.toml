@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "xrpld-lab"
-version = "3.2.0"
+version = "3.3.0"
 description = "Build xrpld networks and standalone ledgers"
 authors = ["Denis Angell <dangell@transia.co>"]
 packages = [
