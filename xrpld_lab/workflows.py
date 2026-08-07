@@ -358,15 +358,16 @@ class LabRunner:
             vl_content = ValidatorsTxtBuilder(node, genesis=True).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
-            # Amendments + genesis
-            features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
-            if not lab.genesis:
-                features = {}
-            genesis = self._genesis(features, protocol_name)
-            write_file(
-                os.path.join(node_dir, "genesis.json"),
-                json.dumps(genesis, indent=4, sort_keys=True),
-            )
+            # Amendments + genesis. A preserved network has no genesis to write: the
+            # node boots from its existing db and takes amendments from the chain.
+            if lab.genesis:
+                features = parse_amendments(
+                    feature_lines, include_unsupported=self.lab.all_amendments)
+                genesis = self._genesis(features, protocol_name)
+                write_file(
+                    os.path.join(node_dir, "genesis.json"),
+                    json.dumps(genesis, indent=4, sort_keys=True),
+                )
 
             # Dockerfile
             dockerfile = DockerfileBuilder.build(
@@ -430,12 +431,14 @@ class LabRunner:
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             # Amendments + genesis (peers always get all amendments)
-            features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
-            genesis = self._genesis(features, protocol_name)
-            write_file(
-                os.path.join(node_dir, "genesis.json"),
-                json.dumps(genesis, indent=4, sort_keys=True),
-            )
+            if lab.genesis:
+                features = parse_amendments(
+                    feature_lines, include_unsupported=self.lab.all_amendments)
+                genesis = self._genesis(features, protocol_name)
+                write_file(
+                    os.path.join(node_dir, "genesis.json"),
+                    json.dumps(genesis, indent=4, sort_keys=True),
+                )
 
             # Dockerfile
             dockerfile = DockerfileBuilder.build(

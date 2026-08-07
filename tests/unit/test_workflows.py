@@ -1095,3 +1095,41 @@ class TestRunNetworkWithoutAnsible:
     def test_ansible_builder_not_called(self):
         self.runner._run_network()
         self.mocks["ansible_builder"].assert_not_called()
+
+
+class TestNonGenesisNetwork(TestRunNetworkWithAnsible):
+    """A preserved (non-genesis) network writes no genesis and keeps its identity."""
+
+    def test_no_genesis_written(self):
+        self.lab.genesis = False
+        LabRunner(self.lab, self.workspace).run()
+        written = [c.args[0] for c in self.mocks["write_file"].call_args_list]
+        assert not any("genesis.json" in p for p in written)
+
+    def test_genesis_written_when_genesis(self):
+        self.lab.genesis = True
+        LabRunner(self.lab, self.workspace).run()
+        written = [c.args[0] for c in self.mocks["write_file"].call_args_list]
+        assert any("genesis.json" in p for p in written)
+
+    def test_update_genesis_not_called_on_preserve(self):
+        self.lab.genesis = False
+        LabRunner(self.lab, self.workspace).run()
+        self.mocks["update_genesis"].assert_not_called()
+
+    def test_ansible_builder_gets_genesis_flag(self):
+        self.lab.genesis = False
+        LabRunner(self.lab, self.workspace).run()
+        assert self.mocks["ansible_builder"].call_args.kwargs["genesis"] is False
+
+    def test_missing_vl_keys_refused_on_preserve(self):
+        self.lab.genesis = False
+        self.mocks["publisher"].return_value.get_keys.return_value = None
+        with pytest.raises(RuntimeError, match="no VL publisher keys"):
+            LabRunner(self.lab, self.workspace).run()
+
+    def test_missing_validator_key_refused_on_preserve(self):
+        self.lab.genesis = False
+        self.mocks["exists"].return_value = False
+        with pytest.raises(RuntimeError, match="would change the"):
+            LabRunner(self.lab, self.workspace).run()
