@@ -665,6 +665,30 @@ class TestXrpldCfgBuilderFullStandalone:
         assert "[dex_feed]\n" in output
 
 
+class TestXrpldCfgBuilderMemoryLimit:
+    """[memory_limit] replaces the node_size/tree_cache stanzas when set."""
+
+    def test_memory_limit_present(self):
+        cfg = _make_standalone_config(memory_limit=16)
+        output = XrpldCfgBuilder(cfg).build()
+        assert "[memory_limit]\n16\n" in output
+
+    def test_memory_limit_replaces_node_size_and_tree_cache(self):
+        cfg = _make_standalone_config(
+            memory_limit=16, tree_cache_target_entries=40_000_000
+        )
+        output = XrpldCfgBuilder(cfg).build()
+        assert "[node_size]" not in output
+        assert "[tree_cache_ram_percent]" not in output
+        assert "[tree_cache_target_entries]" not in output
+
+    def test_absent_keeps_node_size_path(self):
+        cfg = _make_standalone_config()  # memory_limit defaults to None
+        output = XrpldCfgBuilder(cfg).build()
+        assert "[memory_limit]" not in output
+        assert "[node_size]\nhuge\n" in output
+
+
 class TestXrpldCfgBuilderFullValidator:
     """Full end-to-end test for a network validator config."""
 

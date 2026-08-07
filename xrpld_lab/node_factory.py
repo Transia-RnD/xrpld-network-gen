@@ -80,6 +80,7 @@ class NodeFactory:
         datagram_monitor: Optional[List[str]] = None,
         num_ledgers: Optional[int] = 256,
         tree_cache_target_entries: int = 0,
+        memory_limit: Optional[int] = None,
     ) -> NodeConfig:
         """Create a NodeConfig for a validator node in a network."""
         spec = get_spec(protocol)
@@ -126,6 +127,7 @@ class NodeFactory:
             amendment_majority_time=spec.amendment_majority_time,
             datagram_monitor=datagram_monitor or [],
             tree_cache_target_entries=tree_cache_target_entries,
+            memory_limit=memory_limit,
         )
 
     @staticmethod
@@ -144,6 +146,7 @@ class NodeFactory:
         datagram_monitor: Optional[List[str]] = None,
         num_ledgers: Optional[int] = 256,
         tree_cache_target_entries: int = 0,
+        memory_limit: Optional[int] = None,
     ) -> NodeConfig:
         """Create a NodeConfig for a peer node in a network."""
         spec = get_spec(protocol)
@@ -173,6 +176,7 @@ class NodeFactory:
             amendment_majority_time=spec.amendment_majority_time,
             datagram_monitor=datagram_monitor or [],
             tree_cache_target_entries=tree_cache_target_entries,
+            memory_limit=memory_limit,
         )
 
     @staticmethod

@@ -61,9 +61,12 @@ class XrpldCfgBuilder:
 
         out += self._server_section()
         out += self._port_sections()
-        out += self._node_size_section()
-        out += self._tree_cache_ram_percent_section()
-        out += self._tree_cache_target_entries_section()
+        if self.config.memory_limit is not None:
+            out += self._memory_limit_section()
+        else:
+            out += self._node_size_section()
+            out += self._tree_cache_ram_percent_section()
+            out += self._tree_cache_target_entries_section()
         out += self._consensus_reserve_threads_section()
         out += self._node_db_section()
         out += self._relational_db_section()
@@ -176,6 +179,10 @@ class XrpldCfgBuilder:
 
     def _node_size_section(self) -> str:
         return f"\n[node_size]\n{self.config.size_node}\n\n"
+
+    def _memory_limit_section(self) -> str:
+        # memory-pressure binary: RAM budget in GB, replaces [node_size].
+        return f"\n[memory_limit]\n{self.config.memory_limit}\n\n"
 
     def _tree_cache_ram_percent_section(self) -> str:
         return f"[tree_cache_ram_percent]\n{self.config.tree_cache_ram_percent}\n\n"

@@ -89,6 +89,10 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--tree_cache_target_entries", type=int, default=0,
                    help="Explicit [tree_cache_target_entries] for network nodes; "
                         "0 omits the stanza (node_size preset + RAM guardrail).")
+    p.add_argument("--memory_limit", type=int, default=None,
+                   help="RAM budget in GB ([memory_limit]) for the memory-pressure "
+                        "binary; replaces node_size/tree_cache stanzas. Omit for "
+                        "stock builds (node_size path).")
     p.add_argument("--online_delete", type=int, default=256,
                    help="online_delete ledger count for network nodes; "
                         "0 = disabled ([ledger_history] full — growth-study setting)")
@@ -569,6 +573,7 @@ def _build_network_config(args, protocol, spec):
         node_db_type=NodeDbType(args.nodedb_type),
         online_delete=getattr(args, "online_delete", 256) or None,
         tree_cache_target_entries=getattr(args, "tree_cache_target_entries", 0),
+        memory_limit=getattr(args, "memory_limit", None),
         binary_name=args.binary_name,
         import_vl_key=spec.default_import_vl_key,
         key_algorithm=key_algorithm,

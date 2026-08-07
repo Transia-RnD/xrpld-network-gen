@@ -224,6 +224,10 @@ class NodeConfig:
     # the stanza (node_size preset + RAM guardrail decide). Set when the cache
     # must hold the whole expected live tree (e.g. 25M-account growth study).
     tree_cache_target_entries: int = 0
+    # RAM budget in GB for the memory-pressure binary ([memory_limit]). When set,
+    # replaces [node_size]/[tree_cache_ram_percent]/[tree_cache_target_entries]
+    # (all removed on that branch); None keeps the node_size path for stock builds.
+    memory_limit: Optional[int] = None
     consensus_reserve_threads: int = 2
     log_level: str = "trace"
     private_peer: bool = False
@@ -478,6 +482,9 @@ class LabConfig:
     online_delete: Optional[int] = 256
     # Explicit tree-cache entry target for network nodes; 0 = preset sizing.
     tree_cache_target_entries: int = 0
+    # RAM budget in GB for the memory-pressure binary ([memory_limit]); None =
+    # node_size path (stock builds).
+    memory_limit: Optional[int] = None
     binary_name: str = "xrpld"
     # Perf-server XDGM sink as "<ip> <port>" (e.g. "10.128.0.2 9876"); None disables the
     # [datagram_monitor] stanza. Must be the server's INTERNAL IP (firewall is VPC-only).
