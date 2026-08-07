@@ -59,7 +59,7 @@ class TestXrplSpec:
         assert XRPL.default_build_version == "3.2.0-rc2"
 
     def test_default_network_id(self):
-        assert XRPL.default_network_id == 21337
+        assert XRPL.default_network_id == 1025
 
     def test_default_standalone_network_id(self):
         assert XRPL.default_standalone_network_id == 1

@@ -87,7 +87,9 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--protocol", default="xrpl")
     p.add_argument("--num_validators", type=int, default=3)
     p.add_argument("--num_peers", type=int, default=1)
-    p.add_argument("--network_id", type=int, default=21337)
+    p.add_argument("--network_id", type=int, default=None,
+                   help="Network id. Omit to use the protocol default; every real "
+                        "network should set its own (>1024 for replay protection).")
     p.add_argument("--build_server", default=None)
     p.add_argument("--build_version", default=None)
     p.add_argument("--genesis", type=_parse_bool, default=False,
@@ -153,7 +155,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--public_key", default=_DEFAULT_VL_KEY)
     p.add_argument("--import_key", default=None)
     p.add_argument("--protocol", default="xrpl")
-    p.add_argument("--network_id", type=int, default=21337)
+    p.add_argument("--network_id", type=int, default=None,
+                   help="Network id. Omit to use the protocol default; every real "
+                        "network should set its own (>1024 for replay protection).")
     p.add_argument("--network_type", default="standalone")
     p.add_argument("--server", default=None)
     p.add_argument("--version", default=None)
@@ -251,7 +255,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--import_key", default=None)
     p.add_argument("--protocol", default="xrpl")
     p.add_argument("--network_type", default="standalone")
-    p.add_argument("--network_id", type=int, default=21337)
+    p.add_argument("--network_id", type=int, default=None,
+                   help="Network id. Omit to use the protocol default; every real "
+                        "network should set its own (>1024 for replay protection).")
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
 
     # -- down:local ----------------------------------------------------------
@@ -473,7 +479,7 @@ def _build_standalone_config(args, protocol, spec):
         protocol=protocol,
         mode=DeployMode.STANDALONE,
         build_source=source,
-        network_id=args.network_id,
+        network_id=args.network_id or spec.default_standalone_network_id,
         log_level=args.log_level,
         node_db_type=NodeDbType(args.nodedb_type),
         add_ipfs=args.ipfs,
@@ -654,7 +660,7 @@ def main() -> None:
         start_local(
             protocol=args.protocol,
             network_type=args.network_type,
-            network_id=args.network_id,
+            network_id=args.network_id or get_spec(Protocol(args.protocol)).default_network_id,
             log_level=args.log_level,
             nodedb_type=args.nodedb_type,
             public_key=args.public_key,

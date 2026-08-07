@@ -52,7 +52,7 @@ class TestBuildParser:
         assert args.public_key == _DEFAULT_VL_KEY
         assert args.import_key is None
         assert args.protocol == "xrpl"
-        assert args.network_id == 21337
+        assert args.network_id is None
         assert args.network_type == "standalone"
         assert args.server is None
         assert args.version is None
@@ -67,7 +67,7 @@ class TestBuildParser:
         assert args.protocol == "xrpl"
         assert args.num_validators == 3
         assert args.num_peers == 1
-        assert args.network_id == 21337
+        assert args.network_id is None
         assert args.build_server is None
         assert args.build_version is None
         assert args.genesis is False
@@ -121,7 +121,7 @@ class TestBuildParser:
         assert args.import_key is None
         assert args.protocol == "xrpl"
         assert args.network_type == "standalone"
-        assert args.network_id == 21337
+        assert args.network_id is None
         assert args.nodedb_type == "NuDB"
 
     def test_down_local_exists(self):
@@ -500,12 +500,12 @@ class TestBuildLabConfigNetwork:
         assert cfg.import_vl_key == _XAHAU_IMPORT_VL_KEY
 
     def test_network_id_from_spec_when_default(self):
-        """When network_id is the CLI default (21339) and protocol is xrpl,
-        the spec default (21337) should be used via `args.network_id or spec.default_network_id`."""
+        """A falsy --network_id falls back to the spec default via
+        `args.network_id or spec.default_network_id`."""
         args = self._parse("--protocol", "xrpl", "--network_id", "0")
         cfg = build_lab_config(args)
         # 0 is falsy, so spec default should be used
-        assert cfg.network_id == 21337
+        assert cfg.network_id == 1025
 
     # -- GitHub URL mode (custom XRPL builds) --
 
