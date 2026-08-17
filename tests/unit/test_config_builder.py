@@ -525,10 +525,10 @@ class TestXrpldCfgBuilderTransactionQueue:
         assert "minimum_queue_size = 2000\n" in output
         assert "retry_sequence_percent = 25\n" in output
         assert "minimum_escalation_multiplier = 500\n" in output
-        assert "minimum_txn_in_ledger = 10000\n" in output
-        assert "minimum_txn_in_ledger_standalone = 10000\n" in output
-        assert "target_txn_in_ledger = 10000\n" in output
-        assert "maximum_txn_in_ledger = 10000\n" in output
+        assert "minimum_txn_in_ledger = 100000\n" in output
+        assert "minimum_txn_in_ledger_standalone = 100000\n" in output
+        assert "target_txn_in_ledger = 100000\n" in output
+        assert "maximum_txn_in_ledger = 100000\n" in output
         assert "normal_consensus_increase_percent = 20\n" in output
         assert "slow_consensus_decrease_percent = 50\n" in output
         assert "maximum_txn_per_account = 100000\n" in output
@@ -804,3 +804,84 @@ class TestValidatorsTxtBuilderImportVlKeys:
         output = builder.build()
         assert "[import_vl_keys]\n" in output
         assert "    ED_import_key_1\n" in output
+
+
+# ===========================================================================
+# [insight] / [perf] — the telemetry stanzas the Alloy sidecar requires
+# ===========================================================================
+
+
+class TestInsightSection:
+    def test_omitted_without_statsd_address(self):
+        out = XrpldCfgBuilder(_make_standalone_config()).build()
+        assert "[insight]" not in out
+
+    def test_emitted_with_statsd_address(self):
+        cfg = _make_standalone_config(
+            statsd_address="127.0.0.1:9125", statsd_prefix="alphanet.vnode1"
+        )
+        out = XrpldCfgBuilder(cfg).build()
+        assert "[insight]\n" in out
+        assert "server=statsd\n" in out
+        assert "address=127.0.0.1:9125\n" in out
+        assert "prefix=alphanet.vnode1\n" in out
+
+
+class TestPerfSection:
+    def test_omitted_without_perf_path(self):
+        out = XrpldCfgBuilder(_make_standalone_config()).build()
+        assert "[perf]" not in out
+
+    def test_emitted_with_perf_path(self):
+        cfg = _make_standalone_config(perf_path="/opt/ripple/log/perf.log")
+        out = XrpldCfgBuilder(cfg).build()
+        assert "[perf]\n" in out
+        assert "perf_log=/opt/ripple/log/perf.log\n" in out
+        assert "log_interval=2\n" in out
+
+
+class TestValidatorsTxtBootstrapVl:
+    """Static list + publisher list together: cold-start on static, converge on the VL."""
+
+    def test_bootstrap_emits_both(self):
+        cfg = _make_standalone_config(
+            validators=["nHUkey1"],
+            vl_sites=["https://vl.alphanet.xrpl.org"],
+            vl_keys=["ED_vl_key_1"],
+        )
+        out = ValidatorsTxtBuilder(cfg, genesis=True, bootstrap_vl=True).build()
+        assert "[validators]\n" in out
+        assert "    nHUkey1\n" in out
+        assert "[validator_list_sites]\n" in out
+        assert "    https://vl.alphanet.xrpl.org\n" in out
+        assert "[validator_list_keys]\n" in out
+        assert "    ED_vl_key_1\n" in out
+
+    def test_static_list_precedes_publisher_list(self):
+        cfg = _make_standalone_config(
+            validators=["nHUkey1"],
+            vl_sites=["https://vl.alphanet.xrpl.org"],
+            vl_keys=["ED_vl_key_1"],
+        )
+        out = ValidatorsTxtBuilder(cfg, genesis=True, bootstrap_vl=True).build()
+        assert out.index("[validators]") < out.index("[validator_list_sites]")
+
+    def test_default_stays_static_only(self):
+        cfg = _make_standalone_config(
+            validators=["nHUkey1"],
+            vl_sites=["https://vl.alphanet.xrpl.org"],
+            vl_keys=["ED_vl_key_1"],
+        )
+        out = ValidatorsTxtBuilder(cfg, genesis=True).build()
+        assert "[validators]\n" in out
+        assert "[validator_list_sites]" not in out
+
+    def test_bootstrap_ignored_in_vl_only_mode(self):
+        cfg = _make_standalone_config(
+            validators=["nHUkey1"],
+            vl_sites=["https://vl.alphanet.xrpl.org"],
+            vl_keys=["ED_vl_key_1"],
+        )
+        out = ValidatorsTxtBuilder(cfg, genesis=False, bootstrap_vl=True).build()
+        assert "[validators]\n" not in out
+        assert "[validator_list_sites]\n" in out

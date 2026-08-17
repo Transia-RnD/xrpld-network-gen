@@ -6,6 +6,7 @@ import yaml
 import pytest
 
 from xrpld_lab.models import (
+    AlloyConfig,
     AnsibleConfig,
     NginxConfig,
     RedisConfig,
@@ -873,3 +874,157 @@ class TestMainYmlGenesisModes:
         os.makedirs(cluster_dir, exist_ok=True)
         builder = AnsibleBuilder(cluster_dir, _basic_config(), "transia/cluster:abc")
         assert builder.genesis is True
+
+
+# ===========================================================================
+# Per-node SSH keys (drill access handed out and revoked one node at a time)
+# ===========================================================================
+
+
+class TestPerNodeSshKeys:
+    def _builder(self, tmp_path, ssh_keys):
+        cluster_dir = str(tmp_path / "keys-cluster")
+        os.makedirs(cluster_dir, exist_ok=True)
+        config = AnsibleConfig(
+            ssh_port=1988,
+            ssh_user="root",
+            ssh_key_path="~/.ssh/xrpl-labs",
+            vips=["10.0.0.1", "10.0.0.2"],
+            ssh_keys=ssh_keys,
+        )
+        builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc123")
+        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
+        builder.add_node("vnode2", "10.0.0.2", _validator_ports(2), f"{cluster_dir}/vnode2/config/")
+        return builder
+
+    def test_each_node_gets_its_own_key(self, tmp_path):
+        builder = self._builder(tmp_path, {
+            "10.0.0.1": "~/.ssh/alphanet/vnode1",
+            "10.0.0.2": "~/.ssh/alphanet/vnode2",
+        })
+        builder.write()
+        hosts = open(os.path.join(builder.ansible_dir, "hosts.txt")).read()
+        assert "10.0.0.1 ansible_port=1988 ansible_user=root ansible_ssh_private_key_file=~/.ssh/alphanet/vnode1" in hosts
+        assert "10.0.0.2 ansible_port=1988 ansible_user=root ansible_ssh_private_key_file=~/.ssh/alphanet/vnode2" in hosts
+
+    def test_unlisted_node_falls_back_to_cluster_key(self, tmp_path):
+        builder = self._builder(tmp_path, {"10.0.0.1": "~/.ssh/alphanet/vnode1"})
+        builder.write()
+        hosts = open(os.path.join(builder.ansible_dir, "hosts.txt")).read()
+        assert "10.0.0.2 ansible_port=1988 ansible_user=root ansible_ssh_private_key_file=~/.ssh/xrpl-labs" in hosts
+
+    def test_no_overrides_keeps_one_key_everywhere(self, tmp_path):
+        builder = self._builder(tmp_path, {})
+        builder.write()
+        hosts = open(os.path.join(builder.ansible_dir, "hosts.txt")).read()
+        assert hosts.count("ansible_ssh_private_key_file=~/.ssh/xrpl-labs") == 2
+
+
+# ===========================================================================
+# Alloy telemetry sidecar
+# ===========================================================================
+
+
+class TestAlloySidecar:
+    def _builder(self, tmp_path, alloy):
+        cluster_dir = str(tmp_path / "alloy-cluster")
+        os.makedirs(cluster_dir, exist_ok=True)
+        config = AnsibleConfig(
+            ssh_port=1988, ssh_user="root", ssh_key_path="~/.ssh/xrpl-labs",
+            vips=["10.0.0.1"], alloy=alloy,
+        )
+        builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc123")
+        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
+        return builder
+
+    def _alloy(self, tmp_path, **kw):
+        source = tmp_path / "alloy-src" / "docker"
+        source.mkdir(parents=True, exist_ok=True)
+        (source / "alloy.Dockerfile").write_text("FROM grafana/alloy\n")
+        defaults = dict(
+            push_host="xrpl-monitoring-push-staging.aws.peersyst.tech",
+            username="alphanet",
+            password="s3cret",
+            source_dir=str(tmp_path / "alloy-src"),
+            node_label_prefix="alphanet-",
+        )
+        defaults.update(kw)
+        return AlloyConfig(**defaults)
+
+    def test_no_alloy_yml_when_unconfigured(self, tmp_path):
+        builder = self._builder(tmp_path, None)
+        builder.write()
+        assert not os.path.exists(os.path.join(builder.ansible_dir, "alloy.yml"))
+
+    def test_alloy_yml_written(self, tmp_path):
+        builder = self._builder(tmp_path, self._alloy(tmp_path))
+        builder.write()
+        content = open(os.path.join(builder.ansible_dir, "alloy.yml")).read()
+        assert 'network_mode: "container:{{ docker_container_name }}"' in content
+
+    def test_build_context_copied(self, tmp_path):
+        builder = self._builder(tmp_path, self._alloy(tmp_path))
+        builder.write()
+        copied = os.path.join(builder.ansible_dir, "alloy", "docker", "alloy.Dockerfile")
+        assert os.path.exists(copied)
+
+    def test_host_vars_carry_credentials_and_node_label(self, tmp_path):
+        builder = self._builder(tmp_path, self._alloy(tmp_path))
+        builder.write()
+        import yaml
+        data = yaml.safe_load(
+            open(os.path.join(builder.ansible_dir, "host_vars", "10.0.0.1.yml")))
+        env = data["alloy_env_variables"]
+        assert env["ALLOY_NODE"] == "alphanet-vnode1"
+        assert env["ALLOY_PUSH_HOST"] == "xrpl-monitoring-push-staging.aws.peersyst.tech"
+        assert env["ALLOY_USERNAME"] == "alphanet"
+        assert env["ALLOY_PASSWORD"] == "s3cret"
+
+    def test_statsd_addresses_match_the_node_loopback(self, tmp_path):
+        """Sidecar shares the node netns, so listen and [insight] address are identical."""
+        builder = self._builder(tmp_path, self._alloy(tmp_path, statsd_port=19125))
+        builder.write()
+        import yaml
+        env = yaml.safe_load(
+            open(os.path.join(builder.ansible_dir, "host_vars", "10.0.0.1.yml"))
+        )["alloy_env_variables"]
+        assert env["ALLOY_STATSD_LISTEN"] == "127.0.0.1:19125"
+        assert env["ALLOY_RIPPLED_STATSD_ADDRESS"] == "127.0.0.1:19125"
+
+    def test_run_sh_runs_alloy_after_main(self, tmp_path):
+        builder = self._builder(tmp_path, self._alloy(tmp_path))
+        builder.write()
+        run = open(os.path.join(builder.ansible_dir, "run.sh")).read()
+        assert "run_always alloy.yml" in run
+        assert run.index("run_always main.yml") < run.index("run_always alloy.yml")
+
+    def test_clean_removes_the_sidecar(self, tmp_path):
+        builder = self._builder(tmp_path, self._alloy(tmp_path))
+        builder.write()
+        clean = open(os.path.join(builder.ansible_dir, "clean.yml")).read()
+        assert "alloy_container_name is defined" in clean
+
+    def test_per_node_credentials_override_the_cluster_pair(self, tmp_path):
+        alloy = self._alloy(tmp_path, credentials={
+            "vnode1": {"username": "alphanet-1", "password": "code-1"},
+        })
+        builder = self._builder(tmp_path, alloy)
+        builder.write()
+        import yaml
+        env = yaml.safe_load(
+            open(os.path.join(builder.ansible_dir, "host_vars", "10.0.0.1.yml"))
+        )["alloy_env_variables"]
+        assert env["ALLOY_USERNAME"] == "alphanet-1"
+        assert env["ALLOY_PASSWORD"] == "code-1"
+
+    def test_unlisted_node_uses_the_cluster_pair(self, tmp_path):
+        alloy = self._alloy(tmp_path, credentials={
+            "vnode9": {"username": "other", "password": "nope"},
+        })
+        builder = self._builder(tmp_path, alloy)
+        builder.write()
+        import yaml
+        env = yaml.safe_load(
+            open(os.path.join(builder.ansible_dir, "host_vars", "10.0.0.1.yml"))
+        )["alloy_env_variables"]
+        assert env["ALLOY_USERNAME"] == "alphanet"

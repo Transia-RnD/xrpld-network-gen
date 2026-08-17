@@ -83,6 +83,10 @@ class NodeFactory:
         tree_cache_target_entries: int = 0,
         memory_limit: Optional[int] = None,
         database_path: str = "/var/lib/xrpld/db/rdb",
+        vl_sites: Optional[List[str]] = None,
+        statsd_address: Optional[str] = None,
+        statsd_prefix: str = "rippled",
+        perf_path: Optional[str] = None,
     ) -> NodeConfig:
         """Create a NodeConfig for a validator node in a network."""
         spec = get_spec(protocol)
@@ -122,9 +126,12 @@ class NodeFactory:
             log_level=log_level,
             validator=validator,
             validators=validators,
-            vl_sites=["http://vl/vl.json"],
+            vl_sites=vl_sites or ["http://vl/vl.json"],
             vl_keys=[vl_key],
             import_vl_keys=[ivl_key] if ivl_key else [],
+            statsd_address=statsd_address,
+            statsd_prefix=statsd_prefix,
+            perf_path=perf_path,
             ips_fixed_urls=ips_fixed_urls,
             amendment_majority_time=spec.amendment_majority_time,
             datagram_monitor=datagram_monitor or [],
@@ -150,6 +157,10 @@ class NodeFactory:
         tree_cache_target_entries: int = 0,
         memory_limit: Optional[int] = None,
         database_path: str = "/var/lib/xrpld/db/rdb",
+        vl_sites: Optional[List[str]] = None,
+        statsd_address: Optional[str] = None,
+        statsd_prefix: str = "rippled",
+        perf_path: Optional[str] = None,
     ) -> NodeConfig:
         """Create a NodeConfig for a peer node in a network."""
         spec = get_spec(protocol)
@@ -172,9 +183,12 @@ class NodeFactory:
             size_node="huge",
             log_level=log_level,
             validators=list(validators),
-            vl_sites=["http://vl/vl.json"],
+            vl_sites=vl_sites or ["http://vl/vl.json"],
             vl_keys=[vl_key],
             import_vl_keys=[ivl_key] if ivl_key else [],
+            statsd_address=statsd_address,
+            statsd_prefix=statsd_prefix,
+            perf_path=perf_path,
             ips_fixed_urls=list(ips_fixed) if ips_fixed else [],
             amendment_majority_time=spec.amendment_majority_time,
             datagram_monitor=datagram_monitor or [],
@@ -229,12 +243,18 @@ class NodeFactory:
         ips_fixed: Optional[List[str]] = None,
         log_level: str = "trace",
         node_db_type: NodeDbType = NodeDbType.NUDB,
+        datagram_monitor: Optional[List[str]] = None,
+        num_ledgers: Optional[int] = 256,
+        tree_cache_target_entries: int = 0,
+        memory_limit: Optional[int] = None,
+        port_offset: int = 0,
     ) -> NodeConfig:
         """Create a NodeConfig for a local (native process) validator."""
         spec = get_spec(protocol)
-        ports = PortSet.for_node(index, NodeRole.VALIDATOR)
+        ports = PortSet.for_node(index, NodeRole.VALIDATOR, port_offset)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.LOCAL)
-        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
+        # None = online_delete off, [ledger_history] full (growth-study setting)
+        node_db.num_ledgers = num_ledgers
 
         # Validator identity: own public key from all_validators (1-based index)
         self_key = all_validators[index - 1]
@@ -272,6 +292,9 @@ class NodeFactory:
             import_vl_keys=[ivl_key] if ivl_key else [],
             ips_fixed_urls=ips_fixed_urls,
             amendment_majority_time=spec.amendment_majority_time,
+            datagram_monitor=datagram_monitor or [],
+            tree_cache_target_entries=tree_cache_target_entries,
+            memory_limit=memory_limit,
         )
 
     @staticmethod
@@ -286,12 +309,18 @@ class NodeFactory:
         ips_fixed: Optional[List[str]] = None,
         log_level: str = "trace",
         node_db_type: NodeDbType = NodeDbType.NUDB,
+        datagram_monitor: Optional[List[str]] = None,
+        num_ledgers: Optional[int] = 256,
+        tree_cache_target_entries: int = 0,
+        memory_limit: Optional[int] = None,
+        port_offset: int = 0,
     ) -> NodeConfig:
         """Create a NodeConfig for a local peer node."""
         spec = get_spec(protocol)
-        ports = PortSet.for_node(index, NodeRole.PEER)
+        ports = PortSet.for_node(index, NodeRole.PEER, port_offset)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.LOCAL)
-        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
+        # None = online_delete off, [ledger_history] full (growth-study setting)
+        node_db.num_ledgers = num_ledgers
 
         return NodeConfig(
             name=name,
@@ -312,4 +341,7 @@ class NodeFactory:
             import_vl_keys=[ivl_key] if ivl_key else [],
             ips_fixed_urls=list(ips_fixed) if ips_fixed else [],
             amendment_majority_time=spec.amendment_majority_time,
+            datagram_monitor=datagram_monitor or [],
+            tree_cache_target_entries=tree_cache_target_entries,
+            memory_limit=memory_limit,
         )

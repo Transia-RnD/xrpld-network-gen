@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 from dataclasses import dataclass
 from typing import List
 
@@ -84,6 +85,8 @@ class AnsibleBuilder:
         self._write_main_yml()
         self._write_clean_yml()
         self._write_clean_sh()
+        if self.config.alloy:
+            self._write_alloy()
 
         for svc_host in self.config.services:
             self._write_services_host(svc_host)
@@ -121,7 +124,7 @@ class AnsibleBuilder:
         return (
             f"{ip} ansible_port={c.ssh_port}"
             f" ansible_user={c.ssh_user}"
-            f" ansible_ssh_private_key_file={c.ssh_key_path}"
+            f" ansible_ssh_private_key_file={c.key_for(ip)}"
             f" vars_file=host_vars/{ip}.yml "
         )
 
@@ -166,6 +169,7 @@ class AnsibleBuilder:
                 ],
                 "peer_port": node.ports.peer,
                 "ssh_port": self.config.ssh_port,
+                **self._alloy_host_vars(node),
                 # /var/lib/xrpld/db is a Local NVMe mountpoint — excluded from the cleanup
                 # rmtree (can't delete a live mount; it's ephemeral and fresh on boot anyway).
                 "volumes": [
@@ -217,6 +221,42 @@ class AnsibleBuilder:
     # ------------------------------------------------------------------
     # Per-ServicesHost file generation
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Alloy telemetry sidecar
+    # ------------------------------------------------------------------
+
+    def _alloy_host_vars(self, node: AnsibleNode) -> dict:
+        a = self.config.alloy
+        if not a:
+            return {}
+        statsd = f"127.0.0.1:{a.statsd_port}"
+        creds = a.creds_for(node.name)
+        return {
+            "alloy_container_name": a.container_name,
+            "alloy_image": a.image,
+            "alloy_env_variables": {
+                "ALLOY_NODE": a.node_label(node.name),
+                "ALLOY_PUSH_HOST": a.push_host,
+                "ALLOY_USERNAME": creds["username"],
+                "ALLOY_PASSWORD": creds["password"],
+                # Sidecar shares the node's netns, so both ends of the StatsD hop are
+                # the same loopback the node's [insight] stanza points at.
+                "ALLOY_STATSD_LISTEN": statsd,
+                "ALLOY_RIPPLED_STATSD_ADDRESS": statsd,
+                "ALLOY_STATSD_RELAY_ADDR": a.statsd_relay_addr,
+            },
+            "alloy_rippled_config": a.rippled_config_path,
+            "alloy_rippled_log_dir": a.rippled_log_dir,
+        }
+
+    def _write_alloy(self) -> None:
+        a = self.config.alloy
+        alloy_dir = os.path.join(self.ansible_dir, "alloy")
+        if os.path.isdir(alloy_dir):
+            shutil.rmtree(alloy_dir)
+        shutil.copytree(a.source_dir, alloy_dir)
+        self._file_write(os.path.join(self.ansible_dir, "alloy.yml"), _ALLOY_YML)
 
     def _write_services_host(self, host: ServicesHost) -> None:
         host_dir = os.path.join(self.ansible_dir, "services", host.name)
@@ -303,6 +343,11 @@ class AnsibleBuilder:
             "run_once deps deps.yml",
             'run_always main.yml -e ar_token="$AR_TOKEN"',
         ]
+
+        if self.config.alloy:
+            lines.append("")
+            lines.append("# --- Telemetry sidecar (re-run after every node deploy) ---")
+            lines.append("run_always alloy.yml")
 
         for host in self.config.services:
             n = host.name
@@ -658,11 +703,65 @@ _MAIN_DEPLOY_TASKS = """  - name: Create Docker Network
       image_name_mismatch: recreate
 """
 
+# Alloy runs in the node container's network namespace, so rippled's [insight] loopback
+# address reaches it with no published port. A recreated node container tears the namespace
+# down, which is why this runs after every main.yml.
+_ALLOY_YML = """---
+- hosts: all
+  become: true
+  remote_user: root
+
+  tasks:
+  - name: Copy the Alloy build context to the remote server
+    copy:
+      src: alloy/
+      dest: /opt/xrpl-monitoring/
+  - name: Build the Alloy image
+    docker_image:
+      name: "{{ alloy_image }}"
+      source: build
+      force_source: yes
+      build:
+        path: /opt/xrpl-monitoring
+        dockerfile: docker/alloy.Dockerfile
+        pull: no
+  - name: Wait for the node to write its perf log (the Alloy preflight requires it)
+    wait_for:
+      path: "{{ alloy_rippled_log_dir }}/perf.log"
+      timeout: 180
+    ignore_errors: yes
+  - name: Deploy the Alloy sidecar
+    docker_container:
+      name: "{{ alloy_container_name }}"
+      image: "{{ alloy_image }}"
+      network_mode: "container:{{ docker_container_name }}"
+      volumes:
+        - "{{ alloy_rippled_config }}:/rippled-config/rippled.cfg:ro"
+        - "{{ alloy_rippled_log_dir }}:/rippled-logs:ro"
+        - "alloy-data-{{ docker_container_name }}:/var/lib/alloy/data"
+      env: "{{ alloy_env_variables }}"
+      state: started
+      restart_policy: always
+      recreate: yes
+  - name: Report the sidecar state
+    command: docker inspect -f '{{{{ .State.Status }}}}' "{{ alloy_container_name }}"
+    register: alloy_state
+    changed_when: false
+  - debug:
+      msg: "alloy={{ alloy_state.stdout }}"
+"""
+
 _CLEAN_YML = """- hosts: all
   become: true
   remote_user: root
 
   tasks:
+  - name: Remove the Alloy sidecar (its netns is the node container's)
+    docker_container:
+      name: "{{ alloy_container_name }}"
+      state: absent
+    when: alloy_container_name is defined
+    ignore_errors: yes
   - name: Stop Docker Container
     docker_container:
       name: "{{ docker_container_name }}"

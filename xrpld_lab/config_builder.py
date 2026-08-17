@@ -74,6 +74,8 @@ class XrpldCfgBuilder:
         out += self._ledger_history_section()
         out += self._database_path_section()
         out += self._debug_logfile_section()
+        out += self._insight_section()
+        out += self._perf_section()
         out += self._sntp_servers_section()
         out += self._ips_section()
         out += self._ips_fixed_section()
@@ -236,6 +238,27 @@ class XrpldCfgBuilder:
 
     def _debug_logfile_section(self) -> str:
         return f"[debug_logfile]\n{self.config.debug_path}\n\n"
+
+    # -- insight / perf (telemetry the Alloy agent consumes) -------------------
+
+    def _insight_section(self) -> str:
+        addr = self.config.statsd_address
+        if not addr:
+            return ""
+        out = "[insight]\n"
+        out += "server=statsd\n"
+        out += f"address={addr}\n"
+        out += f"prefix={self.config.statsd_prefix}\n\n"
+        return out
+
+    def _perf_section(self) -> str:
+        path = self.config.perf_path
+        if not path:
+            return ""
+        out = "[perf]\n"
+        out += f"perf_log={path}\n"
+        out += f"log_interval={self.config.perf_log_interval}\n\n"
+        return out
 
     # -- sntp_servers ---------------------------------------------------------
 
@@ -430,15 +453,26 @@ class XrpldCfgBuilder:
 class ValidatorsTxtBuilder:
     """Produces the ``validators.txt`` content string from a :class:`NodeConfig`."""
 
-    def __init__(self, config: NodeConfig, genesis: bool = False):
+    def __init__(
+        self,
+        config: NodeConfig,
+        genesis: bool = False,
+        bootstrap_vl: bool = False,
+    ):
         self.config = config
         self.genesis = genesis
+        # Emit the static list AND the publisher list together. rippled unions both into
+        # the trusted set, so the chain cold-starts on the static keys and adopts the VL
+        # once the site is reachable. Ignored unless genesis is set.
+        self.bootstrap_vl = bootstrap_vl
 
     def build(self) -> str:
         out = ""
 
         if self.genesis:
             out += self._genesis_validators()
+            if self.bootstrap_vl:
+                out += self._vl_sites_and_keys()
         else:
             out += self._vl_sites_and_keys()
 

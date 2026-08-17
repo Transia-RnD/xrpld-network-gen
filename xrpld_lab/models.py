@@ -61,12 +61,15 @@ class PortSet:
     peer: int
 
     @classmethod
-    def for_node(cls, index: int, role: NodeRole) -> PortSet:
+    def for_node(cls, index: int, role: NodeRole, port_offset: int = 0) -> PortSet:
         """Calculate ports for a node based on its role and index.
 
         - VALIDATOR: base + index * 100
         - PEER: base + index * 10
         - STANDALONE: base ports (index is ignored)
+
+        port_offset shifts every port so a second cluster can run beside the first
+        (candidate binary next to a baseline) without colliding.
         """
         if role == NodeRole.VALIDATOR:
             offset = index * 100
@@ -76,6 +79,7 @@ class PortSet:
             offset = 0
         else:
             raise ValueError(f"Unknown node role: {role}")
+        offset += port_offset
 
         return cls(
             rpc_public=_RPC_PUBLIC + offset,
@@ -218,6 +222,13 @@ class NodeConfig:
     voting: VotingConfig = field(default_factory=VotingConfig)
     db_path: str = "/opt/ripple/lib/db"
     debug_path: str = "/opt/ripple/log/debug.log"
+    # [insight] StatsD sink as "<ip>:<port>"; None omits the stanza. The Alloy sidecar
+    # shares the node container's network namespace, so it listens on this same loopback.
+    statsd_address: Optional[str] = None
+    statsd_prefix: str = "rippled"
+    # [perf] perf_log path; None omits the stanza. Alloy requires this file to exist.
+    perf_path: Optional[str] = None
+    perf_log_interval: int = 2
     size_node: str = "huge"
     tree_cache_ram_percent: int = 50
     # Explicit tree-cache entry target ([tree_cache_target_entries]); 0 = omit
@@ -378,6 +389,56 @@ class AnsibleConfig:
     vips: List[str] = field(default_factory=list)
     pips: List[str] = field(default_factory=list)
     services: List[ServicesHost] = field(default_factory=list)
+    # Per-node private key overrides, keyed by node IP. A node listed here gets its own
+    # key in hosts.txt instead of the cluster-wide ssh_key_path, so drill access can be
+    # handed out and revoked one node at a time.
+    ssh_keys: Dict[str, str] = field(default_factory=dict)
+    # Grafana Alloy telemetry sidecar; None leaves nodes un-monitored.
+    alloy: Optional["AlloyConfig"] = None
+
+    def key_for(self, ip: str) -> str:
+        return self.ssh_keys.get(ip, self.ssh_key_path)
+
+
+@dataclass
+class AlloyConfig:
+    """Grafana Alloy sidecar shipping rippled StatsD + logs to xrpl-monitoring.
+
+    Runs in the node container's network namespace so rippled's [insight] loopback
+    address reaches Alloy without publishing a port.
+    """
+
+    push_host: str
+    # Build context holding docker/alloy.Dockerfile + alloy/ from the xrpl-monitoring repo.
+    source_dir: str
+    # Cluster-wide Basic Auth, used for any node absent from `credentials`.
+    username: str = ""
+    password: str = ""
+    # Per-node Basic Auth keyed by node name: {"vnode1": {"username": .., "password": ..}}.
+    # The monitoring backend maps each credential to its own tenant, so one credential per
+    # node keeps a leaked node credential from carrying the whole network's telemetry.
+    credentials: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    image: str = "xrpl-monitoring-alloy:local"
+    container_name: str = "xrpl-monitoring-alloy"
+    statsd_port: int = 9125
+    # Remote paths the sidecar mounts read-only. The preflight parses the config for
+    # [insight]/[debug_logfile]/[perf] and refuses to start if any is missing.
+    rippled_config_path: str = "/opt/ripple/config/xrpld.cfg"
+    rippled_log_dir: str = "/opt/ripple/log"
+    # Prefixes the per-node `node` label pushed to Mimir/Loki (e.g. "alphanet-vnode1").
+    node_label_prefix: str = ""
+    # Optional existing StatsD collector to receive the raw rippled packets unchanged.
+    statsd_relay_addr: str = ""
+
+    def node_label(self, node_name: str) -> str:
+        return f"{self.node_label_prefix}{node_name}" if self.node_label_prefix else node_name
+
+    def creds_for(self, node_name: str) -> Dict[str, str]:
+        c = self.credentials.get(node_name, {})
+        return {
+            "username": c.get("username", self.username),
+            "password": c.get("password", self.password),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -461,6 +522,8 @@ class LabConfig:
     log_level: str = "trace"
     num_validators: int = 1
     num_peers: int = 0
+    # Shifts every node port, so a candidate cluster can run beside an existing one.
+    port_offset: int = 0
     genesis: bool = False
     # Boot nodes with --load from a snapshot-restored database directory instead of
     # a genesis JSON (large prefunded state, see loadtester snapshot_push.sh).
@@ -495,6 +558,15 @@ class LabConfig:
     datagram_monitor: Optional[str] = None
     import_vl_key: Optional[str] = None
     public_vl_key: Optional[str] = None
+    # Publisher list URL the nodes fetch ([validator_list_sites]). None keeps the
+    # compose-internal http://vl/vl.json, which only resolves inside a local cluster.
+    vl_site: Optional[str] = None
+    # Emit the static [validators] list alongside the publisher list so a fresh chain
+    # reaches quorum before the VL site is up, then converges on the VL.
+    bootstrap_vl: bool = False
+    # [insight] StatsD sink + [perf] log for the Alloy telemetry sidecar; None omits both.
+    statsd_address: Optional[str] = None
+    perf_path: Optional[str] = None
     add_ipfs: bool = False
     ansible: Optional[AnsibleConfig] = None
     gcp: Optional[GcpConfig] = None
@@ -513,3 +585,8 @@ class LabConfig:
         if self.quorum is not None:
             return self.quorum
         return max(self.num_validators - 1, 1)
+
+    def statsd_prefix_for(self, node_name: str) -> str:
+        """[insight] prefix for one node. The Alloy mapping strips it, so it only has to
+        be distinct enough to read in a raw relayed StatsD stream."""
+        return f"{self.mode.value}.{node_name}" if self.statsd_address else "rippled"

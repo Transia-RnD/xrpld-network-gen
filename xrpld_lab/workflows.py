@@ -347,6 +347,10 @@ class LabRunner:
                 tree_cache_target_entries=lab.tree_cache_target_entries,
                 memory_limit=lab.memory_limit,
                 database_path=lab.database_path,
+                vl_sites=[lab.vl_site] if lab.vl_site else None,
+                statsd_address=lab.statsd_address,
+                statsd_prefix=lab.statsd_prefix_for(node_name),
+                perf_path=lab.perf_path,
             )
 
             node_dir = self.workspace.node_dir(cluster_dir, node_name)
@@ -355,7 +359,8 @@ class LabRunner:
 
             # Config
             cfg_content = XrpldCfgBuilder(node).build()
-            vl_content = ValidatorsTxtBuilder(node, genesis=True).build()
+            vl_content = ValidatorsTxtBuilder(
+                node, genesis=True, bootstrap_vl=lab.bootstrap_vl).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             # Amendments + genesis. A preserved network has no genesis to write: the
@@ -419,6 +424,10 @@ class LabRunner:
                 tree_cache_target_entries=lab.tree_cache_target_entries,
                 memory_limit=lab.memory_limit,
                 database_path=lab.database_path,
+                vl_sites=[lab.vl_site] if lab.vl_site else None,
+                statsd_address=lab.statsd_address,
+                statsd_prefix=lab.statsd_prefix_for(node_name),
+                perf_path=lab.perf_path,
             )
 
             node_dir = self.workspace.node_dir(cluster_dir, node_name)
@@ -427,7 +436,8 @@ class LabRunner:
 
             # Config
             cfg_content = XrpldCfgBuilder(node).build()
-            vl_content = ValidatorsTxtBuilder(node, genesis=True).build()
+            vl_content = ValidatorsTxtBuilder(
+                node, genesis=True, bootstrap_vl=lab.bootstrap_vl).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             # Amendments + genesis (peers always get all amendments)
@@ -639,7 +649,7 @@ class LabRunner:
                 validators.append(keys["public_key"])
                 tokens.append(token)
 
-                ports = PortSet.for_node(i, NodeRole.VALIDATOR)
+                ports = PortSet.for_node(i, NodeRole.VALIDATOR, lab.port_offset)
                 ips_fixed.append(f"127.0.0.1 {ports.peer}")
 
         finally:
@@ -660,6 +670,11 @@ class LabRunner:
                 ips_fixed=ips_fixed,
                 log_level=lab.log_level,
                 node_db_type=lab.node_db_type,
+                datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
+                num_ledgers=lab.online_delete,
+                tree_cache_target_entries=lab.tree_cache_target_entries,
+                memory_limit=lab.memory_limit,
+                port_offset=lab.port_offset,
             )
 
             node_dir = self.workspace.node_dir(cluster_dir, node_name)
@@ -667,7 +682,8 @@ class LabRunner:
             self.workspace.log_dir(node_dir)
 
             cfg_content = XrpldCfgBuilder(node).build()
-            vl_content = ValidatorsTxtBuilder(node, genesis=True).build()
+            vl_content = ValidatorsTxtBuilder(
+                node, genesis=True, bootstrap_vl=lab.bootstrap_vl).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
@@ -690,6 +706,11 @@ class LabRunner:
                 ips_fixed=ips_fixed,
                 log_level=lab.log_level,
                 node_db_type=lab.node_db_type,
+                datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
+                num_ledgers=lab.online_delete,
+                tree_cache_target_entries=lab.tree_cache_target_entries,
+                memory_limit=lab.memory_limit,
+                port_offset=lab.port_offset,
             )
 
             node_dir = self.workspace.node_dir(cluster_dir, node_name)
@@ -697,7 +718,8 @@ class LabRunner:
             self.workspace.log_dir(node_dir)
 
             cfg_content = XrpldCfgBuilder(node).build()
-            vl_content = ValidatorsTxtBuilder(node, genesis=True).build()
+            vl_content = ValidatorsTxtBuilder(
+                node, genesis=True, bootstrap_vl=lab.bootstrap_vl).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)

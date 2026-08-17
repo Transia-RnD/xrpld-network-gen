@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from xrpld_lab.config import load_ansible_config, load_overrides_file
 from xrpld_lab.models import (
+    AlloyConfig,
     AnsibleConfig,
     BuildSource,
     BuildType,
@@ -119,6 +120,9 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
     p.add_argument("--config_overrides", type=str, default=None,
                    help="Path to YAML/JSON file with config overrides")
+    p.add_argument("--port_offset", type=int, default=0,
+                   help="Shift every node port by N so a candidate cluster can run "
+                        "beside an existing one (local mode).")
     p.add_argument("--datagram_monitor", type=str, default=None,
                    help="Perf-server XDGM sink as 'HOST PORT' (internal IP, e.g. "
                         "'10.128.0.2 9876'); adds [datagram_monitor] to every node cfg")
@@ -146,6 +150,19 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
                    help="Workspace root holding <cluster>-cluster and its keystore "
                         "(default: ./workspace). Point at an existing network's "
                         "workspace to reuse its identity instead of copying keys.")
+    p.add_argument("--vl_site", default=None,
+                   help="Publisher list URL for [validator_list_sites]. Default is the "
+                        "compose-internal http://vl/vl.json, which only resolves inside "
+                        "a local cluster.")
+    p.add_argument("--bootstrap_vl", action="store_true",
+                   help="Emit the static [validators] list alongside the publisher list, "
+                        "so a fresh chain reaches quorum before the VL site is up.")
+    p.add_argument("--statsd_address", default=None,
+                   help="[insight] StatsD sink as IP:PORT (e.g. 127.0.0.1:9125). Required "
+                        "by the Alloy telemetry sidecar.")
+    p.add_argument("--perf_path", default=None,
+                   help="[perf] perf_log path (e.g. /opt/ripple/log/perf.log). Required "
+                        "by the Alloy telemetry sidecar.")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -177,6 +194,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
     p.add_argument("--config_overrides", type=str, default=None,
                    help="Path to YAML/JSON file with config overrides")
+    p.add_argument("--port_offset", type=int, default=0,
+                   help="Shift every node port by N so a candidate cluster can run "
+                        "beside an existing one (local mode).")
     p.add_argument("--datagram_monitor", type=str, default=None,
                    help="Perf-server XDGM sink as 'HOST PORT' (e.g. '10.128.0.2 9876')")
     p.add_argument("--all-amendments", dest="all_amendments", action="store_true",
@@ -277,8 +297,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--name", required=True)
     p.add_argument("--node_id", type=int, required=True)
     p.add_argument("--node_type", required=True, choices=["validator", "peer"])
-    p.add_argument("--build_server", required=True)
-    p.add_argument("--build_version", required=True)
+    p.add_argument("--build_server", default=None,
+                   help="raw-binary source (used with --build_version when --image is not given)")
+    p.add_argument("--build_version", required=True,
+                   help="version label for the on-disk binary + Dockerfile COPY line")
+    p.add_argument("--image", default=None,
+                   help="docker image to extract /opt/xrpld/bin/xrpld from (local or GAR); "
+                        "overrides --build_server")
+    p.add_argument("--workspace", default=None,
+                   help="workspace root holding the cluster dir; defaults to ./workspace "
+                        "(set this when invoking from outside the lab root)")
 
     # -- enable:amendment ----------------------------------------------------
     p = subparsers.add_parser("enable:amendment", help="Enable amendment via RPC")
@@ -402,6 +430,7 @@ def _build_ansible_config_from_file(path: str, args) -> AnsibleConfig:
         )
         services.append(host)
 
+    alloy_data = data.get("alloy")
     return AnsibleConfig(
         ssh_port=data.get("ssh_port", args.ssh_port),
         ssh_user=data.get("ssh_user", args.ssh_user),
@@ -409,6 +438,8 @@ def _build_ansible_config_from_file(path: str, args) -> AnsibleConfig:
         vips=_flatten_ips(data.get("vips", args.vips)),
         pips=_flatten_ips(data.get("pips", args.pips)),
         services=services,
+        ssh_keys=dict(data.get("ssh_keys") or {}),
+        alloy=AlloyConfig(**alloy_data) if alloy_data else None,
     )
 
 
@@ -605,6 +636,7 @@ def _build_network_config(args, protocol, spec):
         log_level=log_level,
         num_validators=num_validators,
         num_peers=num_peers,
+        port_offset=getattr(args, "port_offset", 0),
         genesis=args.genesis,
         db_seed=getattr(args, "db_seed", False),
         all_amendments=getattr(args, "all_amendments", False),
@@ -621,6 +653,10 @@ def _build_network_config(args, protocol, spec):
         key_algorithm=key_algorithm,
         config_overrides=config_overrides,
         datagram_monitor=getattr(args, "datagram_monitor", None),
+        vl_site=getattr(args, "vl_site", None),
+        bootstrap_vl=getattr(args, "bootstrap_vl", False),
+        statsd_address=getattr(args, "statsd_address", None),
+        perf_path=getattr(args, "perf_path", None),
         ansible=ansible,
         preload_accounts=getattr(args, "preload_accounts", 0),
         preload_trustlines=getattr(args, "preload_trustlines", 0),
@@ -688,6 +724,7 @@ def main() -> None:
             args.node_type,
             args.build_server,
             args.build_version,
+            image=args.image,
         )
     elif args.command == "enable:amendment":
         enable_amendment(
