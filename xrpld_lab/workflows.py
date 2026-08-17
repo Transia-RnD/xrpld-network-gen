@@ -349,7 +349,7 @@ class LabRunner:
                 database_path=lab.database_path,
                 vl_sites=[lab.vl_site] if lab.vl_site else None,
                 statsd_address=lab.statsd_address,
-                statsd_prefix=lab.statsd_prefix_for(node_name),
+                statsd_prefix=lab.statsd_prefix_for(name, node_name),
                 perf_path=lab.perf_path,
             )
 
@@ -426,7 +426,7 @@ class LabRunner:
                 database_path=lab.database_path,
                 vl_sites=[lab.vl_site] if lab.vl_site else None,
                 statsd_address=lab.statsd_address,
-                statsd_prefix=lab.statsd_prefix_for(node_name),
+                statsd_prefix=lab.statsd_prefix_for(name, node_name),
                 perf_path=lab.perf_path,
             )
 

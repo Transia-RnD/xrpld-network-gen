@@ -7,6 +7,7 @@ import pytest
 
 from xrpld_lab.models import (
     AlloyConfig,
+    VlConfig,
     AnsibleConfig,
     NginxConfig,
     RedisConfig,
@@ -1028,3 +1029,106 @@ class TestAlloySidecar:
             open(os.path.join(builder.ansible_dir, "host_vars", "10.0.0.1.yml"))
         )["alloy_env_variables"]
         assert env["ALLOY_USERNAME"] == "alphanet"
+
+
+# ===========================================================================
+# Publisher-list (UNL) vhost
+# ===========================================================================
+
+
+class TestVlVhost:
+    def _builder(self, tmp_path, vl, le=None):
+        cluster_dir = str(tmp_path / "vl-cluster")
+        os.makedirs(cluster_dir, exist_ok=True)
+        if vl is not None:
+            vl_src = os.path.join(cluster_dir, "vl")
+            os.makedirs(vl_src, exist_ok=True)
+            with open(os.path.join(vl_src, "vl.json"), "w") as f:
+                f.write('{"public_key":"ED_PUB","blob":"eyJ2YWxpZGF0b3JzIjpbXX0="}')
+        nginx = NginxConfig(
+            domain="alphanet.xrpl.org",
+            letsencrypt_services=le or [],
+            letsencrypt_email="ops@example.com",
+        )
+        config = AnsibleConfig(
+            ssh_port=1988, ssh_user="root", ssh_key_path="~/.ssh/xrpl-labs",
+            vips=["10.0.0.1"], pips=["10.0.0.10"],
+            services=[ServicesHost(name="peer", ip="10.0.0.10", nginx=nginx, vl=vl)],
+        )
+        builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc123")
+        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
+        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        return builder
+
+    def _dir(self, builder):
+        return os.path.join(builder.ansible_dir, "services", "peer", "vl")
+
+    def test_not_written_when_unconfigured(self, tmp_path):
+        builder = self._builder(tmp_path, None)
+        builder.write()
+        assert not os.path.isdir(self._dir(builder))
+
+    def test_signed_list_is_staged_beside_the_playbook(self, tmp_path):
+        builder = self._builder(tmp_path, VlConfig())
+        builder.write()
+        staged = os.path.join(self._dir(builder), "vl.json")
+        assert os.path.exists(staged)
+        assert "ED_PUB" in open(staged).read()
+
+    def test_missing_list_fails_loudly(self, tmp_path):
+        """A 404 VL site looks to every node like an unreachable publisher."""
+        cluster_dir = str(tmp_path / "empty-cluster")
+        os.makedirs(cluster_dir, exist_ok=True)
+        config = AnsibleConfig(
+            ssh_port=1988, ssh_user="root", vips=["10.0.0.1"], pips=["10.0.0.10"],
+            services=[ServicesHost(name="peer", ip="10.0.0.10",
+                                   nginx=NginxConfig(domain="alphanet.xrpl.org"),
+                                   vl=VlConfig())],
+        )
+        builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
+        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        with pytest.raises(FileNotFoundError):
+            builder.write()
+
+    def test_hostname_is_vl_subdomain(self, tmp_path):
+        builder = self._builder(tmp_path, VlConfig())
+        builder.write()
+        import yaml
+        v = yaml.safe_load(open(os.path.join(self._dir(builder), "vars.yml")))
+        assert v["VL_SSL_CN"] == "vl.alphanet.xrpl.org"
+
+    def test_http_only_without_letsencrypt(self, tmp_path):
+        builder = self._builder(tmp_path, VlConfig())
+        builder.write()
+        import yaml
+        v = yaml.safe_load(open(os.path.join(self._dir(builder), "vars.yml")))
+        assert v["VL_TLS"] is False
+        assert "VL_SSL_CERT" not in v
+
+    def test_tls_block_when_letsencrypt_covers_vl(self, tmp_path):
+        builder = self._builder(tmp_path, VlConfig(), le=["vl"])
+        builder.write()
+        import yaml
+        v = yaml.safe_load(open(os.path.join(self._dir(builder), "vars.yml")))
+        assert v["VL_TLS"] is True
+        assert v["VL_SSL_CERT"] == "/etc/letsencrypt/live/vl.alphanet.xrpl.org/fullchain.pem"
+
+    def test_vl_is_a_valid_letsencrypt_service(self, tmp_path):
+        """`vl` must be accepted in letsencrypt_services, not rejected as unknown."""
+        builder = self._builder(tmp_path, VlConfig(), le=["vl", "rpc"])
+        builder.write()
+        ssl = open(os.path.join(builder.ansible_dir, "services", "peer", "nginx", "ssl.yml")).read()
+        assert "vl.alphanet.xrpl.org" in ssl
+
+    def test_run_sh_always_reruns_vl(self, tmp_path):
+        builder = self._builder(tmp_path, VlConfig())
+        builder.write()
+        run = open(os.path.join(builder.ansible_dir, "run.sh")).read()
+        assert "run_always services/peer/vl/main.yml" in run
+
+    def test_playbook_verifies_what_it_served(self, tmp_path):
+        builder = self._builder(tmp_path, VlConfig())
+        builder.write()
+        main = open(os.path.join(self._dir(builder), "main.yml")).read()
+        assert "nginx -t" in main
+        assert "public_key" in main

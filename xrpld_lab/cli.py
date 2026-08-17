@@ -27,6 +27,7 @@ from xrpld_lab.models import (
     RedisConfig,
     ServicesHost,
     StreamConfig,
+    VlConfig,
 )
 from xrpld_lab.operations import (
     enable_amendment,
@@ -422,6 +423,7 @@ def _build_ansible_config_from_file(path: str, args) -> AnsibleConfig:
             ip=svc_data["ip"],
             name=svc_data["name"],
             nginx=NginxConfig(**(svc_data["nginx"] or {})) if "nginx" in svc_data else None,
+            vl=VlConfig(**(svc_data["vl"] or {})) if "vl" in svc_data else None,
             redis=RedisConfig(**(svc_data["redis"] or {})) if "redis" in svc_data else None,
             faucet=FaucetConfig(**(svc_data["faucet"] or {})) if "faucet" in svc_data else None,
             stream=StreamConfig(**(svc_data["stream"] or {})) if "stream" in svc_data else None,

@@ -264,6 +264,8 @@ class AnsibleBuilder:
 
         if host.nginx:
             self._write_nginx(host_dir, host)
+        if host.vl:
+            self._write_vl(host_dir, host)
         if host.redis:
             self._write_redis(host_dir, host)
         if host.faucet:
@@ -359,6 +361,9 @@ class AnsibleBuilder:
                 lines.append(f"run_once {n}_nginx_deps {prefix}/nginx/deps.yml")
                 lines.append(f"run_once {n}_nginx_ssl {prefix}/nginx/ssl.yml")
                 lines.append(f"run_once {n}_nginx {prefix}/nginx/main.yml")
+            if host.vl:
+                # Always re-run: a rotated or re-signed list must reach the web root.
+                lines.append(f"run_always {prefix}/vl/main.yml")
             if host.redis:
                 lines.append(f"run_once {n}_redis {prefix}/redis/main.yml")
             if host.faucet:
@@ -447,6 +452,43 @@ class AnsibleBuilder:
         self._file_write(
             os.path.join(nginx_dir, "main.yml"),
             _NGINX_MAIN_TPL.format(group=host.name),
+        )
+
+    def _write_vl(self, host_dir: str, host: ServicesHost) -> None:
+        svc_dir = os.path.join(host_dir, "vl")
+        os.makedirs(svc_dir, exist_ok=True)
+        cfg = host.vl
+        domain = host.nginx.domain if host.nginx else ""
+        cn = _nginx_tls_cn("vl", domain)
+
+        # The signed list is produced in the cluster dir; stage a copy beside the playbook
+        # so `copy: src=` resolves relative to it.
+        src = os.path.join(self.cluster_dir, cfg.source)
+        staged = os.path.join(svc_dir, cfg.filename)
+        if os.path.exists(src):
+            shutil.copyfile(src, staged)
+        else:
+            # A missing list must fail the deploy, not silently serve a 404 that every node
+            # then treats as an unreachable VL site.
+            raise FileNotFoundError(
+                f"no signed publisher list at {src} — generate the cluster before "
+                "writing its VL vhost"
+            )
+
+        le = list(host.nginx.letsencrypt_services or []) if host.nginx else []
+        vars_data = {
+            "VL_SSL_CN": cn,
+            "VL_ROOT": cfg.root_dir,
+            "VL_FILE": cfg.filename,
+            "VL_TLS": "vl" in le,
+        }
+        if "vl" in le:
+            vars_data["VL_SSL_CERT"] = f"/etc/letsencrypt/live/{cn}/fullchain.pem"
+            vars_data["VL_SSL_KEY"] = f"/etc/letsencrypt/live/{cn}/privkey.pem"
+        self._write_vars(os.path.join(svc_dir, "vars.yml"), vars_data)
+        self._file_write(
+            os.path.join(svc_dir, "main.yml"),
+            _VL_MAIN_TPL.format(group=host.name),
         )
 
     def _write_redis(self, host_dir: str, host: ServicesHost) -> None:
@@ -880,6 +922,7 @@ NGINX_TLS_SERVICES = {
     "faucet": ("Faucet", "FAUCET_SSL"),
     "debug": ("Debug", "DEBUG_SSL"),
     "compiler": ("Compiler", "COMPILER_SSL"),
+    "vl": ("VL", "VL_SSL"),
 }
 
 
@@ -1196,6 +1239,85 @@ _NGINX_MAIN_TPL = """- hosts: {group}
 """
 
 # --- Service templates (use {group} placeholder for hosts: directive) ---
+
+# Static publisher-list vhost. Serves plain http always and adds a TLS server block only
+# when the hostname has a Let's Encrypt cert, because LE cannot issue before the DNS record
+# exists while http serving works as soon as it resolves. The list is signed, so nodes verify
+# it against [validator_list_keys] regardless of transport.
+_VL_MAIN_TPL = """---
+- hosts: {group}
+  become: true
+  remote_user: root
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+  - name: Create the publisher list web root
+    file:
+      path: "{{{{ VL_ROOT }}}}"
+      state: directory
+      mode: "0755"
+  - name: Publish the signed validator list
+    copy:
+      src: "{{{{ VL_FILE }}}}"
+      dest: "{{{{ VL_ROOT }}}}/{{{{ VL_FILE }}}}"
+      mode: "0644"
+  - name: Write the VL vhost
+    copy:
+      dest: "/etc/nginx/sites-available/{{{{ VL_SSL_CN }}}}_proxy.conf"
+      content: |
+        server {{
+            listen 80;
+            server_name "{{{{ VL_SSL_CN }}}}";
+            root {{{{ VL_ROOT }}}};
+            location / {{
+                try_files $uri $uri/ =404;
+                add_header Cache-Control "no-cache";
+                default_type application/json;
+            }}
+        }}
+      mode: "0644"
+  - name: Add the TLS server block once the hostname has a certificate
+    blockinfile:
+      path: "/etc/nginx/sites-available/{{{{ VL_SSL_CN }}}}_proxy.conf"
+      marker: "# {{mark}} VL TLS"
+      block: |
+        server {{
+            listen 443 ssl;
+            server_name "{{{{ VL_SSL_CN }}}}";
+            ssl_certificate "{{{{ VL_SSL_CERT | default('') }}}}";
+            ssl_certificate_key "{{{{ VL_SSL_KEY | default('') }}}}";
+            root {{{{ VL_ROOT }}}};
+            location / {{
+                try_files $uri $uri/ =404;
+                add_header Cache-Control "no-cache";
+                default_type application/json;
+            }}
+        }}
+    when: VL_TLS | bool
+  - name: Enable the VL vhost
+    file:
+      src: "/etc/nginx/sites-available/{{{{ VL_SSL_CN }}}}_proxy.conf"
+      dest: "/etc/nginx/sites-enabled/{{{{ VL_SSL_CN }}}}_proxy.conf"
+      state: link
+  - name: Check the nginx config before reloading
+    command: nginx -t
+    changed_when: false
+  - name: Reload nginx
+    service:
+      name: nginx
+      state: reloaded
+  - name: Confirm the list is served locally
+    uri:
+      url: "http://127.0.0.1/{{{{ VL_FILE }}}}"
+      headers:
+        Host: "{{{{ VL_SSL_CN }}}}"
+      return_content: yes
+    register: vl_check
+  - debug:
+      msg: "vl served: {{{{ (vl_check.content | from_json).public_key | default('NO PUBLIC KEY') }}}}"
+"""
 
 _REDIS_MAIN_TPL = """- hosts: {group}
   become: true

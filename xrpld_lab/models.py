@@ -296,9 +296,27 @@ class NginxConfig:
     compiler_port: str = "9000"
     # Services issued publicly-trusted Let's Encrypt certs instead of
     # self-signed ones (for DNS-only hostnames that clients hit directly).
-    # Valid entries: wss, rpc, faucet, debug, compiler.
+    # Valid entries: wss, rpc, faucet, debug, compiler, vl.
     letsencrypt_services: list = field(default_factory=list)
     letsencrypt_email: str = ""
+
+
+@dataclass
+class VlConfig:
+    """Static publisher-list (UNL) vhost served at vl.<domain>.
+
+    The list is signed by the publisher key and checked against
+    [validator_list_keys], so its integrity does not come from TLS: plain http is a
+    valid validator_list_site. That matters because Let's Encrypt cannot issue for the
+    hostname until its DNS record exists, whereas http serving works the moment the
+    record resolves.
+    """
+
+    # Signed list, relative to the cluster dir. xrpld-lab writes it here at generate time.
+    source: str = "vl/vl.json"
+    filename: str = "vl.json"
+    # Serve the host's own domain root too, not just vl.<domain>.
+    root_dir: str = "/var/www/vl"
 
 
 @dataclass
@@ -357,6 +375,7 @@ class ServicesHost:
     ip: str
     name: str
     nginx: Optional[NginxConfig] = None
+    vl: Optional[VlConfig] = None
     redis: Optional[RedisConfig] = None
     faucet: Optional[FaucetConfig] = None
     stream: Optional[StreamConfig] = None
@@ -586,7 +605,7 @@ class LabConfig:
             return self.quorum
         return max(self.num_validators - 1, 1)
 
-    def statsd_prefix_for(self, node_name: str) -> str:
+    def statsd_prefix_for(self, cluster: str, node_name: str) -> str:
         """[insight] prefix for one node. The Alloy mapping strips it, so it only has to
         be distinct enough to read in a raw relayed StatsD stream."""
-        return f"{self.mode.value}.{node_name}" if self.statsd_address else "rippled"
+        return f"{cluster}.{node_name}" if self.statsd_address else "rippled"
