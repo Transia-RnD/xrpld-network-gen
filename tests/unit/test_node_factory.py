@@ -102,7 +102,7 @@ class TestCreateStandalone:
             name="standalone",
             network_id=1,
         )
-        assert node.db_path == "/opt/ripple/lib/db"
+        assert node.db_path == "/var/lib/xrpld/db/rdb"
 
     def test_debug_path_is_docker(self):
         node = NodeFactory.create_standalone(
@@ -183,13 +183,13 @@ class TestCreateStandalone:
         )
         assert node.ips_fixed_urls == ["peer1 51235"]
 
-    def test_node_db_num_ledgers_is_10000(self):
+    def test_node_db_num_ledgers_is_256(self):
         node = NodeFactory.create_standalone(
             protocol=Protocol.XRPL,
             name="standalone",
             network_id=1,
         )
-        assert node.node_db.num_ledgers == 10000
+        assert node.node_db.num_ledgers == 256
 
     def test_size_node_is_huge(self):
         node = NodeFactory.create_standalone(
@@ -385,7 +385,7 @@ class TestCreateValidator:
         )
         assert node.import_vl_keys == []
 
-    def test_node_db_num_ledgers_10000(self, three_validators):
+    def test_node_db_num_ledgers_256(self, three_validators):
         node = NodeFactory.create_validator(
             index=1,
             protocol=Protocol.XRPL,
@@ -395,7 +395,7 @@ class TestCreateValidator:
             all_validators=three_validators,
             vl_key="VL_KEY",
         )
-        assert node.node_db.num_ledgers == 10000
+        assert node.node_db.num_ledgers == 256
 
     def test_node_db_uses_network_mode(self, three_validators):
         node = NodeFactory.create_validator(
@@ -444,7 +444,7 @@ class TestCreateValidator:
             all_validators=three_validators,
             vl_key="VL_KEY",
         )
-        assert node.db_path == "/opt/ripple/lib/db"
+        assert node.db_path == "/var/lib/xrpld/db/rdb"
 
     def test_validator_manifest_is_empty(self, three_validators):
         node = NodeFactory.create_validator(
@@ -537,7 +537,7 @@ class TestCreatePeer:
             validators=three_validators,
             vl_key="VL_KEY",
         )
-        assert node.node_db.num_ledgers == 10000
+        assert node.node_db.num_ledgers == 256
 
     def test_vl_sites_is_vl_json(self, three_validators):
         node = NodeFactory.create_peer(
@@ -582,7 +582,7 @@ class TestCreatePeer:
             validators=three_validators,
             vl_key="VL_KEY",
         )
-        assert node.db_path == "/opt/ripple/lib/db"
+        assert node.db_path == "/var/lib/xrpld/db/rdb"
 
     def test_amendment_majority_time_xahau(self, three_validators):
         node = NodeFactory.create_peer(
@@ -806,7 +806,7 @@ class TestCreateLocalPeer:
             validators=three_validators,
             vl_key="VL_KEY",
         )
-        assert node.node_db.num_ledgers == 10000
+        assert node.node_db.num_ledgers == 256
 
     def test_default_log_level_is_trace(self, three_validators):
         node = NodeFactory.create_local_peer(

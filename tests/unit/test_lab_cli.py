@@ -996,7 +996,26 @@ class TestMain:
 
         mock_run.assert_called_once_with(
             mock_ws, "my-net", 2, "validator",
-            "https://build.example.com", "2.0.0",
+            "https://build.example.com", "2.0.0", image=None,
+        )
+
+    @patch("xrpld_lab.cli.update_node_binary")
+    @patch("xrpld_lab.cli.Workspace")
+    def test_update_node_from_image_dispatches(self, mock_ws_cls, mock_run):
+        mock_ws = MagicMock()
+        mock_ws_cls.return_value = mock_ws
+
+        with patch("sys.argv", ["xrpld-lab", "update:node",
+                                  "--name", "my-net",
+                                  "--node_id", "2",
+                                  "--node_type", "validator",
+                                  "--build_version", "3.3.0-rc1",
+                                  "--image", "rippleci/xrpld:3.3.0-rc1"]):
+            main()
+
+        mock_run.assert_called_once_with(
+            mock_ws, "my-net", 2, "validator",
+            None, "3.3.0-rc1", image="rippleci/xrpld:3.3.0-rc1",
         )
 
     @patch("xrpld_lab.cli.enable_amendment")

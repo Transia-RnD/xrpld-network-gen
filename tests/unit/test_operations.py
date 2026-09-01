@@ -14,13 +14,14 @@ Covers:
 """
 
 import os
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock, call, mock_open
 
 import pytest
 
 from xrpld_lab.operations import (
     enable_amendment,
     remove_network,
+    restart_local_node,
     run_start_script,
     run_stop_script,
     start_local,
@@ -240,6 +241,95 @@ class TestUpdateNodeBinary:
         update_node_binary(ws, "my-net", 3, "peer", "https://build.example.com", "1.0.0")
 
         mock_run.assert_any_call("/workspace/my-net", "docker compose stop pnode3")
+
+    @patch("xrpld_lab.operations.run_command")
+    @patch("subprocess.run")
+    @patch("xrpld_lab.operations.remove_directory")
+    @patch("os.chmod")
+    @patch("os.path.isdir", return_value=True)
+    @patch("os.path.isfile", return_value=False)
+    def test_update_from_image_extracts_not_downloads(
+        self, mock_isfile, mock_isdir, mock_chmod, mock_rm, mock_subproc, mock_run
+    ):
+        # docker create/cp/rm all succeed
+        mock_subproc.return_value = MagicMock(returncode=0)
+        ws = MagicMock()
+        ws.base = "/workspace"
+
+        update_node_binary(
+            ws, "my-net", 2, "validator", None, "3.3.0-rc1",
+            image="rippleci/xrpld:3.3.0-rc1",
+        )
+
+        calls = [c.args[0] for c in mock_subproc.call_args_list]
+        # no curl download when sourcing from an image
+        assert not any("curl" in c for c in calls)
+        # binary is copied out of the image
+        assert any(c[:3] == ["docker", "create", "--name"] for c in calls)
+        assert any(
+            c[:2] == ["docker", "cp"]
+            and c[2].endswith(":/opt/xrpld/bin/xrpld")
+            and c[3].endswith("xrpld.3.3.0-rc1")
+            for c in calls
+        )
+        # still rebuilds via compose
+        mock_run.assert_any_call(
+            "/workspace/my-net",
+            "docker compose up --build --force-recreate -d vnode2",
+        )
+
+
+class TestRestartLocalNode:
+    """Restart routing: docker container vs bare-process pidfile."""
+
+    @patch("xrpld_lab.operations.run_command")
+    @patch("xrpld_lab.operations._docker_container_exists", return_value=True)
+    @patch("os.getcwd", return_value="/cluster")
+    @patch("os.path.isdir", return_value=True)
+    @patch("os.path.isfile", return_value=False)
+    def test_docker_resume(
+        self, mock_isfile, mock_isdir, mock_cwd, mock_docker, mock_run
+    ):
+        restart_local_node("vnode2")
+        mock_run.assert_called_once_with("/cluster", "docker restart vnode2")
+
+    @patch("xrpld_lab.operations.run_command")
+    @patch("xrpld_lab.operations._docker_container_exists", return_value=True)
+    @patch("os.getcwd", return_value="/cluster")
+    @patch("os.path.isdir", return_value=True)
+    @patch("os.path.isfile", return_value=False)
+    def test_docker_genesis_recreates(
+        self, mock_isfile, mock_isdir, mock_cwd, mock_docker, mock_run
+    ):
+        restart_local_node("vnode5", genesis=True)
+        mock_run.assert_called_once_with(
+            "/cluster", "docker compose up --force-recreate -d vnode5"
+        )
+
+    @patch("xrpld_lab.operations.run_command")
+    @patch("xrpld_lab.script_builder.ScriptBuilder.local_node_start_cmd", return_value="./start")
+    @patch("subprocess.run")
+    @patch("xrpld_lab.operations._docker_container_exists", return_value=False)
+    @patch("os.remove")
+    @patch("os.getcwd", return_value="/cluster")
+    @patch("os.path.isdir", return_value=True)
+    @patch("os.path.isfile", return_value=True)
+    def test_bare_process_pidfile_path(
+        self, mock_isfile, mock_isdir, mock_cwd, mock_remove, mock_docker,
+        mock_subproc, mock_startcmd, mock_run,
+    ):
+        with patch("builtins.open", mock_open(read_data="12345")):
+            restart_local_node("vnode1")
+        # killed by pid, not routed to docker
+        assert any("kill" in c.args[0] for c in mock_subproc.call_args_list)
+        mock_run.assert_called_once_with("/cluster", "./start")
+
+    @patch("xrpld_lab.operations.run_command")
+    @patch("os.path.isdir", return_value=False)
+    def test_missing_node_dir(self, mock_isdir, mock_run, capsys):
+        restart_local_node("vnode9")
+        mock_run.assert_not_called()
+        assert "not found" in capsys.readouterr().out
 
 
 # -------------------------------------------------------------------------

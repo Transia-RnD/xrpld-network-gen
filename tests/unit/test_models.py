@@ -254,10 +254,10 @@ class TestTransactionQueueConfig:
         assert cfg.minimum_queue_size == 2000
         assert cfg.retry_sequence_percent == 25
         assert cfg.minimum_escalation_multiplier == 500
-        assert cfg.minimum_txn_in_ledger == 10000
-        assert cfg.minimum_txn_in_ledger_standalone == 10000
-        assert cfg.target_txn_in_ledger == 10000
-        assert cfg.maximum_txn_in_ledger == 10000
+        assert cfg.minimum_txn_in_ledger == 100000
+        assert cfg.minimum_txn_in_ledger_standalone == 100000
+        assert cfg.target_txn_in_ledger == 100000
+        assert cfg.maximum_txn_in_ledger == 100000
         assert cfg.normal_consensus_increase_percent == 20
         assert cfg.slow_consensus_decrease_percent == 50
         assert cfg.maximum_txn_per_account == 100000

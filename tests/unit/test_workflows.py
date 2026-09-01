@@ -369,7 +369,7 @@ class TestRunStandalone:
     def test_calls_update_genesis(self):
         self.runner._run_standalone()
         self.mocks["update_genesis"].assert_called_once_with(
-            {"Feature1": "HASH1"}, "xrpl", preload_entries=None
+            {"Feature1": "HASH1"}, "xrpl", genesis_path=None, preload_entries=None
         )
 
     def test_writes_genesis_json(self):
@@ -803,6 +803,11 @@ class TestRunLocalNetwork:
         p = patch("xrpld_lab.workflows.shutil.copyfile")
         self.mocks["copyfile"] = p.start()
         self.patches["copyfile"] = p
+
+        # shutil.copy2 (binary copy into each node dir)
+        p = patch("xrpld_lab.workflows.shutil.copy2")
+        self.mocks["copy2"] = p.start()
+        self.patches["copy2"] = p
 
         yield
 

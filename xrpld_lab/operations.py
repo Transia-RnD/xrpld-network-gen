@@ -209,6 +209,18 @@ def stop_local() -> None:
     run_command(cwd, "bash stop.sh")
 
 
+def _docker_container_exists(name: str) -> bool:
+    """True if a docker container with this exact name exists (running or not)."""
+    try:
+        r = subprocess.run(
+            ["docker", "ps", "-a", "--filter", f"name=^{name}$", "--format", "{{.Names}}"],
+            capture_output=True, text=True,
+        )
+    except FileNotFoundError:
+        return False
+    return name in r.stdout.split()
+
+
 def restart_local_node(
     node_name: str,
     binary_name: str = "xrpld",
@@ -216,9 +228,16 @@ def restart_local_node(
 ) -> None:
     """Stop and restart a single local node.
 
-    With ``genesis=False`` (default) the node syncs from the network —
-    use this when restarting after a crash, stall, or attack simulation.
-    With ``genesis=True`` it loads the genesis ledger and marks it valid.
+    With ``genesis=False`` (default) the node resumes from its existing
+    database — use this when restarting after a crash, stall, or attack
+    simulation. With ``genesis=True`` it loads the genesis ledger and marks it
+    valid, giving the node a fresh divergent history.
+
+    Two node layouts are supported. A bare-process node has an ``xrpld.pid`` in
+    its directory and is killed and re-launched from ``start.sh``. A docker node
+    has no pidfile and a container named after the node: ``genesis=False``
+    ``docker restart``\\s it (keeping its database layer), ``genesis=True``
+    recreates it so the database is wiped and the entrypoint reloads genesis.
     """
     cwd = os.getcwd()
     node_dir = os.path.join(cwd, node_name)
@@ -226,8 +245,18 @@ def restart_local_node(
         print(f"{bcolors.RED}Node directory not found: {node_dir}{bcolors.END}")
         return
 
-    # Stop the node if running
     pid_file = os.path.join(node_dir, "xrpld.pid")
+    if not os.path.isfile(pid_file) and _docker_container_exists(node_name):
+        if genesis:
+            print(f"{bcolors.CYAN}Recreating {node_name} from genesis...{bcolors.END}")
+            run_command(cwd, f"docker compose up --force-recreate -d {node_name}")
+        else:
+            print(f"{bcolors.CYAN}Restarting {node_name} (resume from db)...{bcolors.END}")
+            run_command(cwd, f"docker restart {node_name}")
+        print(f"{bcolors.GREEN}{node_name} restarted.{bcolors.END}")
+        return
+
+    # Bare-process node: kill by pidfile and re-launch.
     if os.path.isfile(pid_file):
         with open(pid_file) as f:
             pid = f.read().strip()
@@ -238,7 +267,6 @@ def restart_local_node(
             subprocess.run(["kill", "-9", pid], capture_output=True)
         os.remove(pid_file)
 
-    # Start the node
     from xrpld_lab.script_builder import ScriptBuilder
 
     cmd = ScriptBuilder.local_node_start_cmd(
@@ -254,6 +282,55 @@ def restart_local_node(
 # ---------------------------------------------------------------------------
 
 
+# In-image binary locations across the layouts we build/consume: perf datagram
+# images (/opt/xrpld/bin), stock rippleci images (/usr/bin), older ripple images.
+_IMAGE_BINARY_PATHS = (
+    "/opt/xrpld/bin/xrpld",
+    "/usr/bin/xrpld",
+    "/usr/local/bin/rippled",
+    "/opt/ripple/bin/rippled",
+    "/app/xrpld",
+)
+
+
+def _extract_binary_from_image(image: str, dest: str) -> bool:
+    """Copy the xrpld/rippled binary out of a docker image to *dest*.
+
+    The build pipeline publishes images (``-dg`` tags in GAR), not raw binaries,
+    so an upgrade drill sources the target build from an image ref — local or, after
+    a ``docker pull``, from the registry. The binary lives at a different path across
+    image layouts, so each known location is tried. Returns True on success.
+    """
+    probe = f"xrpld-extract-{os.getpid()}"
+    try:
+        subprocess.run(["docker", "rm", "-f", probe], capture_output=True)
+        r = subprocess.run(["docker", "create", "--name", probe, image],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            # Not present locally: pull then retry create.
+            if subprocess.run(["docker", "pull", image]).returncode != 0:
+                print(f"{bcolors.RED}Cannot pull image {image}{bcolors.END}")
+                return False
+            r = subprocess.run(["docker", "create", "--name", probe, image],
+                               capture_output=True, text=True)
+            if r.returncode != 0:
+                print(f"{bcolors.RED}docker create failed: {r.stderr.strip()}{bcolors.END}")
+                return False
+        for path in _IMAGE_BINARY_PATHS:
+            cp = subprocess.run(["docker", "cp", f"{probe}:{path}", dest],
+                                capture_output=True, text=True)
+            if cp.returncode == 0:
+                return True
+        print(f"{bcolors.RED}No xrpld/rippled binary found in {image} "
+              f"(tried {', '.join(_IMAGE_BINARY_PATHS)}){bcolors.END}")
+        return False
+    except FileNotFoundError:
+        print(f"{bcolors.RED}docker not found{bcolors.END}")
+        return False
+    finally:
+        subprocess.run(["docker", "rm", "-f", probe], capture_output=True)
+
+
 def update_node_binary(
     workspace: Workspace,
     name: str,
@@ -261,12 +338,15 @@ def update_node_binary(
     node_type: str,
     build_server: str,
     build_version: str,
+    image: str = None,
 ) -> None:
     """Update the xrpld binary for a single node in a running network.
 
     Steps:
     1. docker-compose stop the node
-    2. Download new binary from build_server/build_version
+    2. Source the new binary: extract it from *image* if given, else download it
+       from ``build_server/build_version``. ``build_version`` is always the version
+       label used for the on-disk filename and the Dockerfile COPY line.
     3. Copy binary to node directory, chmod 755
     4. Remove node's lib directory (force re-sync)
     5. Update Dockerfile with new version
@@ -284,20 +364,26 @@ def update_node_binary(
     print(f"{bcolors.CYAN}Stopping {node_dir_name}...{bcolors.END}")
     run_command(net_dir, f"docker compose stop {node_dir_name}")
 
-    # 2. Download new binary
-    binary_url = f"{build_server}/{build_version}"
+    # 2. Source the new binary — from an image (what the build pipeline produces)
+    #    or a raw-binary download.
     binary_dest = os.path.join(node_dir, f"xrpld.{build_version}")
-    print(f"{bcolors.CYAN}Downloading binary from {binary_url}...{bcolors.END}")
-    try:
-        subprocess.run(
-            ["curl", "-L", "-o", binary_dest, binary_url],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"{bcolors.RED}Failed to download binary: {e}{bcolors.END}")
-        return
+    if image:
+        print(f"{bcolors.CYAN}Extracting binary from image {image}...{bcolors.END}")
+        if not _extract_binary_from_image(image, binary_dest):
+            return
+    else:
+        binary_url = f"{build_server}/{build_version}"
+        print(f"{bcolors.CYAN}Downloading binary from {binary_url}...{bcolors.END}")
+        try:
+            subprocess.run(
+                ["curl", "-L", "-o", binary_dest, binary_url],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            print(f"{bcolors.RED}Failed to download binary: {e}{bcolors.END}")
+            return
 
     # 3. chmod 755
     os.chmod(binary_dest, 0o755)

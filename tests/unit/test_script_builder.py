@@ -98,7 +98,7 @@ class TestDockerfileBuilder:
             binary=True,
             version="1.2.3",
         )
-        assert "COPY xrpld.1.2.3 /app/xrpld" in result
+        assert "COPY xrpld.1.2.3 /opt/xrpld/bin/xrpld" in result
 
     def test_no_binary(self):
         """No binary mode: no COPY binary line."""
