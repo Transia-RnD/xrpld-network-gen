@@ -119,13 +119,17 @@ class LabRunner:
     # ------------------------------------------------------------------
 
     def run(self):
-        """Execute the workflow based on lab.mode."""
+        """Execute the workflow based on lab.mode.
+
+        :return: The generated directory name for standalone, else ``None``
+        """
         if self.lab.mode == DeployMode.STANDALONE:
-            self._run_standalone()
+            return self._run_standalone()
         elif self.lab.mode == DeployMode.NETWORK:
             self._run_network()
         elif self.lab.mode == DeployMode.LOCAL:
             self._run_local_network()
+        return None
 
     # ------------------------------------------------------------------
     # Standalone workflow
@@ -141,6 +145,8 @@ class LabRunner:
         5. Create Dockerfile
         6. Build docker-compose
         7. Generate start/stop scripts
+
+        :return: The generated directory name, relative to the workspace base
         """
         lab = self.lab
         spec = self.spec
@@ -221,6 +227,8 @@ class LabRunner:
             ScriptBuilder.standalone_stop(ws_base, protocol_name, name),
         )
         os.chmod(os.path.join(base_dir, "stop.sh"), 0o755)
+
+        return os.path.basename(base_dir)
 
     # ------------------------------------------------------------------
     # Network workflow

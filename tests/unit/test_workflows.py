@@ -180,7 +180,8 @@ class TestRunDispatch:
     def test_standalone_dispatches(self, standalone_lab, tmp_workspace):
         runner = LabRunner(standalone_lab, workspace=tmp_workspace)
         with patch.object(runner, "_run_standalone") as m:
-            runner.run()
+            m.return_value = "xrpl-3.3.0"
+            assert runner.run() == "xrpl-3.3.0"
             m.assert_called_once()
 
     def test_network_dispatches(self, network_lab, tmp_workspace):
