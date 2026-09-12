@@ -89,7 +89,6 @@ class TestCreateStandalone:
         expected_db = NodeDbConfig.for_mode(NodeDbType.NUDB, DeployMode.STANDALONE)
         assert node.node_db.db_type == expected_db.db_type
         assert node.node_db.path == expected_db.path
-        assert node.node_db.relational_db == expected_db.relational_db
 
     def test_db_path_is_docker(self):
         node = NodeFactory.create_standalone(

@@ -273,22 +273,12 @@ class TestXrpldCfgBuilderNodeDb:
         assert "advisory_delete" not in output
         assert "online_delete" not in output
 
-    def test_relational_db_present(self):
-        node_db = NodeDbConfig(
-            db_type=NodeDbType.MEMORY,
-            path="./",
-            num_ledgers=None,
-            relational_db="backend=memory",
-        )
+    def test_no_relational_db_section(self):
+        node_db = NodeDbConfig(db_type=NodeDbType.MEMORY, path="./", num_ledgers=None)
         cfg = _make_standalone_config(node_db=node_db)
         output = XrpldCfgBuilder(cfg).build()
-        assert "[relational_db]\n" in output
-        assert "backend=memory\n" in output
-
-    def test_relational_db_absent(self):
-        cfg = _make_standalone_config()
-        output = XrpldCfgBuilder(cfg).build()
         assert "[relational_db]" not in output
+        assert "backend=" not in output
 
 
 class TestXrpldCfgBuilderLedgerHistory:

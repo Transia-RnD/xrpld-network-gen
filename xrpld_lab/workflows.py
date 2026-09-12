@@ -145,6 +145,13 @@ class LabRunner:
                 f"{source.build_server}/{source.build_version}", dest
             )
 
+    @staticmethod
+    def _copy_binary_to_node(staged: str, node_dir: str) -> None:
+        """Put the staged binary in the node directory, the docker build context."""
+        dest = os.path.join(node_dir, os.path.basename(staged))
+        shutil.copy2(staged, dest)
+        os.chmod(dest, 0o755)
+
     # ------------------------------------------------------------------
     # Standalone workflow
     # ------------------------------------------------------------------
@@ -275,7 +282,9 @@ class LabRunner:
         feature_lines = self._resolve_feature_lines(source, spec)
 
         # 1c. Binary: copy local or download from build server
-        self._stage_binary(source, os.path.join(cluster_dir, f"xrpld.{name}"))
+        staged_binary = os.path.join(cluster_dir, f"xrpld.{name}")
+        self._stage_binary(source, staged_binary)
+        use_binary = source.build_type == BuildType.BINARY
 
         # 2. Create VL keys
         original_dir = os.getcwd()
@@ -337,11 +346,14 @@ class LabRunner:
         # 4-7. Create nodes, configs, genesis, dockerfiles
         compose = ComposeBuilder(f"{name}-network")
         image_name = source.image or "ubuntu:noble"
-        # A supplied --image (create:gcp) is the node image ansible pulls; otherwise the
-        # default transia/cluster tag built from this source.
-        ansible_image = source.image or (
-            f"transia/cluster:{source.commit_hash or source.build_version}"
-        )
+        # Ansible pulls the image the node Dockerfile builds FROM: the ubuntu base
+        # under a staged binary, a supplied --image, else the transia/cluster tag.
+        if use_binary:
+            ansible_image = image_name
+        else:
+            ansible_image = source.image or (
+                f"transia/cluster:{source.commit_hash or source.build_version}"
+            )
 
         for i in range(1, lab.num_validators + 1):
             node_name = f"vnode{i}"
@@ -375,6 +387,8 @@ class LabRunner:
             node_dir = self.workspace.node_dir(cluster_dir, node_name)
             cfg_path = self.workspace.config_dir(node_dir)
             self.workspace.log_dir(node_dir)
+            if use_binary:
+                self._copy_binary_to_node(staged_binary, node_dir)
 
             # Config
             cfg_content = XrpldCfgBuilder(node).build()
@@ -401,7 +415,7 @@ class LabRunner:
                 ports=node.ports,
                 image_name=image_name,
                 network=True,
-                binary=source.build_type == BuildType.BINARY,
+                binary=use_binary,
                 version=name,
                 # Non-genesis: no genesis.json in the image and a plain entrypoint —
                 # the node boots from its preserved db and syncs with its peers.
@@ -455,6 +469,8 @@ class LabRunner:
             node_dir = self.workspace.node_dir(cluster_dir, node_name)
             cfg_path = self.workspace.config_dir(node_dir)
             self.workspace.log_dir(node_dir)
+            if use_binary:
+                self._copy_binary_to_node(staged_binary, node_dir)
 
             # Config
             cfg_content = XrpldCfgBuilder(node).build()
@@ -480,7 +496,7 @@ class LabRunner:
                 ports=node.ports,
                 image_name=image_name,
                 network=True,
-                binary=source.build_type == BuildType.BINARY,
+                binary=use_binary,
                 version=name,
                 # Non-genesis: no genesis.json in the image and a plain entrypoint —
                 # the node boots from its preserved db and syncs with its peers.
@@ -533,12 +549,7 @@ class LabRunner:
         # 10. Scripts
         write_executable(
             os.path.join(cluster_dir, "start.sh"),
-            ScriptBuilder.network_start(
-                name,
-                lab.num_validators,
-                lab.num_peers,
-                copy_binary=source.build_type == BuildType.BINARY,
-            ),
+            ScriptBuilder.network_start(),
         )
         write_executable(
             os.path.join(cluster_dir, "stop.sh"),
