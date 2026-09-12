@@ -8,7 +8,7 @@ Replaces the functions previously in ``xrpld_netgen/utils/deploy_kit.py``.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
 from xrpld_lab.models import PortSet
 
@@ -157,6 +157,13 @@ class ScriptBuilder:
         )
 
     @staticmethod
+    @staticmethod
+    def wipe_as_root(paths: List[str]) -> str:
+        """Shell line that deletes bind-mounted paths the node wrote as root."""
+        targets = " ".join(f"/wipe/{p}" for p in paths)
+        return f'docker run --rm -v "$(pwd):/wipe" alpine:3 rm -rf {targets}\n'
+
+    @staticmethod
     def standalone_stop(basedir: str, protocol: str, name: str) -> str:
         """Docker compose down + cleanup for standalone."""
         content = "#! /bin/bash\n"
@@ -164,10 +171,7 @@ class ScriptBuilder:
             f"docker compose -f {basedir}/{protocol}-{name}"
             "/docker-compose.yml down --remove-orphans\n"
         )
-        content += f"rm -r {protocol}/config\n"
-        content += f"rm -r {protocol}/lib\n"
-        content += f"rm -r {protocol}/log\n"
-        content += f"rm -r {protocol}\n"
+        content += ScriptBuilder.wipe_as_root([protocol])
         return content
 
     # -- local (non-Docker single node) ------------------------------------
@@ -199,15 +203,11 @@ done
         content += 'if [ "$REMOVE_FLAG" = true ]; then \n'
         content += "docker compose -f docker-compose.yml down --remove-orphans\n"
 
-        for i in range(1, num_validators + 1):
-            content += f"rm -r vnode{i}/lib\n"
-            content += f"rm -r vnode{i}/log\n"
-            content += f"rm -r vnode{i}/xrpld.{name}\n"
-
-        for i in range(1, num_peers + 1):
-            content += f"rm -r pnode{i}/lib\n"
-            content += f"rm -r pnode{i}/log\n"
-            content += f"rm -r pnode{i}/xrpld.{name}\n"
+        nodes = [f"vnode{i}" for i in range(1, num_validators + 1)]
+        nodes += [f"pnode{i}" for i in range(1, num_peers + 1)]
+        content += ScriptBuilder.wipe_as_root(
+            [f"{n}/{leaf}" for n in nodes for leaf in ("lib", "log", f"xrpld.{name}")]
+        )
 
         content += "else \n"
         content += "docker compose -f docker-compose.yml down\n"
