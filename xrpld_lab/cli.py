@@ -26,6 +26,7 @@ from xrpld_lab.models import (
     Protocol,
     RedisConfig,
     ServicesHost,
+    StatusConfig,
     StreamConfig,
     VlConfig,
 )
@@ -429,6 +430,7 @@ def _build_ansible_config_from_file(path: str, args) -> AnsibleConfig:
             stream=StreamConfig(**(svc_data["stream"] or {})) if "stream" in svc_data else None,
             debug=DebugConfig(**(svc_data["debug"] or {})) if "debug" in svc_data else None,
             compiler=CompilerConfig(**(svc_data["compiler"] or {})) if "compiler" in svc_data else None,
+            status=StatusConfig(**(svc_data["status"] or {})) if "status" in svc_data else None,
         )
         services.append(host)
 

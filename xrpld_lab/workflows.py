@@ -330,6 +330,7 @@ class LabRunner:
 
         for i in range(1, lab.num_validators + 1):
             node_name = f"vnode{i}"
+            node_ip = lab.ansible.vips[i - 1] if use_ansible and i <= len(lab.ansible.vips) else ""
             node = NodeFactory.create_validator(
                 index=i,
                 protocol=lab.protocol,
@@ -342,7 +343,7 @@ class LabRunner:
                 ips_fixed=ips_fixed,
                 log_level=lab.log_level,
                 node_db_type=lab.node_db_type,
-                datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
+                datagram_monitor=lab.datagram_monitor_for(node_ip),
                 num_ledgers=lab.online_delete,
                 tree_cache_target_entries=lab.tree_cache_target_entries,
                 memory_limit=lab.memory_limit,
@@ -408,6 +409,7 @@ class LabRunner:
 
         for i in range(1, lab.num_peers + 1):
             node_name = f"pnode{i}"
+            node_ip = lab.ansible.pips[i - 1] if use_ansible and i <= len(lab.ansible.pips) else ""
             node = NodeFactory.create_peer(
                 index=i,
                 protocol=lab.protocol,
@@ -419,7 +421,7 @@ class LabRunner:
                 ips_fixed=ips_fixed,
                 log_level=lab.log_level,
                 node_db_type=lab.node_db_type,
-                datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
+                datagram_monitor=lab.datagram_monitor_for(node_ip),
                 num_ledgers=lab.online_delete,
                 tree_cache_target_entries=lab.tree_cache_target_entries,
                 memory_limit=lab.memory_limit,

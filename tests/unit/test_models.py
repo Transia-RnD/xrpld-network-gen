@@ -18,6 +18,9 @@ from xrpld_lab.models import (
     NodeConfig,
     BuildSource,
     LabConfig,
+    AnsibleConfig,
+    ServicesHost,
+    StatusConfig,
 )
 
 
@@ -283,3 +286,50 @@ class TestVotingConfig:
         assert cfg.account_reserve == 1000000
         assert cfg.owner_reserve == 200000
         assert cfg.reference_fee == 10
+
+
+class TestDatagramMonitorFor:
+    """Per-node [datagram_monitor] sink: explicit sink wins, else the status sampler."""
+
+    def _lab(self, **kw):
+        build = BuildSource(
+            protocol=Protocol.XRPL,
+            build_type=BuildType.IMAGE,
+            build_server="rippleci",
+            build_version="3.1.1",
+        )
+        return LabConfig(
+            protocol=Protocol.XRPL,
+            mode=DeployMode.NETWORK,
+            build_source=build,
+            network_id=21337,
+            **kw,
+        )
+
+    def _ansible(self, status):
+        return AnsibleConfig(
+            vips=["10.0.0.1"], pips=["10.0.0.10"],
+            services=[ServicesHost(name="pnode1", ip="10.0.0.10", status=status)],
+        )
+
+    def test_none_without_sink_or_status(self):
+        assert self._lab(ansible=self._ansible(None)).datagram_monitor_for("10.0.0.1") is None
+        assert self._lab().datagram_monitor_for("10.0.0.1") is None
+
+    def test_explicit_sink_wins(self):
+        lab = self._lab(datagram_monitor="10.128.0.2 9876", ansible=self._ansible(StatusConfig()))
+        assert lab.datagram_monitor_for("10.0.0.1") == ["10.128.0.2 9876"]
+
+    def test_status_sampler_on_the_node_address(self):
+        lab = self._lab(ansible=self._ansible(StatusConfig(xdgm_port=9998)))
+        assert lab.datagram_monitor_for("10.0.0.1") == ["10.0.0.1 9998"]
+
+    def test_node_without_address_gets_no_sink(self):
+        lab = self._lab(ansible=self._ansible(StatusConfig()))
+        assert lab.datagram_monitor_for("") is None
+
+    def test_status_host_property(self):
+        ansible = self._ansible(StatusConfig())
+        assert ansible.status_host.name == "pnode1"
+        assert "status" in ansible.services[0].enabled_services
+        assert self._ansible(None).status_host is None

@@ -18,6 +18,7 @@ from xrpld_lab.models import (
     PortSet,
     NodeRole,
     ServicesHost,
+    StatusConfig,
 )
 from xrpld_lab.ansible_builder import AnsibleBuilder
 
@@ -1132,3 +1133,177 @@ class TestVlVhost:
         main = open(os.path.join(self._dir(builder), "main.yml")).read()
         assert "nginx -t" in main
         assert "public_key" in main
+
+
+# ===========================================================================
+# Status sampler + network roll-up
+# ===========================================================================
+
+
+class TestStatusService:
+    def _builder(self, tmp_path, status, debug=None, redis=None):
+        cluster_dir = str(tmp_path / "status-cluster")
+        os.makedirs(cluster_dir, exist_ok=True)
+        nginx = NginxConfig(domain="alphanet.xrpl.org")
+        config = AnsibleConfig(
+            ssh_port=1988, ssh_user="root", ssh_key_path="~/.ssh/xrpl-labs",
+            vips=["10.0.0.1", "10.0.0.2"], pips=["10.0.0.10"],
+            services=[ServicesHost(name="pnode1", ip="10.0.0.10", nginx=nginx,
+                                   debug=debug, redis=redis, status=status)],
+        )
+        builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc123")
+        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
+        builder.add_node("vnode2", "10.0.0.2", _validator_ports(2), f"{cluster_dir}/vnode2/config/")
+        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        return builder
+
+    def _host_vars(self, builder, ip):
+        return yaml.safe_load(open(os.path.join(builder.ansible_dir, "host_vars", f"{ip}.yml")))
+
+    def _nginx_main(self, builder):
+        return open(os.path.join(builder.ansible_dir, "services", "pnode1", "nginx", "main.yml")).read()
+
+    def test_nothing_written_when_unconfigured(self, tmp_path):
+        builder = self._builder(tmp_path, None)
+        builder.write()
+        assert not os.path.exists(os.path.join(builder.ansible_dir, "status.yml"))
+        assert not os.path.isdir(os.path.join(builder.ansible_dir, "status"))
+        assert "status_env" not in self._host_vars(builder, "10.0.0.1")
+        assert "/status/" not in self._nginx_main(builder)
+        assert "status.yml" not in open(os.path.join(builder.ansible_dir, "run.sh")).read()
+
+    def test_sampler_files_staged_beside_the_playbook(self, tmp_path):
+        builder = self._builder(tmp_path, StatusConfig())
+        builder.write()
+        staged = os.path.join(builder.ansible_dir, "status")
+        assert sorted(os.listdir(staged)) == [
+            "network-dashboard.html", "node-dashboard.html", "node_metrics.py"]
+        assert "def decode_xdgm" in open(os.path.join(staged, "node_metrics.py")).read()
+
+    def test_status_yml_installs_unit_env_and_firewall_on_every_node(self, tmp_path):
+        builder = self._builder(tmp_path, StatusConfig())
+        builder.write()
+        content = open(os.path.join(builder.ansible_dir, "status.yml")).read()
+        plays = yaml.safe_load(content)
+        assert plays[0]["hosts"] == "all"
+        names = [t.get("name") for t in plays[0]["tasks"]]
+        assert "Install the sampler" in names
+        assert "Write the sampler environment" in names
+        assert "Install the xrpld-status systemd unit" in names
+        assert "Allow the services host to reach the sampler" in names
+        assert "Refuse the sampler port from anywhere else" in names
+        assert "Allow XDGM datagrams from the node container network" in names
+        assert "Enable and start xrpld-status" in names
+        assert "dest: /opt/xrpld-status/node_metrics.py" in content
+        assert "ExecStart=/usr/bin/python3 /opt/xrpld-status/node_metrics.py" in content
+        assert "EnvironmentFile=/opt/xrpld-status/node_metrics.env" in content
+        assert "notify: restart xrpld-status" in content
+
+    def test_remote_node_binds_all_addresses_and_admits_only_the_services_host(self, tmp_path):
+        builder = self._builder(tmp_path, StatusConfig(port=8700))
+        builder.write()
+        hv = self._host_vars(builder, "10.0.0.1")
+        env = hv["status_env"]
+        assert env["NODE_METRICS_HTTP_HOST"] == "0.0.0.0"
+        assert env["NODE_METRICS_HTTP_PORT"] == "8700"
+        assert env["NODE_METRICS_ADMIN_RPC"] == f"http://127.0.0.1:{_validator_ports(1).rpc_admin}/"
+        assert env["NODE_METRICS_DEBUGSTREAM_HEALTH"] == ""
+        assert env["NODE_METRICS_REDIS_PORT"] == "0"
+        assert "NODE_METRICS_NETWORK_NODES" not in env
+        assert hv["status_allow_from"] == "10.0.0.10"
+        assert hv["status_http_port"] == 8700
+
+    def test_xdgm_listener_binds_the_node_address_the_container_can_reach(self, tmp_path):
+        builder = self._builder(tmp_path, StatusConfig(xdgm_port=9998))
+        builder.write()
+        hv = self._host_vars(builder, "10.0.0.2")
+        assert hv["status_env"]["NODE_METRICS_XDGM_HOST"] == "10.0.0.2"
+        assert hv["status_env"]["NODE_METRICS_XDGM_PORT"] == "9998"
+        assert hv["status_xdgm_port"] == 9998
+
+    def test_services_host_sampler_is_loopback_and_aggregates(self, tmp_path):
+        builder = self._builder(tmp_path, StatusConfig(), debug=DebugConfig(port=8081),
+                                redis=RedisConfig())
+        builder.write()
+        hv = self._host_vars(builder, "10.0.0.10")
+        env = hv["status_env"]
+        assert env["NODE_METRICS_HTTP_HOST"] == "127.0.0.1"
+        assert hv["status_allow_from"] == ""
+        assert env["NODE_METRICS_NETWORK_NODES"] == (
+            "vnode1=http://10.0.0.1:8687 role=validator,"
+            "vnode2=http://10.0.0.2:8687 role=validator,"
+            "pnode1=http://127.0.0.1:8687 role=peer"
+        )
+        assert env["NODE_METRICS_NETWORK_FILE"] == "/opt/xrpld-status/network.json"
+        assert env["NODE_METRICS_NETWORK_NAME"] == "alphanet.xrpl.org"
+        assert env["NODE_METRICS_DEBUGSTREAM_HEALTH"] == "http://127.0.0.1:8081/health"
+        assert env["NODE_METRICS_REDIS_PORT"] == "6379"
+
+    def test_network_name_override(self, tmp_path):
+        builder = self._builder(tmp_path, StatusConfig(network_name="alphanet"))
+        builder.write()
+        assert self._host_vars(builder, "10.0.0.10")["status_env"]["NODE_METRICS_NETWORK_NAME"] == "alphanet"
+
+    def test_nginx_serves_the_page_the_api_and_every_node(self, tmp_path):
+        builder = self._builder(tmp_path, StatusConfig())
+        builder.write()
+        main = self._nginx_main(builder)
+        yaml.safe_load(main)
+        assert "limit_req_zone $binary_remote_addr zone=xrpld_status:10m rate=20r/s;" in main
+        assert "location = /status/ {" in main
+        assert "try_files /network-dashboard.html =404;" in main
+        assert "location /status/api/ {" in main
+        assert "proxy_pass http://127.0.0.1:8687/api/;" in main
+        assert "location /status/nodes/vnode1/ {" in main
+        assert "proxy_pass http://10.0.0.1:8687/;" in main
+        assert "location /status/nodes/vnode2/ {" in main
+        assert "location /status/nodes/pnode1/ {" in main
+        assert "proxy_pass http://127.0.0.1:8687/;" in main
+        assert main.count("limit_req zone=xrpld_status burst=40 nodelay;") == 5
+        # The locations sit inside the bare-domain server block, before its closing brace.
+        wss = main[main.index("Write WSS proxy config"):main.index("  - name: Link WSS proxy")]
+        assert "location /status/api/" in wss
+        assert wss.rstrip().endswith("}")
+
+    def test_services_host_playbook_installs_the_page_and_seeds_network_json(self, tmp_path):
+        builder = self._builder(tmp_path, StatusConfig())
+        builder.write()
+        svc_dir = os.path.join(builder.ansible_dir, "services", "pnode1", "status")
+        main = open(os.path.join(svc_dir, "main.yml")).read()
+        plays = yaml.safe_load(main)
+        assert plays[0]["hosts"] == "pnode1"
+        assert "www/network-dashboard.html" in main
+        assert "force: no" in main
+        assert "/api/network" in main
+        v = yaml.safe_load(open(os.path.join(svc_dir, "vars.yml")))
+        assert v["STATUS_DIR"] == "/opt/xrpld-status"
+        assert v["STATUS_PORT"] == 8687
+
+    def test_run_sh_reruns_the_sampler_after_main_and_the_page_after_nginx(self, tmp_path):
+        builder = self._builder(tmp_path, StatusConfig())
+        builder.write()
+        run = open(os.path.join(builder.ansible_dir, "run.sh")).read()
+        assert run.index("run_always main.yml") < run.index("run_always status.yml")
+        assert run.index("run_once pnode1_nginx services/pnode1/nginx/main.yml") \
+            < run.index("run_always services/pnode1/status/main.yml")
+
+    def test_clean_stops_the_sampler(self, tmp_path):
+        builder = self._builder(tmp_path, StatusConfig())
+        builder.write()
+        clean = open(os.path.join(builder.ansible_dir, "clean.yml")).read()
+        assert "name: xrpld-status" in clean
+        assert "status_http_port is defined" in clean
+
+    def test_status_host_must_be_a_node(self, tmp_path):
+        cluster_dir = str(tmp_path / "infra-cluster")
+        os.makedirs(cluster_dir, exist_ok=True)
+        config = AnsibleConfig(
+            vips=["10.0.0.1"],
+            services=[ServicesHost(name="infra", ip="10.0.0.50",
+                                   nginx=NginxConfig(domain="example.com"),
+                                   status=StatusConfig())],
+        )
+        builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
+        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
+        with pytest.raises(ValueError):
+            builder.write()

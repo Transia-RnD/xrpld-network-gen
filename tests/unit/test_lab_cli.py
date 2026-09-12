@@ -707,6 +707,53 @@ class TestBuildLabConfigAnsible:
         assert cfg.ansible.services[0].nginx.domain == "example.com"
         assert cfg.ansible.services[0].redis is not None
 
+    def test_ansible_config_file_with_status(self, tmp_path):
+        config_file = tmp_path / "ansible.yml"
+        config_file.write_text(
+            "vips:\n  - 10.0.0.1\n"
+            "pips:\n  - 10.0.0.2\n"
+            "services:\n"
+            "  - ip: 10.0.0.2\n"
+            "    name: pnode1\n"
+            "    nginx:\n"
+            "      domain: example.com\n"
+            "    status:\n"
+            "      port: 8700\n"
+        )
+        parser = _build_parser()
+        args = parser.parse_args([
+            "create:ansible",
+            "--vips", "ignored",
+            "--pips", "ignored",
+            "--ansible_config", str(config_file),
+        ])
+        cfg = build_lab_config(args)
+        status = cfg.ansible.services[0].status
+        assert status is not None
+        assert status.port == 8700
+        assert status.xdgm_port == 9999
+        assert cfg.ansible.status_host is cfg.ansible.services[0]
+        # Every node's [datagram_monitor] targets its own address and the sampler's XDGM port.
+        assert cfg.datagram_monitor_for("10.0.0.1") == ["10.0.0.1 9999"]
+
+    def test_ansible_config_file_status_defaults(self, tmp_path):
+        config_file = tmp_path / "ansible.yml"
+        config_file.write_text(
+            "vips:\n  - 10.0.0.1\n"
+            "pips:\n  - 10.0.0.2\n"
+            "services:\n"
+            "  - ip: 10.0.0.2\n"
+            "    name: pnode1\n"
+            "    status: {}\n"
+        )
+        parser = _build_parser()
+        args = parser.parse_args([
+            "create:ansible", "--vips", "ignored", "--pips", "ignored",
+            "--ansible_config", str(config_file),
+        ])
+        cfg = build_lab_config(args)
+        assert cfg.ansible.services[0].status.port == 8687
+
     def test_stream_service_forces_trace_log_level(self, tmp_path):
         config_file = tmp_path / "ansible.yml"
         config_file.write_text(

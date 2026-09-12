@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.5.0
+
+### Added
+- **`status` service** (`services: - status: {port: 8687}` in the ansible config) — every
+  node runs `node_metrics.py` (the xrplf-devnet-node sampler, stdlib only) as the
+  `xrpld-status` systemd unit; the services host aggregates them at `/api/network` and
+  `/api/network/health` and its nginx vhost serves `/status/`, `/status/api/` and
+  `/status/nodes/<name>/`. Node `[datagram_monitor]` stanzas default to the node's own
+  address and the sampler's XDGM port. Operators fill `/opt/xrpld-status/network.json`
+  for the deploy, branches, faucet, VL and amendment panels.
+
 ## 3.2.0
 
 ### Added

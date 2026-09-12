@@ -150,7 +150,35 @@ services:
       ws_url: ws://10.0.0.4:6016
       network_id: "21339"
       seed: sEdxxxxxxxxx
+    status:
+      port: 8687
 ```
+
+**Status service** (`status:` on the services host, which must be one of the nodes). Every
+node gets `node_metrics.py` as the `xrpld-status` systemd unit: it samples `/proc`, the
+admin RPC `server_info` and the XDGM datagram into a SQLite ring buffer and serves a
+per-node dashboard plus `/api/latest`, `/api/series`, `/api/events`, `/api/health`. Each
+node's `[datagram_monitor]` is pointed at its own address and the sampler's `xdgm_port`
+(default 9999) unless `--datagram_monitor` names another sink. The services host's sampler
+also aggregates every node (`/api/network`, `/api/network/health`: 200 only when every
+validator is `proposing` and every peer `full`), and its bare-domain nginx vhost serves
+`/status/` (network dashboard), `/status/api/` (aggregation) and `/status/nodes/<name>/`
+(each node's dashboard). Samplers on the other nodes bind `0.0.0.0:<port>`, admitted by ufw
+from the services host only. Operators write `/opt/xrpld-status/network.json` on the
+services host after a deploy (`last_deploy`, `branches`, `faucet`, `vl`, `amendments`);
+the network page renders it. `status.yml` re-runs on every deploy; the nginx vhost is a
+`run_once` stage, so an existing deployment picks up the new locations with `--force` or
+by deleting `.done_<host>_nginx`.
+
+| `status` key | Default | Description |
+|---|---|---|
+| `port` | `8687` | Sampler HTTP port on every node |
+| `xdgm_port` | `9999` | UDP port for xrpld's XDGM datagram |
+| `interval` | `10` | Sampling interval in seconds |
+| `process` | `xrpld` | Process name looked up in `/proc` for RSS |
+| `disk_path` | `/var/lib/xrpld/db` | Filesystem measured for disk usage |
+| `network_name` | nginx domain | Heading on the network dashboard |
+| `retain_raw_hours` / `retain_5m_days` / `retain_1h_days` | `48` / `30` / `365` | Ring buffer retention |
 
 ### `deploy:ansible` -- Run ansible deployment
 
@@ -202,6 +230,7 @@ xrpld_lab/
   workflows.py        # LabRunner: orchestrates standalone/network/local/ansible
   cli.py              # Thin CLI: argparse -> LabConfig -> LabRunner.run()
   ansible_builder.py  # Ansible playbooks, inventory, host vars, services
+  services/status/    # node_metrics.py sampler + node and network dashboards
   operations.py       # Node updates, amendment enabling, log viewing
   workspace.py        # Path resolution
   utils.py            # File I/O, colors, subprocess helpers
