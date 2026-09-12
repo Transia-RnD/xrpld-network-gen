@@ -263,7 +263,6 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--log_level", default="trace", choices=["warning", "debug", "trace"]
     )
-    p.add_argument("--build_type", default="binary", choices=["image", "binary"])
     p.add_argument("--public_key", default=_DEFAULT_VL_KEY)
     p.add_argument("--protocol", default="xrpl")
     p.add_argument(
@@ -660,7 +659,6 @@ def _build_standalone_config(args, protocol, spec):
     """Build LabConfig for the up:standalone command."""
     server = args.server
     version = args.version
-    build_type = BuildType(args.build_type)
 
     # Load config overrides from file if provided
     config_overrides = {}
@@ -892,8 +890,7 @@ def main() -> None:
         start_local(
             protocol=args.protocol,
             network_type=args.network_type,
-            network_id=args.network_id
-            or get_spec(Protocol(args.protocol)).default_network_id,
+            network_id=args.network_id,
             log_level=args.log_level,
             nodedb_type=args.nodedb_type,
             public_key=args.public_key,

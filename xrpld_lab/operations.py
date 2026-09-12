@@ -98,7 +98,7 @@ def stop_standalone(
 def start_local(
     protocol: str = "xrpl",
     network_type: str = "standalone",
-    network_id: int = 21339,
+    network_id: int | None = None,
     log_level: str = "trace",
     nodedb_type: str = "NuDB",
     public_key: str = None,
@@ -123,6 +123,7 @@ def start_local(
     cwd = os.getcwd()
     protocol_enum = Protocol(protocol)
     spec = get_spec(protocol_enum)
+    network_id = network_id or spec.default_network_id
     binary_name = spec.daemon_name
     config_filename = f"{binary_name}.cfg"
 
