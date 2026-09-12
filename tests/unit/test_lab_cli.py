@@ -1360,6 +1360,132 @@ class TestMain:
 
         mock_deploy.assert_called_once_with(mock_ws, "my-cluster")
 
+    # -- Exit status: a failed operation exits 1, a successful one returns --
+
+    @patch("xrpld_lab.cli.run_start_script", return_value=True)
+    @patch("xrpld_lab.cli.Workspace")
+    def test_successful_up_returns_normally(self, mock_ws_cls, mock_run):
+        with patch("sys.argv", ["xrpld-lab", "up", "--name", "my-net"]):
+            assert main() is None
+
+    @patch("xrpld_lab.cli.run_start_script", return_value=False)
+    @patch("xrpld_lab.cli.Workspace")
+    def test_failing_up_exits_1(self, mock_ws_cls, mock_run):
+        with patch("sys.argv", ["xrpld-lab", "up", "--name", "my-net"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+
+        assert exc.value.code == 1
+
+    @patch("xrpld_lab.cli.run_stop_script", return_value=False)
+    @patch("xrpld_lab.cli.Workspace")
+    def test_failing_down_exits_1(self, mock_ws_cls, mock_run):
+        with patch("sys.argv", ["xrpld-lab", "down", "--name", "my-net"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+
+        assert exc.value.code == 1
+
+    @patch("xrpld_lab.cli.stop_standalone", return_value=False)
+    @patch("xrpld_lab.cli.Workspace")
+    def test_failing_down_standalone_exits_1(self, mock_ws_cls, mock_run):
+        with patch("sys.argv", ["xrpld-lab", "down:standalone", "--name", "sa"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+
+        assert exc.value.code == 1
+
+    @patch("xrpld_lab.operations.run_command", return_value=7)
+    def test_failing_down_standalone_keeps_the_directory(self, mock_run, tmp_path):
+        from xrpld_lab.workspace import Workspace
+
+        net_dir = tmp_path / "my-standalone"
+        net_dir.mkdir()
+        (net_dir / "stop.sh").write_text("#!/bin/bash\nexit 7\n")
+
+        with patch("xrpld_lab.cli.Workspace", return_value=Workspace(str(tmp_path))):
+            with patch(
+                "sys.argv", ["xrpld-lab", "down:standalone", "--name", "my-standalone"]
+            ):
+                with pytest.raises(SystemExit) as exc:
+                    main()
+
+        assert exc.value.code == 1
+        mock_run.assert_called_once_with(str(net_dir), "bash stop.sh")
+        assert (net_dir / "stop.sh").is_file()
+
+    @patch("xrpld_lab.cli._deploy_ansible", return_value=False)
+    @patch("xrpld_lab.cli.Workspace")
+    def test_failing_deploy_ansible_exits_1(self, mock_ws_cls, mock_deploy):
+        with patch("sys.argv", ["xrpld-lab", "deploy:ansible", "--name", "c"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+
+        assert exc.value.code == 1
+
+    @patch("xrpld_lab.cli.restart_local_node", return_value=False)
+    @patch("xrpld_lab.cli.Workspace")
+    def test_failing_node_restart_exits_1(self, mock_ws_cls, mock_restart):
+        with patch("sys.argv", ["xrpld-lab", "node:restart", "vnode1"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+
+        assert exc.value.code == 1
+
+    # -- update:node needs exactly one binary source --
+
+    @patch("xrpld_lab.cli.update_node_binary")
+    @patch("xrpld_lab.cli.Workspace")
+    def test_update_node_requires_a_binary_source(self, mock_ws_cls, mock_run):
+        with patch(
+            "sys.argv",
+            [
+                "xrpld-lab",
+                "update:node",
+                "--name",
+                "my-net",
+                "--node_id",
+                "2",
+                "--node_type",
+                "validator",
+                "--build_version",
+                "3.3.0",
+            ],
+        ):
+            with pytest.raises(SystemExit) as exc:
+                main()
+
+        assert exc.value.code == 2
+        mock_run.assert_not_called()
+
+    @patch("xrpld_lab.cli.update_node_binary")
+    @patch("xrpld_lab.cli.Workspace")
+    def test_update_node_rejects_both_binary_sources(self, mock_ws_cls, mock_run):
+        with patch(
+            "sys.argv",
+            [
+                "xrpld-lab",
+                "update:node",
+                "--name",
+                "my-net",
+                "--node_id",
+                "2",
+                "--node_type",
+                "validator",
+                "--build_version",
+                "3.3.0",
+                "--build_server",
+                "https://build.example.com",
+                "--image",
+                "rippleci/xrpld:3.3.0",
+            ],
+        ):
+            with pytest.raises(SystemExit) as exc:
+                main()
+
+        assert exc.value.code == 2
+        mock_run.assert_not_called()
+
 
 class TestFlattenIps:
     """_flatten_ips normalises IP args so a joined string can't collapse the fleet."""
