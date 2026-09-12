@@ -124,28 +124,28 @@ jobs:
 
       - name: Test CLI --help
         run: |
-          poetry run xrpld-netgen --help
+          poetry run xrpld-lab --help
 
       - name: Test CLI subcommand help
         run: |
-          poetry run xrpld-netgen create:network --help
-          poetry run xrpld-netgen up:standalone --help
-          poetry run xrpld-netgen up:local --help
+          poetry run xrpld-lab create:network --help
+          poetry run xrpld-lab up:standalone --help
+          poetry run xrpld-lab up:local --help
 
       - name: Test CLI without args does not crash
         run: |
-          poetry run xrpld-netgen || true
+          poetry run xrpld-lab || true
           
       - name: Test CLI command for xrpl
         run: |
-          poetry run xrpld-netgen up:standalone --protocol xrpl
+          poetry run xrpld-lab up:standalone --protocol xrpl
           sleep 5
           docker logs xrpl
           docker ps | grep xrpl
 
       - name: Test CLI command for xahau
         run: |
-          poetry run xrpld-netgen up:standalone --protocol xahau
+          poetry run xrpld-lab up:standalone --protocol xahau
           sleep 5
           docker logs xahau
           docker ps | grep xahau
