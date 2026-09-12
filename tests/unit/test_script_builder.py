@@ -222,25 +222,9 @@ class TestScriptBuilderNetwork:
     """Tests for network Docker start/stop scripts."""
 
     def test_network_start(self):
-        """Copies binary to vnodes and pnodes, compose up."""
-        result = ScriptBuilder.network_start(
-            name="testnet",
-            num_validators=2,
-            num_peers=1,
-        )
+        """Compose up only; the binary is already in each node directory."""
+        result = ScriptBuilder.network_start()
         assert "#! /bin/bash" in result
-        # Copies binary to validator nodes
-        assert "cp xrpld.testnet vnode1/xrpld.testnet" in result
-        assert "cp xrpld.testnet vnode2/xrpld.testnet" in result
-        # Copies binary to peer nodes
-        assert "cp xrpld.testnet pnode1/xrpld.testnet" in result
-        # Compose up
-        assert "docker compose -f docker-compose.yml" in result
-
-    def test_network_start_image_mode_copies_nothing(self):
-        result = ScriptBuilder.network_start(
-            name="testnet", num_validators=2, num_peers=1, copy_binary=False
-        )
         assert "cp " not in result
         assert "docker compose -f docker-compose.yml" in result
         assert "up --build --force-recreate -d" in result

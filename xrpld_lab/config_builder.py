@@ -68,7 +68,6 @@ class XrpldCfgBuilder:
             out += self._tree_cache_target_entries_section()
         out += self._consensus_reserve_threads_section()
         out += self._node_db_section()
-        out += self._relational_db_section()
         out += self._fee_reserves_section()
         out += self._ledger_history_section()
         out += self._database_path_section()
@@ -176,7 +175,7 @@ class XrpldCfgBuilder:
 
         return out
 
-    # -- node_size / node_db / relational_db ----------------------------------
+    # -- node_size / node_db --------------------------------------------------
 
     def _node_size_section(self) -> str:
         return f"\n[node_size]\n{self.config.size_node}\n\n"
@@ -202,24 +201,15 @@ class XrpldCfgBuilder:
         )
 
     def _node_db_section(self) -> str:
-        from xrpld_lab.models import NodeDbType
-
         ndb = self.config.node_db
         out = "[node_db]\n"
         out += f"type={ndb.db_type.value}\n"
-        if ndb.db_type != NodeDbType.RWDB:
-            out += f"path={ndb.path}\n"
-            if ndb.num_ledgers:
-                out += "advisory_delete=0\n"
-                out += f"online_delete={ndb.num_ledgers}\n"
+        out += f"path={ndb.path}\n"
+        if ndb.num_ledgers:
+            out += "advisory_delete=0\n"
+            out += f"online_delete={ndb.num_ledgers}\n"
         out += "\n"
         return out
-
-    def _relational_db_section(self) -> str:
-        rdb = self.config.node_db.relational_db
-        if rdb:
-            return f"[relational_db]\n{rdb}\n\n"
-        return ""
 
     # -- fee reserves ---------------------------------------------------------
 

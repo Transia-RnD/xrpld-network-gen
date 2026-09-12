@@ -55,6 +55,21 @@ class TestBuildParser:
         assert args.ipfs is False
         assert args.nodedb_type == "NuDB"
 
+    @pytest.mark.parametrize("value", ["False", "false", "0"])
+    def test_up_standalone_ipfs_false_values(self, value):
+        args = _build_parser().parse_args(["up:standalone", "--ipfs", value])
+        assert args.ipfs is False
+
+    @pytest.mark.parametrize("value", ["True", "true", "1"])
+    def test_up_standalone_ipfs_true_values(self, value):
+        args = _build_parser().parse_args(["up:standalone", "--ipfs", value])
+        assert args.ipfs is True
+
+    @pytest.mark.parametrize("command", ["up:standalone", "create:network", "up:local"])
+    def test_nodedb_type_rwdb_is_rejected(self, command):
+        with pytest.raises(SystemExit):
+            _build_parser().parse_args([command, "--nodedb_type", "rwdb"])
+
     def test_create_network_defaults(self):
         parser = _build_parser()
         args = parser.parse_args(["create:network"])
@@ -526,7 +541,7 @@ class TestBuildLabConfigNetwork:
     def test_xrpl_with_local_uses_github_url(self):
         args = self._parse("--protocol", "xrpl", "--local")
         cfg = build_lab_config(args)
-        assert cfg.build_source.build_server == "https://github.com/XRPLF/xrpld/tree"
+        assert cfg.build_source.build_server == "https://github.com/XRPLF/rippled/tree"
         assert cfg.mode == DeployMode.LOCAL
 
     def test_xrpl_without_local_uses_spec_default(self):
@@ -555,7 +570,7 @@ class TestBuildLabConfigNetwork:
             "--protocol",
             "xrpl",
             "--build_server",
-            "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
+            "https://github.com/XRPLF/rippled/tree/xrplf-smart-contracts",
             "--build_version",
             "abc123",
         )
@@ -567,7 +582,7 @@ class TestBuildLabConfigNetwork:
             "--protocol",
             "xrpl",
             "--build_server",
-            "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
+            "https://github.com/XRPLF/rippled/tree/xrplf-smart-contracts",
             "--build_version",
             "abc123def456",
         )
@@ -579,7 +594,7 @@ class TestBuildLabConfigNetwork:
             "--protocol",
             "xrpl",
             "--build_server",
-            "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
+            "https://github.com/XRPLF/rippled/tree/xrplf-smart-contracts",
             "--build_version",
             "abc123",
         )
@@ -591,7 +606,7 @@ class TestBuildLabConfigNetwork:
             "--protocol",
             "xrpl",
             "--build_server",
-            "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
+            "https://github.com/XRPLF/rippled/tree/xrplf-smart-contracts",
             "--build_version",
             "abc123",
             "--binary_path",
@@ -605,7 +620,7 @@ class TestBuildLabConfigNetwork:
             "--protocol",
             "xrpl",
             "--build_server",
-            "https://github.com/XRPLF/xrpld/tree/feature-branch",
+            "https://github.com/XRPLF/rippled/tree/feature-branch",
             "--build_version",
             "abc123",
         )
@@ -624,16 +639,46 @@ class TestBuildLabConfigNetwork:
         cfg = build_lab_config(args)
         assert cfg.build_source.owner == "Transia-RnD"
 
-    def test_github_url_sets_repo_to_rippled(self):
+    def test_github_url_xrplf_rippled(self):
         args = self._parse(
             "--protocol",
             "xrpl",
             "--build_server",
-            "https://github.com/XRPLF/xrpld/tree/some-branch",
+            "https://github.com/XRPLF/rippled/tree/some-branch",
             "--build_version",
             "abc123",
         )
         cfg = build_lab_config(args)
+        assert cfg.build_source.owner == "XRPLF"
+        assert cfg.build_source.repo == "rippled"
+        assert cfg.build_source.cluster_name == "some-branch"
+
+    def test_github_url_extracts_repo(self):
+        args = self._parse(
+            "--protocol",
+            "xrpl",
+            "--build_server",
+            "https://github.com/Transia-RnD/xrpld-private/tree/custom-branch",
+            "--build_version",
+            "abc123",
+        )
+        cfg = build_lab_config(args)
+        assert cfg.build_source.owner == "Transia-RnD"
+        assert cfg.build_source.repo == "xrpld-private"
+        assert cfg.build_source.cluster_name == "custom-branch"
+        assert cfg.build_source.build_type == BuildType.BINARY
+
+    def test_github_url_without_repo_falls_back_to_rippled(self):
+        args = self._parse(
+            "--protocol",
+            "xrpl",
+            "--build_server",
+            "https://github.com/Transia-RnD/",
+            "--build_version",
+            "abc123",
+        )
+        cfg = build_lab_config(args)
+        assert cfg.build_source.owner == "Transia-RnD"
         assert cfg.build_source.repo == "rippled"
 
     def test_github_url_branch_with_slashes(self):
@@ -641,7 +686,7 @@ class TestBuildLabConfigNetwork:
             "--protocol",
             "xrpl",
             "--build_server",
-            "https://github.com/XRPLF/xrpld/tree/feature/my-branch",
+            "https://github.com/XRPLF/rippled/tree/feature/my-branch",
             "--build_version",
             "abc123",
         )
@@ -729,10 +774,10 @@ class TestBuildLabConfigAnsible:
         cfg = build_lab_config(args)
         assert cfg.build_source.build_server == "rippleci"
 
-    def test_nodedb_type_rwdb(self):
-        args = self._parse("--nodedb_type", "rwdb")
+    def test_nodedb_type_memory(self):
+        args = self._parse("--nodedb_type", "Memory")
         cfg = build_lab_config(args)
-        assert cfg.node_db_type == NodeDbType.RWDB
+        assert cfg.node_db_type == NodeDbType.MEMORY
 
     def test_ansible_config_from_file(self, tmp_path):
         config_file = tmp_path / "ansible.yml"

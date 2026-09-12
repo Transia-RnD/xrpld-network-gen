@@ -32,7 +32,7 @@ xrpld-lab up --name 3.3.0-cluster
 # XRPL network from a custom GitHub branch (local binary)
 xrpld-lab create:network \
   --protocol xrpl \
-  --build_server "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts" \
+  --build_server "https://github.com/XRPLF/rippled/tree/xrplf-smart-contracts" \
   --build_version <commit_hash> \
   --num_validators 3 --num_peers 1
 
@@ -46,7 +46,7 @@ xrpld-lab create:ansible \
   --num_validators 6 --num_peers 2 \
   --vips 10.0.0.1 10.0.0.2 10.0.0.3 10.0.0.4 10.0.0.5 10.0.0.6 \
   --pips 10.0.0.7 10.0.0.8 \
-  --nodedb_type rwdb --genesis True --quorum 3
+  --genesis True --quorum 3
 ```
 
 ## Commands
@@ -86,7 +86,7 @@ xrpld-lab create:network [OPTIONS]
 | `--log_level` | `trace` | `warning`, `debug`, `trace` |
 | `--genesis` | `false` | Genesis mode |
 | `--quorum` | `n-1` | Consensus quorum |
-| `--nodedb_type` | `NuDB` | `NuDB`, `Memory`, or `rwdb` |
+| `--nodedb_type` | `NuDB` | `NuDB` (persistent) or `Memory` (fast) |
 | `--local` | off | Run as native processes (no Docker for nodes) |
 | `--binary_name` | `xrpld` | Binary name for local networks |
 | `--binary_path` | `./xrpld` | Path to pre-built binary (GitHub URL mode) |
