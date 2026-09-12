@@ -535,7 +535,12 @@ class LabRunner:
         # 10. Scripts
         write_executable(
             os.path.join(cluster_dir, "start.sh"),
-            ScriptBuilder.network_start(name, lab.num_validators, lab.num_peers),
+            ScriptBuilder.network_start(
+                name,
+                lab.num_validators,
+                lab.num_peers,
+                copy_binary=source.build_type == BuildType.BINARY,
+            ),
         )
         write_executable(
             os.path.join(cluster_dir, "stop.sh"),

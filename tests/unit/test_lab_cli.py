@@ -497,6 +497,35 @@ class TestBuildLabConfigNetwork:
         cfg = build_lab_config(args)
         assert cfg.mode == DeployMode.LOCAL
 
+    # -- image for xrpl --
+
+    def test_xrpl_network_defaults_to_the_release_image(self):
+        cfg = build_lab_config(self._parse("--protocol", "xrpl"))
+        assert cfg.build_source.build_type == BuildType.IMAGE
+        assert cfg.build_source.image == f"rippleci/xrpld:{_XRPL_RELEASE_FALLBACK}"
+
+    def test_xrpl_ansible_image_flag_wins(self):
+        args = _build_parser().parse_args(
+            [
+                "create:ansible",
+                "--protocol",
+                "xrpl",
+                "--vips",
+                "10.0.0.1",
+                "--pips",
+                "10.0.0.2",
+                "--image",
+                "example/xrpld:dev",
+            ]
+        )
+        cfg = build_lab_config(args)
+        assert cfg.build_source.image == "example/xrpld:dev"
+
+    def test_xahau_network_has_no_default_image(self):
+        cfg = build_lab_config(self._parse("--protocol", "xahau"))
+        assert cfg.build_source.build_type == BuildType.BINARY
+        assert cfg.build_source.image == ""
+
     def test_no_local_flag_sets_network_mode(self):
         args = self._parse()
         cfg = build_lab_config(args)

@@ -745,6 +745,7 @@ def _build_network_config(args, protocol, spec):
     cluster_name = ""
     commit_hash = ""
     binary_path = ""
+    default_image = ""
     build_type = BuildType.IMAGE
     owner = spec.github_owner
     repo = spec.github_repo
@@ -770,13 +771,14 @@ def _build_network_config(args, protocol, spec):
         else:
             server = server or spec.default_build_server
             version = version or _XRPL_RELEASE_FALLBACK
+            default_image = f"{server}/xrpld:{version}"
 
     # Explicit cluster name (workspace dir) overrides the branch-derived one.
     if getattr(args, "cluster", None):
         cluster_name = args.cluster
 
     # A prebuilt image IS the binary: deploy it directly, skip the local-binary path.
-    image = getattr(args, "image", None) or ""
+    image = getattr(args, "image", None) or default_image
     if image:
         build_type = BuildType.IMAGE
         binary_path = ""
