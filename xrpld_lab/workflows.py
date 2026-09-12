@@ -561,14 +561,27 @@ class LabRunner:
 
         # 11. Ansible deployment (if configured)
         if lab.ansible:
-            self._generate_ansible(lab, cluster_dir, name, ansible_image)
+            self._generate_ansible(
+                lab,
+                cluster_dir,
+                name,
+                ansible_image,
+                build_tag=(
+                    (source.commit_hash or source.build_version) if use_binary else ""
+                ),
+            )
 
     # ------------------------------------------------------------------
     # Ansible generation
     # ------------------------------------------------------------------
 
     def _generate_ansible(
-        self, lab: LabConfig, cluster_dir: str, name: str, image_name: str
+        self,
+        lab: LabConfig,
+        cluster_dir: str,
+        name: str,
+        image_name: str,
+        build_tag: str = "",
     ):
         """Generate ansible deployment files for the cluster."""
         ansible_builder = AnsibleBuilder(
@@ -576,6 +589,7 @@ class LabRunner:
             config=lab.ansible,
             image_name=image_name,
             genesis=lab.genesis,
+            build_tag=build_tag,
         )
 
         for i in range(1, lab.num_validators + 1):
