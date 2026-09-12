@@ -207,10 +207,10 @@ class TestScriptBuilderStandalone:
         assert "-f /opt/cluster/xrpl-test-net/docker-compose.yml" in result
         assert "down --remove-orphans" in result
         # Standalone cleanup dirs
-        assert "rm -r xrpl/config" in result
-        assert "rm -r xrpl/lib" in result
-        assert "rm -r xrpl/log" in result
-        assert "rm -r xrpl\n" in result
+        assert (
+            'docker run --rm -v "$(pwd):/wipe" alpine:3 rm -rf /wipe/xrpl\n' in result
+        )
+        assert "rm -r " not in result
 
 
 # ---------------------------------------------------------------------------
@@ -242,16 +242,12 @@ class TestScriptBuilderNetwork:
         # --remove-orphans in the remove branch
         assert "down --remove-orphans" in result
         # Cleanup for vnodes
-        assert "rm -r vnode1/lib" in result
-        assert "rm -r vnode1/log" in result
-        assert "rm -r vnode1/xrpld.testnet" in result
-        assert "rm -r vnode2/lib" in result
-        assert "rm -r vnode2/log" in result
-        assert "rm -r vnode2/xrpld.testnet" in result
-        # Cleanup for pnodes
-        assert "rm -r pnode1/lib" in result
-        assert "rm -r pnode1/log" in result
-        assert "rm -r pnode1/xrpld.testnet" in result
+        wipe = [line for line in result.splitlines() if line.startswith("docker run")]
+        assert len(wipe) == 1
+        for node in ("vnode1", "vnode2", "pnode1"):
+            for leaf in ("lib", "log", "xrpld.testnet"):
+                assert f" /wipe/{node}/{leaf}" in wipe[0], (node, leaf)
+        assert "rm -r " not in result
         # Else branch with just compose down (no --remove-orphans)
         assert "docker compose -f docker-compose.yml down\n" in result
         # fi closing
