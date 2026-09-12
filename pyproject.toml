@@ -14,8 +14,9 @@ requests = "^2.31.0"
 xrpld-publisher = "^2.0.0"
 xrpl-py = "^2.6.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
+pytest-cov = "^5.0.0"
 flake8 = "^7.3.0"
 
 [build-system]

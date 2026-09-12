@@ -3,7 +3,7 @@
 ## Setup
 
 ```bash
-git clone https://github.com/Transia-RnD/xrpld-lab
+git clone https://github.com/XRPLF/xrpld-lab
 cd xrpld-lab
 poetry install
 ```

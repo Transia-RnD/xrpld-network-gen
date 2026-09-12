@@ -23,10 +23,11 @@ pip install xrpld-lab
 
 ```bash
 # Standalone XRPL ledger
-xrpld-lab up:standalone --protocol xrpl
+xrpld-lab up:standalone
 
-# 3-validator XRPL network (Docker image from rippleci)
-xrpld-lab create:network --protocol xrpl --num_validators 3 --num_peers 1
+# 3-validator, 1-peer XRPL network from the rippleci/xrpld release image
+xrpld-lab create:network --num_validators 3 --num_peers 1 --genesis True
+xrpld-lab up --name 3.3.0-cluster
 
 # XRPL network from a custom GitHub branch (local binary)
 xrpld-lab create:network \
@@ -41,7 +42,7 @@ xrpld-lab create:network --protocol xrpl --local
 # Ansible deployment to remote servers
 xrpld-lab create:ansible \
   --protocol xrpl \
-  --build_version 3.2.0-rc2 \
+  --build_version 3.3.0 \
   --num_validators 6 --num_peers 2 \
   --vips 10.0.0.1 10.0.0.2 10.0.0.3 10.0.0.4 10.0.0.5 10.0.0.6 \
   --pips 10.0.0.7 10.0.0.8 \
@@ -59,10 +60,9 @@ xrpld-lab up:standalone [OPTIONS]
 | Option | Default | Description |
 |---|---|---|
 | `--protocol` | `xrpl` | Protocol |
-| `--version` | latest | Build version |
-| `--build_type` | `binary` | `image` or `binary` |
+| `--version` | `3.3.0` | Build version |
 | `--log_level` | `trace` | `warning`, `debug`, `trace` |
-| `--network_id` | `21339` | Network identifier |
+| `--network_id` | `1` | Network identifier |
 | `--nodedb_type` | `NuDB` | `NuDB` (persistent) or `Memory` (fast) |
 | `--ipfs` | `false` | Include IPFS server |
 | `--server` | auto | Build server URL |
@@ -80,9 +80,9 @@ xrpld-lab create:network [OPTIONS]
 | `--protocol` | `xrpl` | Protocol |
 | `--num_validators` | `3` | Number of validator nodes |
 | `--num_peers` | `1` | Number of peer nodes |
-| `--build_version` | latest | Build version or commit hash |
+| `--build_version` | `3.3.0` | Build version or commit hash |
 | `--build_server` | auto | Build server URL or GitHub branch URL |
-| `--network_id` | `21339` | Network identifier |
+| `--network_id` | `1025` | Network identifier |
 | `--log_level` | `trace` | `warning`, `debug`, `trace` |
 | `--genesis` | `false` | Genesis mode |
 | `--quorum` | `n-1` | Consensus quorum |
@@ -144,7 +144,7 @@ services:
     redis: {}
     faucet:
       ws_url: ws://10.0.0.4:6016
-      network_id: "21339"
+      network_id: "1025"
       seed: sEdxxxxxxxxx
     status:
       port: 8687
@@ -235,15 +235,15 @@ xrpld_lab/
 ## Development
 
 ```bash
-git clone https://github.com/Transia-RnD/xrpld-lab
+git clone https://github.com/XRPLF/xrpld-lab
 cd xrpld-lab
 poetry install
-poetry run pytest tests/ -v
+poetry run pytest tests
 ```
 
 ## Current versions
 
-- XRPL: `3.2.0-rc2`
+- XRPL: `3.3.0`
 
 ## License
 
