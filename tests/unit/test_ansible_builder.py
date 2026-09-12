@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import os
+import re
 import yaml
 import pytest
 
@@ -21,6 +22,7 @@ from xrpld_lab.models import (
     StatusConfig,
 )
 from xrpld_lab.ansible_builder import AnsibleBuilder
+import xrpld_lab.ansible_builder as ansible_builder
 
 
 # ---------------------------------------------------------------------------
@@ -341,6 +343,14 @@ class TestRunSh:
         builder.write()
         content = open(os.path.join(builder.ansible_dir, "run.sh")).read()
         assert "run_always main.yml" in content
+
+    def test_registry_token_is_exported_not_passed_in_argv(self, tmp_path):
+        builder = _build_basic(tmp_path)
+        builder.write()
+        content = open(os.path.join(builder.ansible_dir, "run.sh")).read()
+        assert 'export AR_TOKEN="$(gcloud auth print-access-token' in content
+        assert "ar_token" not in content
+        assert "-e " not in content
 
     def test_has_force_flag(self, tmp_path):
         builder = _build_basic(tmp_path)
@@ -1135,6 +1145,25 @@ class TestMainYmlGenesisModes:
         assert "Deploy Docker Image" in names
         assert "restart docker" not in names
 
+    @pytest.mark.parametrize("genesis", [True, False])
+    def test_registry_login_reads_the_token_from_the_environment(
+        self, tmp_path, genesis
+    ):
+        content = self._main_yml(tmp_path, genesis=genesis)
+        assert 'echo "{{ ar_token }}"' not in content
+        assert "ar_token" not in content
+        plays = yaml.safe_load(content)
+        login = next(
+            t
+            for t in plays[0]["tasks"]
+            if t["name"].startswith("Authenticate Docker to Artifact Registry")
+        )
+        assert login["no_log"] is True
+        assert login["environment"] == {"AR_TOKEN": "{{ lookup('env', 'AR_TOKEN') }}"}
+        assert "printf '%s' \"$AR_TOKEN\" | docker login" in login["shell"]
+        assert "--password-stdin" in login["shell"]
+        assert login["when"] == "lookup('env', 'AR_TOKEN') | length > 0"
+
     def test_default_is_genesis(self, tmp_path):
         cluster_dir = str(tmp_path / "cluster-default")
         os.makedirs(cluster_dir, exist_ok=True)
@@ -1297,6 +1326,21 @@ class TestAlloySidecar:
         builder.write()
         clean = open(os.path.join(builder.ansible_dir, "clean.yml")).read()
         assert "alloy_container_name is defined" in clean
+
+    def test_inspect_template_is_raw_for_the_ansible_templater(self, tmp_path):
+        builder = self._builder(tmp_path, self._alloy(tmp_path))
+        builder.write()
+        content = open(os.path.join(builder.ansible_dir, "alloy.yml")).read()
+        assert "{{{{" not in content
+        assert "{% raw %}{{ .State.Status }}{% endraw %}" in content
+        plays = yaml.safe_load(content)
+        report = next(
+            t for t in plays[0]["tasks"] if t.get("name") == "Report the sidecar state"
+        )
+        assert report["command"] == (
+            "docker inspect -f '{% raw %}{{ .State.Status }}{% endraw %}' "
+            '"{{ alloy_container_name }}"'
+        )
 
     def test_per_node_credentials_override_the_cluster_pair(self, tmp_path):
         alloy = self._alloy(
@@ -1581,13 +1625,11 @@ class TestStatusService:
         assert hv["status_allow_from"] == "10.0.0.10"
         assert hv["status_http_port"] == 8700
 
-    def test_xdgm_listener_binds_the_node_address_the_container_can_reach(
-        self, tmp_path
-    ):
+    def test_xdgm_listener_binds_every_interface(self, tmp_path):
         builder = self._builder(tmp_path, StatusConfig(xdgm_port=9998))
         builder.write()
         hv = self._host_vars(builder, "10.0.0.2")
-        assert hv["status_env"]["NODE_METRICS_XDGM_HOST"] == "10.0.0.2"
+        assert hv["status_env"]["NODE_METRICS_XDGM_HOST"] == "0.0.0.0"
         assert hv["status_env"]["NODE_METRICS_XDGM_PORT"] == "9998"
         assert hv["status_xdgm_port"] == 9998
 
@@ -1702,3 +1744,56 @@ class TestStatusService:
         )
         with pytest.raises(ValueError):
             builder.write()
+
+
+# ===========================================================================
+# Template brace hygiene
+# ===========================================================================
+
+
+class TestTemplateBraces:
+    """A template written with _file_write reaches Ansible verbatim, so a doubled
+    brace is a Jinja syntax error there; a template passed through str.format()
+    needs every Jinja brace doubled, so a bare one is a KeyError or a lost var."""
+
+    VERBATIM = [
+        "_DEPS_YML",
+        "_MAIN_HEADER",
+        "_MAIN_HEADER_ROLLING",
+        "_MAIN_RESET_TASKS",
+        "_MAIN_DEPLOY_TASKS",
+        "_ALLOY_YML",
+        "_CLEAN_YML",
+        "_STATUS_YML",
+    ]
+    FORMATTED = [
+        "_NGINX_DEPS_TPL",
+        "_NGINX_SSL_HEADER_TPL",
+        "_NGINX_MAIN_TPL",
+        "_VL_MAIN_TPL",
+        "_REDIS_MAIN_TPL",
+        "_FAUCET_MAIN_TPL",
+        "_STREAM_MAIN_TPL",
+        "_DEBUG_MAIN_TPL",
+        "_COMPILER_MAIN_TPL",
+        "_STATUS_SITE_MAIN_TPL",
+    ]
+
+    def test_every_playbook_template_is_classified(self):
+        found = {
+            name
+            for name, value in vars(ansible_builder).items()
+            if re.fullmatch(r"_[A-Z_]+", name)
+            and isinstance(value, str)
+            and ("hosts:" in value or "- name:" in value)
+        }
+        assert found == set(self.VERBATIM) | set(self.FORMATTED)
+
+    @pytest.mark.parametrize("name", VERBATIM)
+    def test_verbatim_template_has_no_doubled_braces(self, name):
+        assert "{{{{" not in getattr(ansible_builder, name)
+        assert "}}}}" not in getattr(ansible_builder, name)
+
+    @pytest.mark.parametrize("name", FORMATTED)
+    def test_formatted_template_has_no_bare_jinja_braces(self, name):
+        assert re.search(r"(?<!\{)\{\{ ", getattr(ansible_builder, name)) is None

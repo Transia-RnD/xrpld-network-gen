@@ -1161,3 +1161,78 @@ class TestStageBinary:
 
         m.assert_not_called()
         assert not (tmp_path / "b").exists()
+
+
+# ===========================================================================
+# Binary staging into node directories
+# ===========================================================================
+
+
+class TestNetworkBinaryStaging:
+    """A network built from a local binary carries it in every node directory,
+    which is the docker build context for both start.sh and ansible."""
+
+    def _generate(self, tmp_path, *extra_args):
+        from xrpld_lab.cli import _build_parser, build_lab_config
+
+        binary = tmp_path / "xrpld"
+        binary.write_text("#!/bin/sh\necho fake\n")
+        features = tmp_path / "features.macro"
+        features.write_text(
+            "XRPL_FEATURE(Feature1, Supported::yes, DefaultVote::yes)\n"
+        )
+        args = _build_parser().parse_args(
+            [
+                "create:ansible",
+                "--build_server",
+                "https://github.com/XRPLF/rippled/tree/develop",
+                "--build_version",
+                "abc1234",
+                "--binary_path",
+                str(binary),
+                "--features_file",
+                str(features),
+                "--vips",
+                "10.0.0.1",
+                "10.0.0.2",
+                "--pips",
+                "10.0.0.3",
+                "--genesis",
+                "True",
+                "--num_validators",
+                "2",
+                "--num_peers",
+                "1",
+                *extra_args,
+            ]
+        )
+        lab = build_lab_config(args)
+        LabRunner(lab, Workspace(base=str(tmp_path / "ws"))).run()
+        return tmp_path / "ws" / "develop-cluster"
+
+    def test_binary_lands_in_every_node_dir(self, tmp_path):
+        cluster = self._generate(tmp_path)
+        for node in ("vnode1", "vnode2", "pnode1"):
+            staged = cluster / node / "xrpld.develop"
+            assert staged.is_file(), node
+            assert os.access(staged, os.X_OK), node
+            assert staged.read_text() == (tmp_path / "xrpld").read_text()
+            dockerfile = (cluster / node / "Dockerfile").read_text()
+            assert "FROM ubuntu:noble" in dockerfile
+            assert "COPY xrpld.develop /opt/xrpld/bin/xrpld" in dockerfile
+
+    def test_start_script_does_not_copy(self, tmp_path):
+        cluster = self._generate(tmp_path)
+        assert "cp " not in (cluster / "start.sh").read_text()
+
+    def test_ansible_pulls_the_dockerfile_base_image(self, tmp_path):
+        import yaml
+
+        cluster = self._generate(tmp_path)
+        nodes = {"10.0.0.1": "vnode1", "10.0.0.2": "vnode2", "10.0.0.3": "pnode1"}
+        for ip, node in nodes.items():
+            with open(cluster / "ansible" / "host_vars" / f"{ip}.yml") as f:
+                host_vars = yaml.safe_load(f)
+            assert host_vars["docker_image_name"] == "ubuntu:noble", ip
+            assert host_vars["docker_build_tag"] == f"{node}:abc1234", ip
+            assert host_vars["build_context"] == str(cluster / node)

@@ -80,31 +80,29 @@ class TestNodeDbConfig:
         cfg = NodeDbConfig.for_mode(NodeDbType.NUDB, DeployMode.LOCAL)
         assert cfg.db_type == NodeDbType.NUDB
         assert cfg.path == "db"
-        assert cfg.relational_db is None
 
     def test_nudb_standalone(self):
         cfg = NodeDbConfig.for_mode(NodeDbType.NUDB, DeployMode.STANDALONE)
         assert cfg.db_type == NodeDbType.NUDB
         assert cfg.path == "/opt/ripple/lib/db"
-        assert cfg.relational_db is None
 
     def test_nudb_network(self):
         cfg = NodeDbConfig.for_mode(NodeDbType.NUDB, DeployMode.NETWORK)
         assert cfg.db_type == NodeDbType.NUDB
         assert cfg.path == "/var/lib/xrpld/db"
-        assert cfg.relational_db is None
 
     def test_memory(self):
         cfg = NodeDbConfig.for_mode(NodeDbType.MEMORY, DeployMode.LOCAL)
         assert cfg.db_type == NodeDbType.MEMORY
         assert cfg.path == "./"
-        assert cfg.relational_db == "backend=memory"
 
-    def test_rwdb_network(self):
-        cfg = NodeDbConfig.for_mode(NodeDbType.RWDB, DeployMode.NETWORK)
-        assert cfg.db_type == NodeDbType.RWDB
-        assert cfg.path == "/var/lib/xrpld/db"
-        assert cfg.relational_db == "backend=rwdb"
+    def test_memory_network(self):
+        cfg = NodeDbConfig.for_mode(NodeDbType.MEMORY, DeployMode.NETWORK)
+        assert cfg.path == "./"
+
+    def test_rwdb_is_not_a_backend(self):
+        with pytest.raises(ValueError):
+            NodeDbType("rwdb")
 
 
 class TestLabConfig:
@@ -227,7 +225,7 @@ class TestEnums:
     def test_nodedb_type_values(self):
         assert NodeDbType.NUDB.value == "NuDB"
         assert NodeDbType.MEMORY.value == "Memory"
-        assert NodeDbType.RWDB.value == "rwdb"
+        assert [t.value for t in NodeDbType] == ["NuDB", "Memory"]
 
 
 class TestServerConfig:

@@ -146,7 +146,7 @@ def _add_network_args(p: argparse.ArgumentParser) -> None:
         help="[database_path] (SQLite) for network nodes. Pin to the running "
         "network's existing path on a preserve deploy.",
     )
-    p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
+    p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB"])
     p.add_argument(
         "--config_overrides",
         type=str,
@@ -283,8 +283,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "ghcr.io/xrplf/xrpld/supported:<sha-short|version> and "
         "resolves the amendment set from that ref.",
     )
-    p.add_argument("--ipfs", type=bool, default=False)
-    p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
+    p.add_argument("--ipfs", type=_parse_bool, default=False)
+    p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB"])
     p.add_argument(
         "--config_overrides",
         type=str,
@@ -429,7 +429,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Network id. Omit to use the protocol default; every real "
         "network should set its own (>1024 for replay protection).",
     )
-    p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
+    p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB"])
 
     # -- down:local ----------------------------------------------------------
     p = subparsers.add_parser("down:local", help="Stop local standalone")
@@ -736,16 +736,16 @@ def _build_network_config(args, protocol, spec):
     repo = spec.github_repo
 
     if server and server.startswith("https://github.com/"):
-        owner = server.split("https://github.com/")[1].split("/")[0]
-        tail = server.split(f"https://github.com/{owner}/")[1]
+        # https://github.com/<owner>/<repo>/tree/<branch>
+        owner, _, tail = server[len("https://github.com/") :].partition("/")
+        repo = tail.split("/")[0] or "rippled"
         branch = tail.split("/tree/")[1] if "/tree/" in tail else tail
         cluster_name = branch.replace("/", "-")
         commit_hash = version or ""
         binary_path = args.binary_path if args.binary_path else "./xrpld"
         build_type = BuildType.BINARY
-        repo = "rippled"
     elif has_local:
-        server = server or "https://github.com/XRPLF/xrpld/tree"
+        server = server or "https://github.com/XRPLF/rippled/tree"
         version = version or _XRPL_RELEASE_FALLBACK
         build_type = BuildType.BINARY
     else:

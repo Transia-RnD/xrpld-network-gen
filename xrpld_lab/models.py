@@ -34,7 +34,6 @@ class BuildType(Enum):
 class NodeDbType(Enum):
     NUDB = "NuDB"
     MEMORY = "Memory"
-    RWDB = "rwdb"
 
 
 # ---------------------------------------------------------------------------
@@ -112,49 +111,19 @@ class NodeDbConfig:
     db_type: NodeDbType = NodeDbType.NUDB
     path: str = "db"
     num_ledgers: Optional[int] = 10000
-    relational_db: Optional[str] = None
 
     @classmethod
     def for_mode(cls, db_type: NodeDbType, mode: DeployMode) -> NodeDbConfig:
-        """Derive path and relational_db from the db type and deploy mode.
-
-        Mirrors ``get_node_db_path`` / ``get_relational_db`` in misc.py.
-        """
-        # --- path ---
-        if db_type == NodeDbType.NUDB:
-            if mode == DeployMode.LOCAL:
-                path = "db"
-            elif mode == DeployMode.STANDALONE:
-                path = "/opt/ripple/lib/db"
-            elif mode == DeployMode.NETWORK:
-                path = "/var/lib/xrpld/db"
-            else:
-                path = "db"
-        elif db_type == NodeDbType.MEMORY:
+        """Derive the [node_db] path from the db type and deploy mode."""
+        if db_type == NodeDbType.MEMORY:
             path = "./"
-        elif db_type == NodeDbType.RWDB:
-            if mode == DeployMode.NETWORK:
-                path = "/var/lib/xrpld/db"
-            else:
-                path = "db"
+        elif mode == DeployMode.STANDALONE:
+            path = "/opt/ripple/lib/db"
+        elif mode == DeployMode.NETWORK:
+            path = "/var/lib/xrpld/db"
         else:
             path = "db"
-
-        # --- relational_db ---
-        if db_type == NodeDbType.NUDB:
-            relational_db = None
-        elif db_type == NodeDbType.MEMORY:
-            relational_db = "backend=memory"
-        elif db_type == NodeDbType.RWDB:
-            relational_db = "backend=rwdb"
-        else:
-            relational_db = None
-
-        return cls(
-            db_type=db_type,
-            path=path,
-            relational_db=relational_db,
-        )
+        return cls(db_type=db_type, path=path)
 
 
 @dataclass
