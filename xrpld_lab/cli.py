@@ -884,7 +884,9 @@ def main() -> None:
     # Commands that need LabConfig -> LabRunner
     if args.command in ("up:standalone", "create:network", "create:ansible"):
         lab = build_lab_config(args)
-        LabRunner(lab, workspace).run()
+        generated = LabRunner(lab, workspace).run()
+        if args.command == "up:standalone":
+            run_start_script(workspace, generated)
         return
 
     if args.command == "health":

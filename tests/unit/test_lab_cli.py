@@ -1081,12 +1081,14 @@ class TestBuildLabConfigAnsible:
 class TestMain:
     """Test main() dispatches correctly."""
 
+    @patch("xrpld_lab.cli.run_start_script")
     @patch("xrpld_lab.cli.LabRunner")
     @patch("xrpld_lab.cli.build_lab_config")
-    def test_up_standalone_calls_runner(self, mock_build, mock_runner_cls):
+    def test_up_standalone_calls_runner(self, mock_build, mock_runner_cls, mock_start):
         mock_config = MagicMock()
         mock_build.return_value = mock_config
         mock_runner = MagicMock()
+        mock_runner.run.return_value = "xahau-2025.7.9"
         mock_runner_cls.return_value = mock_runner
 
         with patch("sys.argv", ["xrpld-lab", "up:standalone", "--protocol", "xahau"]):
@@ -1096,6 +1098,22 @@ class TestMain:
         assert mock_runner_cls.call_count == 1
         assert mock_runner_cls.call_args.args[0] is mock_config
         mock_runner.run.assert_called_once()
+        mock_start.assert_called_once()
+        assert mock_start.call_args.args[1] == "xahau-2025.7.9"
+
+    @patch("xrpld_lab.cli.run_start_script")
+    @patch("xrpld_lab.cli.LabRunner")
+    @patch("xrpld_lab.cli.build_lab_config")
+    def test_create_network_does_not_start(
+        self, mock_build, mock_runner_cls, mock_start
+    ):
+        mock_build.return_value = MagicMock()
+        mock_runner_cls.return_value = MagicMock()
+
+        with patch("sys.argv", ["xrpld-lab", "create:network", "--protocol", "xrpl"]):
+            main()
+
+        mock_start.assert_not_called()
 
     @patch("xrpld_lab.cli.LabRunner")
     @patch("xrpld_lab.cli.build_lab_config")
