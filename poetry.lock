@@ -1118,4 +1118,4 @@ xrpl-py = ">=2.4.0,<3.0.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9.6"
-content-hash = "763b261815371ff168783581e185bd1c9cd844f5086be3d867594b6b60ddac03"
+content-hash = "d241206172f22a7d97e87e0990900eb91f538b8f64e7c2b0421a7ff4eb9a95d3"
