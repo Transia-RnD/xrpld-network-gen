@@ -13,8 +13,6 @@ Four deployment modes:
 - **Local** -- multi-node native processes (no Docker for nodes, fastest iteration)
 - **Ansible** -- generate ansible playbooks for remote server deployment
 
-Supports both **XRPL** and **Xahau** protocols.
-
 ## Install
 
 ```bash
@@ -24,8 +22,8 @@ pip install xrpld-lab
 ## Quick start
 
 ```bash
-# Standalone Xahau ledger
-xrpld-lab up:standalone --protocol xahau
+# Standalone XRPL ledger
+xrpld-lab up:standalone --protocol xrpl
 
 # 3-validator XRPL network (Docker image from rippleci)
 xrpld-lab create:network --protocol xrpl --num_validators 3 --num_peers 1
@@ -38,12 +36,12 @@ xrpld-lab create:network \
   --num_validators 3 --num_peers 1
 
 # Local network (native processes, no Docker for nodes)
-xrpld-lab create:network --protocol xahau --local --binary_name xahaud
+xrpld-lab create:network --protocol xrpl --local
 
 # Ansible deployment to remote servers
 xrpld-lab create:ansible \
-  --protocol xahau \
-  --build_version 2025.7.9-release+1951 \
+  --protocol xrpl \
+  --build_version 3.2.0-rc2 \
   --num_validators 6 --num_peers 2 \
   --vips 10.0.0.1 10.0.0.2 10.0.0.3 10.0.0.4 10.0.0.5 10.0.0.6 \
   --pips 10.0.0.7 10.0.0.8 \
@@ -60,7 +58,7 @@ xrpld-lab up:standalone [OPTIONS]
 
 | Option | Default | Description |
 |---|---|---|
-| `--protocol` | `xahau` | `xrpl` or `xahau` |
+| `--protocol` | `xrpl` | Protocol |
 | `--version` | latest | Build version |
 | `--build_type` | `binary` | `image` or `binary` |
 | `--log_level` | `trace` | `warning`, `debug`, `trace` |
@@ -80,7 +78,7 @@ xrpld-lab create:network [OPTIONS]
 
 | Option | Default | Description |
 |---|---|---|
-| `--protocol` | `xahau` | `xrpl` or `xahau` |
+| `--protocol` | `xrpl` | Protocol |
 | `--num_validators` | `3` | Number of validator nodes |
 | `--num_peers` | `1` | Number of peer nodes |
 | `--build_version` | latest | Build version or commit hash |
@@ -100,7 +98,6 @@ xrpld-lab create:network [OPTIONS]
 
 **Build server modes:**
 
-- **Xahau**: `--build_server` defaults to `https://build.xahau.tech`. Downloads binary from server.
 - **XRPL Docker**: `--build_server` defaults to `rippleci`. Uses Docker image `rippleci/xrpld:<version>`.
 - **XRPL GitHub**: Pass `--build_server "https://github.com/OWNER/repo/tree/branch"` with `--build_version <commit_hash>`. Copies local binary, resolves features from GitHub at that commit.
 
@@ -110,7 +107,7 @@ Generates everything `create:network` does, plus a complete ansible directory fo
 
 ```bash
 xrpld-lab create:ansible \
-  --protocol xahau \
+  --protocol xrpl \
   --vips 10.0.0.1 10.0.0.2 10.0.0.3 \
   --pips 10.0.0.4 \
   [OPTIONS]
@@ -219,7 +216,7 @@ The merge order is: hardcoded defaults -> repo config (downloaded from GitHub at
 ```
 xrpld_lab/
   models.py           # Dataclasses: Protocol, NodeConfig, LabConfig, PortSet, etc.
-  protocol.py         # ProtocolSpec: all xrpl-vs-xahau differences in one place
+  protocol.py         # ProtocolSpec: protocol-specific defaults in one place
   config_builder.py   # XrpldCfgBuilder + ValidatorsTxtBuilder
   config.py           # INI parsing, YAML overrides, 3-layer merge, ansible config loader
   amendments.py       # C++ feature macro parsing + genesis updates
@@ -247,8 +244,7 @@ poetry run pytest tests/ -v
 
 ## Current versions
 
-- XRPL: `3.1.1`
-- Xahau: `2025.7.9-release+1951`
+- XRPL: `3.2.0-rc2`
 
 ## License
 
