@@ -52,10 +52,13 @@ class AnsibleBuilder:
         image_name: str,
         network_name: str = "loadnet",
         genesis: bool = True,
+        build_tag: str = "",
     ):
         self.cluster_dir = cluster_dir
         self.config = config
         self.image_name = image_name
+        # Tag for the per-node wrapper image; the base image's tag unless given.
+        self.build_tag = build_tag or image_name.rsplit(":", 1)[-1]
         self.network_name = network_name
         # genesis=True: reset every node's state for a fresh chain, all hosts
         # in parallel.
@@ -148,7 +151,7 @@ class AnsibleBuilder:
                 # Tag the wrapper by the base image's tag so each build gets a distinct
                 # name and the container RECREATES on a new image (a constant tag makes
                 # docker_container see "same image" and merely restart the stale one).
-                "docker_build_tag": f"{node.name}:{self.image_name.rsplit(':', 1)[-1]}",
+                "docker_build_tag": f"{node.name}:{self.build_tag}",
                 "docker_container_name": node.name,
                 "docker_container_ports": [
                     f"{node.ports.rpc_public}:{node.ports.rpc_public}",

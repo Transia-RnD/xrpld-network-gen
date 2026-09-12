@@ -1234,4 +1234,5 @@ class TestNetworkBinaryStaging:
             with open(cluster / "ansible" / "host_vars" / f"{ip}.yml") as f:
                 host_vars = yaml.safe_load(f)
             assert host_vars["docker_image_name"] == "ubuntu:noble", ip
+            assert host_vars["docker_build_tag"] == f"{node}:abc1234", ip
             assert host_vars["build_context"] == str(cluster / node)
