@@ -293,6 +293,50 @@ class TestDownloadBinary:
                 resolver.download_binary("https://example.com/xrpld", save_path)
 
 
+class TestResolveRef:
+    """Test which git ref the feature and config files are read at."""
+
+    @patch.object(SourceResolver, "get_commit_hash")
+    def test_commit_hash_wins(self, mock_hash, resolver):
+        source = BuildSource(
+            protocol=Protocol.XRPL,
+            build_type=BuildType.IMAGE,
+            build_server="rippleci",
+            build_version="3.3.0",
+            commit_hash="deadbeef",
+        )
+
+        assert resolver.resolve_ref(source) == "deadbeef"
+        mock_hash.assert_not_called()
+
+    @patch.object(SourceResolver, "get_commit_hash")
+    def test_http_build_server_reads_releaseinfo(self, mock_hash, resolver):
+        mock_hash.return_value = "abc123"
+        source = BuildSource(
+            protocol=Protocol.XAHAU,
+            build_type=BuildType.BINARY,
+            build_server="https://build.xahau.tech",
+            build_version="2025.7.9-release+1951",
+        )
+
+        assert resolver.resolve_ref(source) == "abc123"
+        mock_hash.assert_called_once_with(
+            "https://build.xahau.tech", "2025.7.9-release+1951"
+        )
+
+    @patch.object(SourceResolver, "get_commit_hash")
+    def test_registry_namespace_uses_the_version_as_the_tag(self, mock_hash, resolver):
+        source = BuildSource(
+            protocol=Protocol.XRPL,
+            build_type=BuildType.IMAGE,
+            build_server="rippleci",
+            build_version="3.3.0",
+        )
+
+        assert resolver.resolve_ref(source) == "3.3.0"
+        mock_hash.assert_not_called()
+
+
 class TestResolveFeatures:
     """Test feature resolution from build source."""
 

@@ -388,7 +388,6 @@ class TestResolveRepoConfig:
     def test_uses_fallback_paths_from_spec(
         self, mock_hash, mock_download, resolver, xrpl_spec
     ):
-        mock_hash.return_value = "def456"
         mock_download.return_value = b"[node_size]\nmedium\n"
 
         source = BuildSource(
@@ -402,10 +401,11 @@ class TestResolveRepoConfig:
 
         result = resolver.resolve_repo_config(source, xrpl_spec)
 
+        mock_hash.assert_not_called()
         mock_download.assert_called_once_with(
             "XRPLF",
             "rippled",
-            "def456",
+            "3.1.1",
             "cfg/rippled-example.cfg",
             fallback_path="cfg/xrpld-example.cfg",
         )

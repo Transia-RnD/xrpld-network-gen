@@ -102,22 +102,35 @@ class SourceResolver:
         except requests.exceptions.RequestException as e:
             raise ValueError(f"An error occurred: {e}")
 
+    def resolve_ref(self, source: BuildSource) -> str:
+        """Resolve the git ref the feature and config files are read at.
+
+        An explicit ``source.commit_hash`` wins. An http(s) build server
+        publishes ``.releaseinfo`` naming the commit; any other build server is
+        a container registry namespace, where the build version is the tag.
+
+        :param source: The build source configuration
+        :return: A commit hash or tag accepted by ``download_file_at_commit``
+        """
+        if source.commit_hash:
+            return source.commit_hash
+        if source.build_server.startswith(("http://", "https://")):
+            return self.get_commit_hash(source.build_server, source.build_version)
+        return source.build_version
+
     def resolve_features(self, source: BuildSource, spec: ProtocolSpec) -> bytes:
         """Resolve feature content from the build source.
 
         Uses spec.feature_paths (ordered list) to try downloading feature files
         from the GitHub repo at the resolved commit. Returns the raw bytes content.
 
-        If ``source.commit_hash`` is already set (e.g. GitHub-URL mode), uses it
-        directly.  Otherwise resolves from the build server's ``.releaseinfo``.
+        The ref comes from ``resolve_ref``.
 
         :param source: The build source configuration
         :param spec: The protocol specification with feature paths
         :return: The raw feature file content as bytes
         """
-        commit_hash = source.commit_hash or self.get_commit_hash(
-            source.build_server, source.build_version
-        )
+        ref = self.resolve_ref(source)
 
         primary_path = spec.feature_paths[0]
         fallback_path = spec.feature_paths[1] if len(spec.feature_paths) > 1 else None
@@ -125,7 +138,7 @@ class SourceResolver:
         return self.download_file_at_commit(
             source.owner,
             source.repo,
-            commit_hash,
+            ref,
             primary_path,
             fallback_path=fallback_path,
         )
@@ -144,9 +157,7 @@ class SourceResolver:
             return {}
 
         try:
-            commit_hash = source.commit_hash or self.get_commit_hash(
-                source.build_server, source.build_version
-            )
+            ref = self.resolve_ref(source)
 
             primary_path = spec.config_paths[0]
             fallback_path = spec.config_paths[1] if len(spec.config_paths) > 1 else None
@@ -154,7 +165,7 @@ class SourceResolver:
             content = self.download_file_at_commit(
                 source.owner,
                 source.repo,
-                commit_hash,
+                ref,
                 primary_path,
                 fallback_path=fallback_path,
             )
