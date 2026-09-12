@@ -13,18 +13,26 @@ from xrpld_lab.services.status import node_metrics as nm
 
 
 def _latest(state, seq=100, ok=1, **extra):
-    row = {"server_state": state, "validated_seq": seq, "xrpld_ok": ok, "peers": 4,
-           "uptime": 3600, "build_version": "3.1.0"}
+    row = {
+        "server_state": state,
+        "validated_seq": seq,
+        "xrpld_ok": ok,
+        "peers": 4,
+        "uptime": 3600,
+        "build_version": "3.1.0",
+    }
     row.update(extra)
     return row
 
 
 def _fake_fetch(table):
     """urlopen stand-in keyed by node URL; a missing URL is a refused connection."""
+
     def fetch(url, timeout):
         if url not in table:
             raise urllib.error.URLError("connection refused")
         return table[url]
+
     return fetch
 
 
@@ -38,10 +46,15 @@ NODES = nm.parse_network_nodes(
 class TestParseNetworkNodes:
     def test_roles_from_name_prefix(self):
         nodes = nm.parse_network_nodes("vnode1=http://a:1,pnode1=http://b:1/")
-        assert nodes == [("vnode1", "validator", "http://a:1"), ("pnode1", "peer", "http://b:1")]
+        assert nodes == [
+            ("vnode1", "validator", "http://a:1"),
+            ("pnode1", "peer", "http://b:1"),
+        ]
 
     def test_explicit_role_token_overrides_the_prefix(self):
-        nodes = nm.parse_network_nodes("watcher=http://c:1 role=validator, other=http://d:1")
+        nodes = nm.parse_network_nodes(
+            "watcher=http://c:1 role=validator, other=http://d:1"
+        )
         assert nodes[0] == ("watcher", "validator", "http://c:1")
         assert nodes[1][1] == "peer"
 
@@ -64,14 +77,18 @@ class TestNetworkReport:
             path = str(tmp_path / "network.json")
             if network is not None:
                 (tmp_path / "network.json").write_text(json.dumps(network))
-        return nm.Network(NODES, network_file=path, name="alphanet", fetch=_fake_fetch(table))
+        return nm.Network(
+            NODES, network_file=path, name="alphanet", fetch=_fake_fetch(table)
+        )
 
     def test_agreement_when_every_validator_reports_the_same_ledger(self):
-        report = self._network({
-            "http://10.0.0.1:8687": _latest("proposing", 500),
-            "http://10.0.0.2:8687": _latest("proposing", 500),
-            "http://127.0.0.1:8687": _latest("full", 499),
-        }).report()
+        report = self._network(
+            {
+                "http://10.0.0.1:8687": _latest("proposing", 500),
+                "http://10.0.0.2:8687": _latest("proposing", 500),
+                "http://127.0.0.1:8687": _latest("full", 499),
+            }
+        ).report()
         assert report["agreement"] is True
         assert report["validated_ledger"] == 500
         assert report["name"] == "alphanet"
@@ -88,18 +105,22 @@ class TestNetworkReport:
         assert isinstance(report["generated_at"], int)
 
     def test_no_agreement_when_validators_differ(self):
-        report = self._network({
-            "http://10.0.0.1:8687": _latest("proposing", 500),
-            "http://10.0.0.2:8687": _latest("proposing", 498),
-            "http://127.0.0.1:8687": _latest("full", 500),
-        }).report()
+        report = self._network(
+            {
+                "http://10.0.0.1:8687": _latest("proposing", 500),
+                "http://10.0.0.2:8687": _latest("proposing", 498),
+                "http://127.0.0.1:8687": _latest("full", 500),
+            }
+        ).report()
         assert report["agreement"] is False
 
     def test_no_agreement_when_a_validator_is_unreachable(self):
-        report = self._network({
-            "http://10.0.0.1:8687": _latest("proposing", 500),
-            "http://127.0.0.1:8687": _latest("full", 500),
-        }).report()
+        report = self._network(
+            {
+                "http://10.0.0.1:8687": _latest("proposing", 500),
+                "http://127.0.0.1:8687": _latest("full", 500),
+            }
+        ).report()
         assert report["agreement"] is False
         vnode2 = report["nodes"][1]
         assert vnode2["ok"] is False
@@ -107,12 +128,17 @@ class TestNetworkReport:
         assert "refused" in vnode2["error"]
 
     def test_peer_only_network_has_no_agreement(self):
-        net = nm.Network(nm.parse_network_nodes("pnode1=http://a:1"),
-                         fetch=_fake_fetch({"http://a:1": _latest("full")}))
+        net = nm.Network(
+            nm.parse_network_nodes("pnode1=http://a:1"),
+            fetch=_fake_fetch({"http://a:1": _latest("full")}),
+        )
         assert net.report()["agreement"] is False
 
     def test_network_json_merged(self, tmp_path):
-        info = {"last_deploy": {"sha": "abc123"}, "branches": [{"repo": "XRPLF/rippled"}]}
+        info = {
+            "last_deploy": {"sha": "abc123"},
+            "branches": [{"repo": "XRPLF/rippled"}],
+        }
         report = self._network({}, tmp_path, info).report()
         assert report["network"] == info
 
@@ -130,20 +156,24 @@ class TestNetworkHealth:
         return nm.Network(NODES, fetch=_fake_fetch(table)).health()
 
     def test_200_when_validators_propose_and_peers_are_full(self):
-        body, code = self._health({
-            "http://10.0.0.1:8687": _latest("proposing"),
-            "http://10.0.0.2:8687": _latest("proposing"),
-            "http://127.0.0.1:8687": _latest("full"),
-        })
+        body, code = self._health(
+            {
+                "http://10.0.0.1:8687": _latest("proposing"),
+                "http://10.0.0.2:8687": _latest("proposing"),
+                "http://127.0.0.1:8687": _latest("full"),
+            }
+        )
         assert code == 200
         assert body["ok"] is True
         assert body["failing"] == []
 
     def test_503_lists_the_failing_nodes(self):
-        body, code = self._health({
-            "http://10.0.0.1:8687": _latest("proposing"),
-            "http://10.0.0.2:8687": _latest("full"),
-        })
+        body, code = self._health(
+            {
+                "http://10.0.0.1:8687": _latest("proposing"),
+                "http://10.0.0.2:8687": _latest("full"),
+            }
+        )
         assert code == 503
         assert body["ok"] is False
         assert body["failing"] == [
@@ -152,11 +182,13 @@ class TestNetworkHealth:
         ]
 
     def test_a_full_validator_is_not_healthy(self):
-        body, code = self._health({
-            "http://10.0.0.1:8687": _latest("full"),
-            "http://10.0.0.2:8687": _latest("proposing"),
-            "http://127.0.0.1:8687": _latest("full"),
-        })
+        body, code = self._health(
+            {
+                "http://10.0.0.1:8687": _latest("full"),
+                "http://10.0.0.2:8687": _latest("proposing"),
+                "http://127.0.0.1:8687": _latest("full"),
+            }
+        )
         assert code == 503
         assert [f["name"] for f in body["failing"]] == ["vnode1"]
 
@@ -169,7 +201,9 @@ class TestNetworkRoutes:
             "http://10.0.0.2:8687": _latest("proposing"),
             "http://127.0.0.1:8687": _latest("full"),
         }
-        nm.Handler.network = nm.Network(NODES, name="alphanet", fetch=_fake_fetch(table))
+        nm.Handler.network = nm.Network(
+            NODES, name="alphanet", fetch=_fake_fetch(table)
+        )
         srv = ThreadingHTTPServer(("127.0.0.1", 0), nm.Handler)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         yield srv, table

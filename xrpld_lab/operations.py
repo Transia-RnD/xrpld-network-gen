@@ -13,7 +13,6 @@ import glob
 import json
 import os
 import subprocess
-import sys
 
 from xrpld_lab.models import NodeRole, PortSet
 from xrpld_lab.utils import (
@@ -117,7 +116,7 @@ def start_local(
         update_genesis,
     )
     from xrpld_lab.config_builder import XrpldCfgBuilder, ValidatorsTxtBuilder
-    from xrpld_lab.models import DeployMode, NodeDbType, Protocol
+    from xrpld_lab.models import NodeDbType, Protocol
     from xrpld_lab.node_factory import NodeFactory
     from xrpld_lab.protocol import get_spec
     from xrpld_lab.utils import save_config, write_executable, write_file
@@ -213,8 +212,17 @@ def _docker_container_exists(name: str) -> bool:
     """True if a docker container with this exact name exists (running or not)."""
     try:
         r = subprocess.run(
-            ["docker", "ps", "-a", "--filter", f"name=^{name}$", "--format", "{{.Names}}"],
-            capture_output=True, text=True,
+            [
+                "docker",
+                "ps",
+                "-a",
+                "--filter",
+                f"name=^{name}$",
+                "--format",
+                "{{.Names}}",
+            ],
+            capture_output=True,
+            text=True,
         )
     except FileNotFoundError:
         return False
@@ -251,7 +259,9 @@ def restart_local_node(
             print(f"{bcolors.CYAN}Recreating {node_name} from genesis...{bcolors.END}")
             run_command(cwd, f"docker compose up --force-recreate -d {node_name}")
         else:
-            print(f"{bcolors.CYAN}Restarting {node_name} (resume from db)...{bcolors.END}")
+            print(
+                f"{bcolors.CYAN}Restarting {node_name} (resume from db)...{bcolors.END}"
+            )
             run_command(cwd, f"docker restart {node_name}")
         print(f"{bcolors.GREEN}{node_name} restarted.{bcolors.END}")
         return
@@ -304,25 +314,37 @@ def _extract_binary_from_image(image: str, dest: str) -> bool:
     probe = f"xrpld-extract-{os.getpid()}"
     try:
         subprocess.run(["docker", "rm", "-f", probe], capture_output=True)
-        r = subprocess.run(["docker", "create", "--name", probe, image],
-                           capture_output=True, text=True)
+        r = subprocess.run(
+            ["docker", "create", "--name", probe, image], capture_output=True, text=True
+        )
         if r.returncode != 0:
             # Not present locally: pull then retry create.
             if subprocess.run(["docker", "pull", image]).returncode != 0:
                 print(f"{bcolors.RED}Cannot pull image {image}{bcolors.END}")
                 return False
-            r = subprocess.run(["docker", "create", "--name", probe, image],
-                               capture_output=True, text=True)
+            r = subprocess.run(
+                ["docker", "create", "--name", probe, image],
+                capture_output=True,
+                text=True,
+            )
             if r.returncode != 0:
-                print(f"{bcolors.RED}docker create failed: {r.stderr.strip()}{bcolors.END}")
+                print(
+                    f"{bcolors.RED}docker create failed: "
+                    f"{r.stderr.strip()}{bcolors.END}"
+                )
                 return False
         for path in _IMAGE_BINARY_PATHS:
-            cp = subprocess.run(["docker", "cp", f"{probe}:{path}", dest],
-                                capture_output=True, text=True)
+            cp = subprocess.run(
+                ["docker", "cp", f"{probe}:{path}", dest],
+                capture_output=True,
+                text=True,
+            )
             if cp.returncode == 0:
                 return True
-        print(f"{bcolors.RED}No xrpld/rippled binary found in {image} "
-              f"(tried {', '.join(_IMAGE_BINARY_PATHS)}){bcolors.END}")
+        print(
+            f"{bcolors.RED}No xrpld/rippled binary found in {image} "
+            f"(tried {', '.join(_IMAGE_BINARY_PATHS)}){bcolors.END}"
+        )
         return False
     except FileNotFoundError:
         print(f"{bcolors.RED}docker not found{bcolors.END}")
@@ -415,7 +437,9 @@ def update_node_binary(
         net_dir,
         f"docker compose up --build --force-recreate -d {node_dir_name}",
     )
-    print(f"{bcolors.GREEN}Node {node_dir_name} updated to {build_version}.{bcolors.END}")
+    print(
+        f"{bcolors.GREEN}Node {node_dir_name} updated to {build_version}.{bcolors.END}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -447,10 +471,12 @@ def enable_amendment(
     rpc_port = ports.rpc_admin
 
     # Build RPC request
-    payload = json.dumps({
-        "method": "feature",
-        "params": [{"feature": amendment_hash, "vetoed": False}],
-    })
+    payload = json.dumps(
+        {
+            "method": "feature",
+            "params": [{"feature": amendment_hash, "vetoed": False}],
+        }
+    )
 
     url = f"http://localhost:{rpc_port}"
     print(
@@ -510,17 +536,16 @@ def node_stall(
     else:
         params = {"duration_ms": duration_ms}
 
-    payload = json.dumps({
-        "method": "node_stall",
-        "params": [params],
-    })
+    payload = json.dumps(
+        {
+            "method": "node_stall",
+            "params": [params],
+        }
+    )
 
     url = f"http://localhost:{rpc_port}"
     action = "Clearing stall on" if clear else f"Stalling ({duration_ms}ms)"
-    print(
-        f"{bcolors.CYAN}{action} {node_type} {node_id} "
-        f"at {url}...{bcolors.END}"
-    )
+    print(f"{bcolors.CYAN}{action} {node_type} {node_id} " f"at {url}...{bcolors.END}")
 
     try:
         subprocess.run(

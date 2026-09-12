@@ -117,7 +117,9 @@ class TestStopStandalone:
     @patch("xrpld_lab.operations.run_command")
     @patch("os.path.isdir", return_value=True)
     @patch("os.path.isfile", return_value=True)
-    def test_with_name_uses_name_directly(self, mock_isfile, mock_isdir, mock_run, mock_rm):
+    def test_with_name_uses_name_directly(
+        self, mock_isfile, mock_isdir, mock_run, mock_rm
+    ):
         ws = MagicMock()
         ws.base = "/workspace"
         stop_standalone(ws, "custom-name", "xahau", None)
@@ -128,7 +130,9 @@ class TestStopStandalone:
     @patch("xrpld_lab.operations.run_command")
     @patch("os.path.isdir", return_value=True)
     @patch("os.path.isfile", return_value=True)
-    def test_with_version_constructs_dir_name(self, mock_isfile, mock_isdir, mock_run, mock_rm):
+    def test_with_version_constructs_dir_name(
+        self, mock_isfile, mock_isdir, mock_run, mock_rm
+    ):
         ws = MagicMock()
         ws.base = "/workspace"
         stop_standalone(ws, None, "xahau", "1.0.0")
@@ -196,7 +200,9 @@ class TestUpdateNodeBinary:
         ws = MagicMock()
         ws.base = "/workspace"
 
-        update_node_binary(ws, "my-net", 2, "validator", "https://build.example.com", "2.0.0")
+        update_node_binary(
+            ws, "my-net", 2, "validator", "https://build.example.com", "2.0.0"
+        )
 
         # Should stop container
         mock_run.assert_any_call("/workspace/my-net", "docker compose stop vnode2")
@@ -220,7 +226,9 @@ class TestUpdateNodeBinary:
     def test_update_missing_node_dir(self, mock_isdir, mock_run, capsys):
         ws = MagicMock()
         ws.base = "/workspace"
-        update_node_binary(ws, "my-net", 1, "peer", "https://build.example.com", "1.0.0")
+        update_node_binary(
+            ws, "my-net", 1, "peer", "https://build.example.com", "1.0.0"
+        )
         mock_run.assert_not_called()
         captured = capsys.readouterr()
         assert "not found" in captured.out
@@ -238,7 +246,9 @@ class TestUpdateNodeBinary:
         ws = MagicMock()
         ws.base = "/workspace"
 
-        update_node_binary(ws, "my-net", 3, "peer", "https://build.example.com", "1.0.0")
+        update_node_binary(
+            ws, "my-net", 3, "peer", "https://build.example.com", "1.0.0"
+        )
 
         mock_run.assert_any_call("/workspace/my-net", "docker compose stop pnode3")
 
@@ -257,7 +267,12 @@ class TestUpdateNodeBinary:
         ws.base = "/workspace"
 
         update_node_binary(
-            ws, "my-net", 2, "validator", None, "3.3.0-rc1",
+            ws,
+            "my-net",
+            2,
+            "validator",
+            None,
+            "3.3.0-rc1",
             image="rippleci/xrpld:3.3.0-rc1",
         )
 
@@ -307,7 +322,10 @@ class TestRestartLocalNode:
         )
 
     @patch("xrpld_lab.operations.run_command")
-    @patch("xrpld_lab.script_builder.ScriptBuilder.local_node_start_cmd", return_value="./start")
+    @patch(
+        "xrpld_lab.script_builder.ScriptBuilder.local_node_start_cmd",
+        return_value="./start",
+    )
     @patch("subprocess.run")
     @patch("xrpld_lab.operations._docker_container_exists", return_value=False)
     @patch("os.remove")
@@ -315,8 +333,15 @@ class TestRestartLocalNode:
     @patch("os.path.isdir", return_value=True)
     @patch("os.path.isfile", return_value=True)
     def test_bare_process_pidfile_path(
-        self, mock_isfile, mock_isdir, mock_cwd, mock_remove, mock_docker,
-        mock_subproc, mock_startcmd, mock_run,
+        self,
+        mock_isfile,
+        mock_isdir,
+        mock_cwd,
+        mock_remove,
+        mock_docker,
+        mock_subproc,
+        mock_startcmd,
+        mock_run,
     ):
         with patch("builtins.open", mock_open(read_data="12345")):
             restart_local_node("vnode1")
@@ -375,9 +400,10 @@ class TestEnableAmendment:
 
         # Compute expected hash
         import hashlib
-        expected = hashlib.sha512(
-            "fixNFTokenRemint".encode("utf-8")
-        ).hexdigest().upper()[:64]
+
+        expected = (
+            hashlib.sha512("fixNFTokenRemint".encode("utf-8")).hexdigest().upper()[:64]
+        )
 
         enable_amendment("my-net", "fixNFTokenRemint", 1, "validator", ws)
 

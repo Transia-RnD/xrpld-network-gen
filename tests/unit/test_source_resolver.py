@@ -108,23 +108,17 @@ class TestGetCommitHash:
     def test_http_error_raises(self, mock_get, resolver):
         mock_response = Mock()
         mock_response.status_code = 404
-        mock_response.raise_for_status.side_effect = requests.HTTPError(
-            "404 Not Found"
-        )
+        mock_response.raise_for_status.side_effect = requests.HTTPError("404 Not Found")
         mock_get.return_value = mock_response
 
         with pytest.raises(requests.HTTPError):
-            resolver.get_commit_hash(
-                "https://build.xahau.tech", "invalid-version"
-            )
+            resolver.get_commit_hash("https://build.xahau.tech", "invalid-version")
 
     @patch("xrpld_lab.source_resolver.requests.get")
     def test_long_hash(self, mock_get, resolver):
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.text = (
-            "commit 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
-        )
+        mock_response.text = "commit 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
         mock_get.return_value = mock_response
 
         result = resolver.get_commit_hash(
@@ -205,9 +199,7 @@ class TestDownloadFileAtCommit:
     def test_404_without_fallback_raises(self, mock_get, resolver):
         mock_response = Mock()
         mock_response.status_code = 404
-        mock_response.raise_for_status.side_effect = requests.HTTPError(
-            "404 Not Found"
-        )
+        mock_response.raise_for_status.side_effect = requests.HTTPError("404 Not Found")
         mock_get.return_value = mock_response
 
         with pytest.raises(requests.HTTPError):
@@ -240,9 +232,7 @@ class TestDownloadFileAtCommit:
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
 
-        resolver.download_file_at_commit(
-            "XRPLF", "rippled", "abc123", "src/file.cpp"
-        )
+        resolver.download_file_at_commit("XRPLF", "rippled", "abc123", "src/file.cpp")
 
         # Verify timeout=30 was passed
         _, kwargs = mock_get.call_args
@@ -273,7 +263,9 @@ class TestDownloadBinary:
         mock_response.raise_for_status = Mock()
         mock_response.iter_content.return_value = [b"chunk1", b"chunk2", b"chunk3"]
 
-        with patch("xrpld_lab.source_resolver.requests.get", return_value=mock_response) as mock_get:
+        with patch(
+            "xrpld_lab.source_resolver.requests.get", return_value=mock_response
+        ) as mock_get:
             resolver.download_binary("https://example.com/xrpld", save_path)
             mock_get.assert_called_once_with(
                 "https://example.com/xrpld", stream=True, timeout=60
@@ -290,11 +282,13 @@ class TestDownloadBinary:
         save_path = str(tmp_path / "xrpld")
 
         mock_response = Mock()
-        mock_response.raise_for_status.side_effect = requests.exceptions.RequestException(
-            "Connection failed"
+        mock_response.raise_for_status.side_effect = (
+            requests.exceptions.RequestException("Connection failed")
         )
 
-        with patch("xrpld_lab.source_resolver.requests.get", return_value=mock_response):
+        with patch(
+            "xrpld_lab.source_resolver.requests.get", return_value=mock_response
+        ):
             with pytest.raises(ValueError, match="An error occurred"):
                 resolver.download_binary("https://example.com/xrpld", save_path)
 
@@ -333,7 +327,9 @@ class TestResolveFeatures:
 
     @patch.object(SourceResolver, "download_file_at_commit")
     @patch.object(SourceResolver, "get_commit_hash")
-    def test_uses_spec_feature_paths(self, mock_hash, mock_download, resolver, xrpl_spec):
+    def test_uses_spec_feature_paths(
+        self, mock_hash, mock_download, resolver, xrpl_spec
+    ):
         mock_hash.return_value = "def456"
         mock_download.return_value = b"xrpl features"
 
@@ -348,9 +344,7 @@ class TestResolveFeatures:
 
         result = resolver.resolve_features(source, xrpl_spec)
 
-        mock_hash.assert_called_once_with(
-            "https://rippleci.example.com", "3.1.1"
-        )
+        mock_hash.assert_called_once_with("https://rippleci.example.com", "3.1.1")
         # Should use xrpl_spec.feature_paths[0] as primary, [1] as fallback
         mock_download.assert_called_once_with(
             "XRPLF",
@@ -389,9 +383,7 @@ class TestResolveFeatures:
 
     @patch.object(SourceResolver, "download_file_at_commit")
     @patch.object(SourceResolver, "get_commit_hash")
-    def test_single_feature_path_no_fallback(
-        self, mock_hash, mock_download, resolver
-    ):
+    def test_single_feature_path_no_fallback(self, mock_hash, mock_download, resolver):
         """When spec has only one feature path, no fallback is provided."""
         mock_hash.return_value = "abc123"
         mock_download.return_value = b"single path content"

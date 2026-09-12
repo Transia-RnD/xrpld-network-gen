@@ -86,85 +86,171 @@ def _parse_bool(value: str) -> bool:
 
 def _add_network_args(p: argparse.ArgumentParser) -> None:
     """Add arguments shared by create:network and create:ansible."""
-    p.add_argument("--log_level", default="trace", choices=["warning", "debug", "trace"])
+    p.add_argument(
+        "--log_level", default="trace", choices=["warning", "debug", "trace"]
+    )
     p.add_argument("--protocol", default="xrpl")
     p.add_argument("--num_validators", type=int, default=3)
     p.add_argument("--num_peers", type=int, default=1)
-    p.add_argument("--network_id", type=int, default=None,
-                   help="Network id. Omit to use the protocol default; every real "
-                        "network should set its own (>1024 for replay protection).")
+    p.add_argument(
+        "--network_id",
+        type=int,
+        default=None,
+        help="Network id. Omit to use the protocol default; every real "
+        "network should set its own (>1024 for replay protection).",
+    )
     p.add_argument("--build_server", default=None)
     p.add_argument("--build_version", default=None)
-    p.add_argument("--genesis", type=_parse_bool, default=False,
-                   help="True: fresh chain from a generated genesis (deploy wipes node "
-                        "state). False: join/preserve — nodes keep their db and boot "
-                        "normally.")
-    p.add_argument("--db_seed", action="store_true",
-                   help="Boot nodes with --load from a snapshot-restored db dir "
-                        "(no genesis.json baked into the image)")
-    p.add_argument("--genesis_file", default=None,
-                   help="Custom genesis JSON (e.g. prefunded accounts). Default: xrpld-lab's "
-                        "bundled genesis; the resolved amendments are merged into it.")
+    p.add_argument(
+        "--genesis",
+        type=_parse_bool,
+        default=False,
+        help="True: fresh chain from a generated genesis (deploy wipes node "
+        "state). False: join/preserve — nodes keep their db and boot "
+        "normally.",
+    )
+    p.add_argument(
+        "--db_seed",
+        action="store_true",
+        help="Boot nodes with --load from a snapshot-restored db dir "
+        "(no genesis.json baked into the image)",
+    )
+    p.add_argument(
+        "--genesis_file",
+        default=None,
+        help="Custom genesis JSON (e.g. prefunded accounts). Default: xrpld-lab's "
+        "bundled genesis; the resolved amendments are merged into it.",
+    )
     p.add_argument("--quorum", type=int, default=None)
-    p.add_argument("--tree_cache_target_entries", type=int, default=0,
-                   help="Explicit [tree_cache_target_entries] for network nodes; "
-                        "0 omits the stanza (node_size preset + RAM guardrail).")
-    p.add_argument("--memory_limit", type=int, default=None,
-                   help="RAM budget in GB ([memory_limit]) for the memory-pressure "
-                        "binary; replaces node_size/tree_cache stanzas. Omit for "
-                        "stock builds (node_size path).")
-    p.add_argument("--online_delete", type=int, default=256,
-                   help="online_delete ledger count for network nodes; "
-                        "0 = disabled ([ledger_history] full — growth-study setting)")
-    p.add_argument("--database_path", default="/var/lib/xrpld/db/rdb",
-                   help="[database_path] (SQLite) for network nodes. Pin to the running "
-                        "network's existing path on a preserve deploy.")
+    p.add_argument(
+        "--tree_cache_target_entries",
+        type=int,
+        default=0,
+        help="Explicit [tree_cache_target_entries] for network nodes; "
+        "0 omits the stanza (node_size preset + RAM guardrail).",
+    )
+    p.add_argument(
+        "--memory_limit",
+        type=int,
+        default=None,
+        help="RAM budget in GB ([memory_limit]) for the memory-pressure "
+        "binary; replaces node_size/tree_cache stanzas. Omit for "
+        "stock builds (node_size path).",
+    )
+    p.add_argument(
+        "--online_delete",
+        type=int,
+        default=256,
+        help="online_delete ledger count for network nodes; "
+        "0 = disabled ([ledger_history] full — growth-study setting)",
+    )
+    p.add_argument(
+        "--database_path",
+        default="/var/lib/xrpld/db/rdb",
+        help="[database_path] (SQLite) for network nodes. Pin to the running "
+        "network's existing path on a preserve deploy.",
+    )
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
-    p.add_argument("--config_overrides", type=str, default=None,
-                   help="Path to YAML/JSON file with config overrides")
-    p.add_argument("--port_offset", type=int, default=0,
-                   help="Shift every node port by N so a candidate cluster can run "
-                        "beside an existing one (local mode).")
-    p.add_argument("--datagram_monitor", type=str, default=None,
-                   help="Perf-server XDGM sink as 'HOST PORT' (internal IP, e.g. "
-                        "'10.128.0.2 9876'); adds [datagram_monitor] to every node cfg")
-    p.add_argument("--binary_path", type=str, default=None,
-                   help="Path to pre-built binary (skips download)")
-    p.add_argument("--quantum", action="store_true",
-                   help="Use dilithium (post-quantum) keys for validators and publisher")
-    p.add_argument("--all-amendments", dest="all_amendments", action="store_true",
-                   help="Pre-enable EVERY amendment in genesis, ignoring the "
-                        "Supported flag. Requires a binary built with those "
-                        "amendments supported (else it amendment-blocks).")
-    p.add_argument("--features_file", default=None,
-                   help="Read features.macro from this local path instead of "
-                        "fetching from GitHub. Use with a binary built from an "
-                        "unpushed commit so the amendment set matches the binary.")
-    p.add_argument("--preload_accounts", type=int, default=0,
-                   help="Prefund N accounts directly in genesis (perf-iac style)")
-    p.add_argument("--preload_trustlines", type=int, default=0,
-                   help="Create N trustlines from account 0 (issuer hub) in genesis")
-    p.add_argument("--preload_balance", default="1000000000",
-                   help="Drops per prefunded account (default 1000 XRP)")
-    p.add_argument("--preload_currency", default="USD",
-                   help="Currency code for preloaded trustlines")
-    p.add_argument("--workspace", default=None,
-                   help="Workspace root holding <cluster>-cluster and its keystore "
-                        "(default: ./workspace). Point at an existing network's "
-                        "workspace to reuse its identity instead of copying keys.")
-    p.add_argument("--vl_site", default=None,
-                   help="Publisher list URL for [validator_list_sites]. Default is the "
-                        "compose-internal http://vl/vl.json, which only resolves inside "
-                        "a local cluster.")
-    p.add_argument("--bootstrap_vl", action="store_true",
-                   help="Emit the static [validators] list alongside the publisher list, "
-                        "so a fresh chain reaches quorum before the VL site is up.")
-    p.add_argument("--statsd_address", default=None,
-                   help="[insight] StatsD sink as IP:PORT (e.g. 127.0.0.1:9125). Required "
-                        "by the Alloy telemetry sidecar.")
-    p.add_argument("--perf_path", default=None,
-                   help="[perf] perf_log path (e.g. /opt/ripple/log/perf.log). Required "
-                        "by the Alloy telemetry sidecar.")
+    p.add_argument(
+        "--config_overrides",
+        type=str,
+        default=None,
+        help="Path to YAML/JSON file with config overrides",
+    )
+    p.add_argument(
+        "--port_offset",
+        type=int,
+        default=0,
+        help="Shift every node port by N so a candidate cluster can run "
+        "beside an existing one (local mode).",
+    )
+    p.add_argument(
+        "--datagram_monitor",
+        type=str,
+        default=None,
+        help="Perf-server XDGM sink as 'HOST PORT' (internal IP, e.g. "
+        "'10.128.0.2 9876'); adds [datagram_monitor] to every node cfg",
+    )
+    p.add_argument(
+        "--binary_path",
+        type=str,
+        default=None,
+        help="Path to pre-built binary (skips download)",
+    )
+    p.add_argument(
+        "--quantum",
+        action="store_true",
+        help="Use dilithium (post-quantum) keys for validators and publisher",
+    )
+    p.add_argument(
+        "--all-amendments",
+        dest="all_amendments",
+        action="store_true",
+        help="Pre-enable EVERY amendment in genesis, ignoring the "
+        "Supported flag. Requires a binary built with those "
+        "amendments supported (else it amendment-blocks).",
+    )
+    p.add_argument(
+        "--features_file",
+        default=None,
+        help="Read features.macro from this local path instead of "
+        "fetching from GitHub. Use with a binary built from an "
+        "unpushed commit so the amendment set matches the binary.",
+    )
+    p.add_argument(
+        "--preload_accounts",
+        type=int,
+        default=0,
+        help="Prefund N accounts directly in genesis (perf-iac style)",
+    )
+    p.add_argument(
+        "--preload_trustlines",
+        type=int,
+        default=0,
+        help="Create N trustlines from account 0 (issuer hub) in genesis",
+    )
+    p.add_argument(
+        "--preload_balance",
+        default="1000000000",
+        help="Drops per prefunded account (default 1000 XRP)",
+    )
+    p.add_argument(
+        "--preload_currency",
+        default="USD",
+        help="Currency code for preloaded trustlines",
+    )
+    p.add_argument(
+        "--workspace",
+        default=None,
+        help="Workspace root holding <cluster>-cluster and its keystore "
+        "(default: ./workspace). Point at an existing network's "
+        "workspace to reuse its identity instead of copying keys.",
+    )
+    p.add_argument(
+        "--vl_site",
+        default=None,
+        help="Publisher list URL for [validator_list_sites]. Default is the "
+        "compose-internal http://vl/vl.json, which only resolves inside "
+        "a local cluster.",
+    )
+    p.add_argument(
+        "--bootstrap_vl",
+        action="store_true",
+        help="Emit the static [validators] list alongside the publisher list, "
+        "so a fresh chain reaches quorum before the VL site is up.",
+    )
+    p.add_argument(
+        "--statsd_address",
+        default=None,
+        help="[insight] StatsD sink as IP:PORT (e.g. 127.0.0.1:9125). Required "
+        "by the Alloy telemetry sidecar.",
+    )
+    p.add_argument(
+        "--perf_path",
+        default=None,
+        help="[perf] perf_log path (e.g. /opt/ripple/log/perf.log). Required "
+        "by the Alloy telemetry sidecar.",
+    )
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -175,92 +261,145 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     # -- up:standalone -------------------------------------------------------
-    p = subparsers.add_parser("up:standalone", help="Create and start standalone ledger")
-    p.add_argument("--log_level", default="trace", choices=["warning", "debug", "trace"])
+    p = subparsers.add_parser(
+        "up:standalone", help="Create and start standalone ledger"
+    )
+    p.add_argument(
+        "--log_level", default="trace", choices=["warning", "debug", "trace"]
+    )
     p.add_argument("--build_type", default="binary", choices=["image", "binary"])
     p.add_argument("--public_key", default=_DEFAULT_VL_KEY)
     p.add_argument("--import_key", default=None)
     p.add_argument("--protocol", default="xrpl")
-    p.add_argument("--network_id", type=int, default=None,
-                   help="Network id. Omit to use the protocol default; every real "
-                        "network should set its own (>1024 for replay protection).")
+    p.add_argument(
+        "--network_id",
+        type=int,
+        default=None,
+        help="Network id. Omit to use the protocol default; every real "
+        "network should set its own (>1024 for replay protection).",
+    )
     p.add_argument("--network_type", default="standalone")
     p.add_argument("--server", default=None)
     p.add_argument("--version", default=None)
-    p.add_argument("--commit", default=None,
-                   help="Commit sha OR release version (e.g. 3.2.0) of an "
-                        "all-amendments 'supported' build: pulls "
-                        "ghcr.io/xrplf/xrpld/supported:<sha-short|version> and "
-                        "resolves the amendment set from that ref.")
+    p.add_argument(
+        "--commit",
+        default=None,
+        help="Commit sha OR release version (e.g. 3.2.0) of an "
+        "all-amendments 'supported' build: pulls "
+        "ghcr.io/xrplf/xrpld/supported:<sha-short|version> and "
+        "resolves the amendment set from that ref.",
+    )
     p.add_argument("--ipfs", type=bool, default=False)
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
-    p.add_argument("--config_overrides", type=str, default=None,
-                   help="Path to YAML/JSON file with config overrides")
-    p.add_argument("--port_offset", type=int, default=0,
-                   help="Shift every node port by N so a candidate cluster can run "
-                        "beside an existing one (local mode).")
-    p.add_argument("--datagram_monitor", type=str, default=None,
-                   help="Perf-server XDGM sink as 'HOST PORT' (e.g. '10.128.0.2 9876')")
-    p.add_argument("--all-amendments", dest="all_amendments", action="store_true",
-                   help="Pre-enable EVERY amendment in genesis, ignoring the "
-                        "Supported flag. Requires a binary built with those "
-                        "amendments supported (else it amendment-blocks).")
-    p.add_argument("--features_file", default=None,
-                   help="Read features.macro from this local path instead of "
-                        "fetching from GitHub. Use with a binary built from an "
-                        "unpushed commit so the amendment set matches the binary.")
+    p.add_argument(
+        "--config_overrides",
+        type=str,
+        default=None,
+        help="Path to YAML/JSON file with config overrides",
+    )
+    p.add_argument(
+        "--port_offset",
+        type=int,
+        default=0,
+        help="Shift every node port by N so a candidate cluster can run "
+        "beside an existing one (local mode).",
+    )
+    p.add_argument(
+        "--datagram_monitor",
+        type=str,
+        default=None,
+        help="Perf-server XDGM sink as 'HOST PORT' (e.g. '10.128.0.2 9876')",
+    )
+    p.add_argument(
+        "--all-amendments",
+        dest="all_amendments",
+        action="store_true",
+        help="Pre-enable EVERY amendment in genesis, ignoring the "
+        "Supported flag. Requires a binary built with those "
+        "amendments supported (else it amendment-blocks).",
+    )
+    p.add_argument(
+        "--features_file",
+        default=None,
+        help="Read features.macro from this local path instead of "
+        "fetching from GitHub. Use with a binary built from an "
+        "unpushed commit so the amendment set matches the binary.",
+    )
 
     # -- create:network ------------------------------------------------------
     p = subparsers.add_parser("create:network", help="Create a multi-node network")
     _add_network_args(p)
     p.add_argument("--local", action="store_true")
     p.add_argument("--binary_name", default="xrpld")
-    p.add_argument("--ansible", action="store_true",
-                   help="Also generate ansible deployment files")
-    p.add_argument("--vips", nargs="+", default=None,
-                   help="Validator IP addresses (for ansible)")
-    p.add_argument("--pips", nargs="+", default=None,
-                   help="Peer IP addresses (for ansible)")
-    p.add_argument("--ssh_port", type=int, default=20,
-                   help="SSH port for ansible (default: 20)")
-    p.add_argument("--ssh_user", default="ubuntu",
-                   help="SSH user for ansible (default: ubuntu)")
-    p.add_argument("--ssh_key", default="~/.ssh/id_rsa",
-                   help="SSH key path for ansible")
+    p.add_argument(
+        "--ansible", action="store_true", help="Also generate ansible deployment files"
+    )
+    p.add_argument(
+        "--vips", nargs="+", default=None, help="Validator IP addresses (for ansible)"
+    )
+    p.add_argument(
+        "--pips", nargs="+", default=None, help="Peer IP addresses (for ansible)"
+    )
+    p.add_argument(
+        "--ssh_port", type=int, default=20, help="SSH port for ansible (default: 20)"
+    )
+    p.add_argument(
+        "--ssh_user", default="ubuntu", help="SSH user for ansible (default: ubuntu)"
+    )
+    p.add_argument(
+        "--ssh_key", default="~/.ssh/id_rsa", help="SSH key path for ansible"
+    )
 
     # -- create:ansible ------------------------------------------------------
-    p = subparsers.add_parser("create:ansible",
-                              help="Create network with ansible deployment")
+    p = subparsers.add_parser(
+        "create:ansible", help="Create network with ansible deployment"
+    )
     _add_network_args(p)
     p.add_argument("--binary_name", default="xrpld")
-    p.add_argument("--vips", nargs="+", default=None,
-                   help="Validator IP addresses")
-    p.add_argument("--pips", nargs="+", default=None,
-                   help="Peer IP addresses")
+    p.add_argument("--vips", nargs="+", default=None, help="Validator IP addresses")
+    p.add_argument("--pips", nargs="+", default=None, help="Peer IP addresses")
     p.add_argument("--ssh_port", type=int, default=20)
     p.add_argument("--ssh_user", default="ubuntu")
     p.add_argument("--ssh_key", default="~/.ssh/id_rsa")
-    p.add_argument("--cluster", default=None,
-                   help="Cluster name (workspace dir). Pass the same name to deploy:ansible.")
-    p.add_argument("--image", default=None,
-                   help="Prebuilt node image to deploy (the image IS the binary, built "
-                        "elsewhere). Skips the local-binary path; build_type becomes IMAGE.")
-    p.add_argument("--ansible_config", type=str, default=None,
-                   help="Path to YAML file with full ansible config (services, etc.)")
+    p.add_argument(
+        "--cluster",
+        default=None,
+        help="Cluster name (workspace dir). Pass the same name to deploy:ansible.",
+    )
+    p.add_argument(
+        "--image",
+        default=None,
+        help="Prebuilt node image to deploy (the image IS the binary, built "
+        "elsewhere). Skips the local-binary path; build_type becomes IMAGE.",
+    )
+    p.add_argument(
+        "--ansible_config",
+        type=str,
+        default=None,
+        help="Path to YAML file with full ansible config (services, etc.)",
+    )
 
     # -- deploy:ansible ------------------------------------------------------
-    p = subparsers.add_parser("deploy:ansible",
-                              help="Run ansible deployment for an existing cluster")
+    p = subparsers.add_parser(
+        "deploy:ansible", help="Run ansible deployment for an existing cluster"
+    )
     p.add_argument("--name", required=True, help="Cluster name")
-    p.add_argument("--workspace", default=None,
-                   help="Workspace root holding <name>-cluster (default: ./workspace)")
+    p.add_argument(
+        "--workspace",
+        default=None,
+        help="Workspace root holding <name>-cluster (default: ./workspace)",
+    )
 
     # -- health --------------------------------------------------------------
-    p = subparsers.add_parser("health",
-                              help="Poll validators until they reach consensus")
-    p.add_argument("--vips", nargs="+", required=True,
-                   help="Validator external IPs, in node order")
-    p.add_argument("--timeout", type=int, default=300, help="Overall deadline (seconds)")
+    p = subparsers.add_parser(
+        "health", help="Poll validators until they reach consensus"
+    )
+    p.add_argument(
+        "--vips", nargs="+", required=True, help="Validator external IPs, in node order"
+    )
+    p.add_argument(
+        "--timeout", type=int, default=300, help="Overall deadline (seconds)"
+    )
     p.add_argument("--interval", type=int, default=10, help="Seconds between polls")
 
     # -- Operational commands ------------------------------------------------
@@ -274,21 +413,29 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--name", required=True)
 
     # -- down:standalone -----------------------------------------------------
-    p = subparsers.add_parser("down:standalone", help="Stop and remove standalone ledger")
+    p = subparsers.add_parser(
+        "down:standalone", help="Stop and remove standalone ledger"
+    )
     p.add_argument("--name", default=None)
     p.add_argument("--protocol", default="xrpl")
     p.add_argument("--version", default=None)
 
     # -- up:local ------------------------------------------------------------
     p = subparsers.add_parser("up:local", help="Start local standalone")
-    p.add_argument("--log_level", default="trace", choices=["warning", "debug", "trace"])
+    p.add_argument(
+        "--log_level", default="trace", choices=["warning", "debug", "trace"]
+    )
     p.add_argument("--public_key", default=_DEFAULT_VL_KEY)
     p.add_argument("--import_key", default=None)
     p.add_argument("--protocol", default="xrpl")
     p.add_argument("--network_type", default="standalone")
-    p.add_argument("--network_id", type=int, default=None,
-                   help="Network id. Omit to use the protocol default; every real "
-                        "network should set its own (>1024 for replay protection).")
+    p.add_argument(
+        "--network_id",
+        type=int,
+        default=None,
+        help="Network id. Omit to use the protocol default; every real "
+        "network should set its own (>1024 for replay protection).",
+    )
     p.add_argument("--nodedb_type", default="NuDB", choices=["Memory", "NuDB", "rwdb"])
 
     # -- down:local ----------------------------------------------------------
@@ -299,16 +446,28 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--name", required=True)
     p.add_argument("--node_id", type=int, required=True)
     p.add_argument("--node_type", required=True, choices=["validator", "peer"])
-    p.add_argument("--build_server", default=None,
-                   help="raw-binary source (used with --build_version when --image is not given)")
-    p.add_argument("--build_version", required=True,
-                   help="version label for the on-disk binary + Dockerfile COPY line")
-    p.add_argument("--image", default=None,
-                   help="docker image to extract /opt/xrpld/bin/xrpld from (local or GAR); "
-                        "overrides --build_server")
-    p.add_argument("--workspace", default=None,
-                   help="workspace root holding the cluster dir; defaults to ./workspace "
-                        "(set this when invoking from outside the lab root)")
+    p.add_argument(
+        "--build_server",
+        default=None,
+        help="raw-binary source (used with --build_version when --image is not given)",
+    )
+    p.add_argument(
+        "--build_version",
+        required=True,
+        help="version label for the on-disk binary + Dockerfile COPY line",
+    )
+    p.add_argument(
+        "--image",
+        default=None,
+        help="docker image to extract /opt/xrpld/bin/xrpld from (local or GAR); "
+        "overrides --build_server",
+    )
+    p.add_argument(
+        "--workspace",
+        default=None,
+        help="workspace root holding the cluster dir; defaults to ./workspace "
+        "(set this when invoking from outside the lab root)",
+    )
 
     # -- enable:amendment ----------------------------------------------------
     p = subparsers.add_parser("enable:amendment", help="Enable amendment via RPC")
@@ -322,10 +481,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--name", required=True)
     p.add_argument("--node_id", type=int, required=True)
     p.add_argument("--node_type", required=True, choices=["validator", "peer"])
-    p.add_argument("--duration_ms", type=int, default=30000,
-                   help="Stall duration in ms (default: 30000)")
-    p.add_argument("--clear", action="store_true",
-                   help="Clear the stall immediately")
+    p.add_argument(
+        "--duration_ms",
+        type=int,
+        default=30000,
+        help="Stall duration in ms (default: 30000)",
+    )
+    p.add_argument("--clear", action="store_true", help="Clear the stall immediately")
 
     # -- node:restart --------------------------------------------------------
     p = subparsers.add_parser(
@@ -333,8 +495,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Restart a single local node (syncs from network)",
     )
     p.add_argument("node_name", help="Node directory name (e.g. vnode2)")
-    p.add_argument("--genesis", action="store_true",
-                   help="Start from genesis instead of syncing from network")
+    p.add_argument(
+        "--genesis",
+        action="store_true",
+        help="Start from genesis instead of syncing from network",
+    )
 
     # -- logs:local ----------------------------------------------------------
     p = subparsers.add_parser("logs:local", help="View local node logs")
@@ -352,9 +517,7 @@ def _build_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_service_dependencies(
-    ansible: AnsibleConfig, log_level: str
-) -> tuple:
+def _resolve_service_dependencies(ansible: AnsibleConfig, log_level: str) -> tuple:
     """Enforce service dependency constraints.
 
     - stream + debug are always paired (auto-create missing half)
@@ -385,8 +548,10 @@ def _resolve_service_dependencies(
                 host.debug.endpoint = f"ws://{host.ip}:{host.stream.port}/"
 
     if needs_trace and log_level != "trace":
-        print(f"  [xrpld-lab] stream/debug services require trace logging, "
-              f"overriding log_level from '{log_level}' to 'trace'")
+        print(
+            f"  [xrpld-lab] stream/debug services require trace logging, "
+            f"overriding log_level from '{log_level}' to 'trace'"
+        )
         log_level = "trace"
 
     return ansible, log_level
@@ -423,14 +588,42 @@ def _build_ansible_config_from_file(path: str, args) -> AnsibleConfig:
         host = ServicesHost(
             ip=svc_data["ip"],
             name=svc_data["name"],
-            nginx=NginxConfig(**(svc_data["nginx"] or {})) if "nginx" in svc_data else None,
+            nginx=(
+                NginxConfig(**(svc_data["nginx"] or {}))
+                if "nginx" in svc_data
+                else None
+            ),
             vl=VlConfig(**(svc_data["vl"] or {})) if "vl" in svc_data else None,
-            redis=RedisConfig(**(svc_data["redis"] or {})) if "redis" in svc_data else None,
-            faucet=FaucetConfig(**(svc_data["faucet"] or {})) if "faucet" in svc_data else None,
-            stream=StreamConfig(**(svc_data["stream"] or {})) if "stream" in svc_data else None,
-            debug=DebugConfig(**(svc_data["debug"] or {})) if "debug" in svc_data else None,
-            compiler=CompilerConfig(**(svc_data["compiler"] or {})) if "compiler" in svc_data else None,
-            status=StatusConfig(**(svc_data["status"] or {})) if "status" in svc_data else None,
+            redis=(
+                RedisConfig(**(svc_data["redis"] or {}))
+                if "redis" in svc_data
+                else None
+            ),
+            faucet=(
+                FaucetConfig(**(svc_data["faucet"] or {}))
+                if "faucet" in svc_data
+                else None
+            ),
+            stream=(
+                StreamConfig(**(svc_data["stream"] or {}))
+                if "stream" in svc_data
+                else None
+            ),
+            debug=(
+                DebugConfig(**(svc_data["debug"] or {}))
+                if "debug" in svc_data
+                else None
+            ),
+            compiler=(
+                CompilerConfig(**(svc_data["compiler"] or {}))
+                if "compiler" in svc_data
+                else None
+            ),
+            status=(
+                StatusConfig(**(svc_data["status"] or {}))
+                if "status" in svc_data
+                else None
+            ),
         )
         services.append(host)
 
@@ -696,7 +889,10 @@ def main() -> None:
 
     if args.command == "health":
         from xrpld_lab.health import check_consensus
-        ok = check_consensus(args.vips, timeout_s=args.timeout, interval_s=args.interval)
+
+        ok = check_consensus(
+            args.vips, timeout_s=args.timeout, interval_s=args.interval
+        )
         raise SystemExit(0 if ok else 1)
     elif args.command == "deploy:ansible":
         _deploy_ansible(workspace, args.name)
@@ -712,7 +908,8 @@ def main() -> None:
         start_local(
             protocol=args.protocol,
             network_type=args.network_type,
-            network_id=args.network_id or get_spec(Protocol(args.protocol)).default_network_id,
+            network_id=args.network_id
+            or get_spec(Protocol(args.protocol)).default_network_id,
             log_level=args.log_level,
             nodedb_type=args.nodedb_type,
             public_key=args.public_key,
@@ -770,4 +967,3 @@ def _deploy_ansible(workspace: Workspace, name: str) -> None:
         return
 
     subprocess.run(["bash", run_sh], cwd=ansible_dir, check=False)
-

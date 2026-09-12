@@ -35,7 +35,7 @@ def parse_xrpld_cfg(content: str) -> Dict[str, Any]:
             return
 
         # Filter out empty lines
-        lines = [l for l in section_lines if l.strip()]
+        lines = [line for line in section_lines if line.strip()]
 
         if not lines:
             # Empty section, skip
@@ -44,7 +44,7 @@ def parse_xrpld_cfg(content: str) -> Dict[str, Any]:
             return
 
         # Check if any line contains '='
-        has_kv = any("=" in l for l in lines)
+        has_kv = any("=" in line for line in lines)
 
         if has_kv:
             # Key-value pairs -> dict
@@ -60,7 +60,7 @@ def parse_xrpld_cfg(content: str) -> Dict[str, Any]:
             result[current_section] = lines[0].strip()
         else:
             # Multiple lines -> list
-            result[current_section] = [l.strip() for l in lines]
+            result[current_section] = [line.strip() for line in lines]
 
         current_section = None
         section_lines = []

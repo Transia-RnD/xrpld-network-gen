@@ -12,7 +12,9 @@ from xrpld_lab.script_builder import DockerfileBuilder, ScriptBuilder
 
 
 def _default_ports() -> PortSet:
-    return PortSet(rpc_public=5007, rpc_admin=5005, ws_public=6008, ws_admin=6006, peer=51235)
+    return PortSet(
+        rpc_public=5007, rpc_admin=5005, ws_public=6008, ws_admin=6006, peer=51235
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +83,10 @@ class TestDockerfileBuilder:
         assert "ENV PEER=51235" in result
         assert "ENV DATA=12345" in result
         # Should have $VAR EXPOSE
-        assert "$RPC_PUBLIC $RPC_ADMIN $WS_PUBLIC $WS_ADMIN $PEER $PEER/udp $DATA $DATA/udp" in result
+        assert (
+            "$RPC_PUBLIC $RPC_ADMIN $WS_PUBLIC $WS_ADMIN $PEER $PEER/udp $DATA $DATA/udp"
+            in result
+        )
         # Should have COPY entrypoint
         assert "COPY entrypoint /entrypoint.sh" in result
         # ENTRYPOINT without genesis (default)
@@ -130,7 +135,9 @@ class TestDockerfileBuilder:
             standalone="false",
         )
         assert "COPY genesis.json /genesis.json" in result
-        assert 'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", "2", "false" ]' in result
+        assert (
+            'ENTRYPOINT [ "/entrypoint.sh", "/genesis.json", "2", "false" ]' in result
+        )
 
     def test_no_genesis(self):
         """No genesis: ENTRYPOINT without genesis args."""
@@ -270,7 +277,7 @@ class TestScriptBuilderNetwork:
         )
         assert "#! /bin/bash" in result
         assert "REMOVE_FLAG=false" in result
-        assert '--remove' in result
+        assert "--remove" in result
         # --remove-orphans in the remove branch
         assert "down --remove-orphans" in result
         # Cleanup for vnodes
@@ -312,19 +319,19 @@ class TestScriptBuilderLocalNetwork:
         assert "up --build --force-recreate -d" in result
         # Binary discovery
         assert 'CLUSTER_DIR="$(cd "$(dirname "$0")" && pwd)"' in result
-        assert '$CLUSTER_DIR/../xrpld' in result
+        assert "$CLUSTER_DIR/../xrpld" in result
         assert "command -v xrpld" in result
         assert "BINARY_PATH" in result
         # Copy binary to nodes
-        assert "cp \"$BINARY_PATH\" vnode1/xrpld" in result
-        assert "cp \"$BINARY_PATH\" vnode2/xrpld" in result
-        assert "cp \"$BINARY_PATH\" pnode1/xrpld" in result
+        assert 'cp "$BINARY_PATH" vnode1/xrpld' in result
+        assert 'cp "$BINARY_PATH" vnode2/xrpld' in result
+        assert 'cp "$BINARY_PATH" pnode1/xrpld' in result
         # nohup start
         assert "nohup ./xrpld --conf config/xrpld.cfg" in result
         assert "--ledgerfile config/genesis.json --valid" in result
         # PID files
         assert "xrpld.pid" in result
-        assert 'echo $!' in result
+        assert "echo $!" in result
         # Node lists in output
         assert "vnode1" in result
         assert "vnode2" in result
@@ -350,7 +357,7 @@ class TestScriptBuilderLocalNetwork:
             num_peers=0,
             binary_name="rippled",
         )
-        assert '$CLUSTER_DIR/../rippled' in result
+        assert "$CLUSTER_DIR/../rippled" in result
         assert "command -v rippled" in result
         assert 'cp "$BINARY_PATH" vnode1/rippled' in result
         assert "nohup ./rippled" in result

@@ -308,16 +308,22 @@ class TestDatagramMonitorFor:
 
     def _ansible(self, status):
         return AnsibleConfig(
-            vips=["10.0.0.1"], pips=["10.0.0.10"],
+            vips=["10.0.0.1"],
+            pips=["10.0.0.10"],
             services=[ServicesHost(name="pnode1", ip="10.0.0.10", status=status)],
         )
 
     def test_none_without_sink_or_status(self):
-        assert self._lab(ansible=self._ansible(None)).datagram_monitor_for("10.0.0.1") is None
+        assert (
+            self._lab(ansible=self._ansible(None)).datagram_monitor_for("10.0.0.1")
+            is None
+        )
         assert self._lab().datagram_monitor_for("10.0.0.1") is None
 
     def test_explicit_sink_wins(self):
-        lab = self._lab(datagram_monitor="10.128.0.2 9876", ansible=self._ansible(StatusConfig()))
+        lab = self._lab(
+            datagram_monitor="10.128.0.2 9876", ansible=self._ansible(StatusConfig())
+        )
         assert lab.datagram_monitor_for("10.0.0.1") == ["10.128.0.2 9876"]
 
     def test_status_sampler_on_the_node_address(self):

@@ -7,7 +7,8 @@ The node (xrpld) needs NO change — ``StartUpType::LoadFile`` already ingests
 ``accountState`` entries; each just needs its ``index`` (the SHAMap keylet).
 
 Keylets are derived to match xrpld exactly:
-  - account      = SHA512Half(0x0061 ‖ accountID)         [verified vs genesis root vector]
+  - account      = SHA512Half(0x0061 ‖ accountID)
+                   [verified vs genesis root vector]
   - ripple_state = SHA512Half(0x0072 ‖ lo ‖ hi ‖ cur20)   [0x0072 namespace documented;
                    currency encoding verified vs xrpl-py codec; account order canonical]
 
@@ -60,7 +61,11 @@ def currency_to_bytes(code: str) -> bytes:
 def ripple_state_index(addr_a: str, addr_b: str, currency: str) -> str:
     a, b = decode_classic_address(addr_a), decode_classic_address(addr_b)
     lo, hi = (a, b) if a < b else (b, a)
-    return _sha512half(_NS_RIPPLE_STATE + lo + hi + currency_to_bytes(currency)).hex().upper()
+    return (
+        _sha512half(_NS_RIPPLE_STATE + lo + hi + currency_to_bytes(currency))
+        .hex()
+        .upper()
+    )
 
 
 def owner_dir_index(address: str) -> str:
@@ -68,12 +73,15 @@ def owner_dir_index(address: str) -> str:
 
 
 def make_wallet(index: int, prefix: bytes = b"perf-iac-") -> Wallet:
-    """Deterministic wallet from an index (so lab + loadtester agree on the account set)."""
+    """Deterministic wallet from an index (so lab + loadtester agree on the
+    account set)."""
     entropy = hashlib.sha256(prefix + index.to_bytes(8, "big")).digest()[:16]
     return Wallet.from_seed(generate_seed(entropy.hex()))
 
 
-def account_root_entry(address: str, balance_drops, sequence: int = 1, owner_count: int = 0) -> dict:
+def account_root_entry(
+    address: str, balance_drops, sequence: int = 1, owner_count: int = 0
+) -> dict:
     return {
         "Account": address,
         "Balance": str(balance_drops),
@@ -87,8 +95,9 @@ def account_root_entry(address: str, balance_drops, sequence: int = 1, owner_cou
     }
 
 
-def ripple_state_entry(addr_a: str, addr_b: str, currency: str,
-                       value: str = "0", limit: str = "1000000000") -> dict:
+def ripple_state_entry(
+    addr_a: str, addr_b: str, currency: str, value: str = "0", limit: str = "1000000000"
+) -> dict:
     a, b = decode_classic_address(addr_a), decode_classic_address(addr_b)
     low_addr, high_addr = (addr_a, addr_b) if a < b else (addr_b, addr_a)
     return {
@@ -97,7 +106,7 @@ def ripple_state_entry(addr_a: str, addr_b: str, currency: str,
         "Balance": {"currency": currency, "issuer": _ACCOUNT_ZERO, "value": value},
         "LowLimit": {"currency": currency, "issuer": low_addr, "value": limit},
         "HighLimit": {"currency": currency, "issuer": high_addr, "value": limit},
-        "LowNode": "0",   # page 0 of the low account's owner directory
+        "LowNode": "0",  # page 0 of the low account's owner directory
         "HighNode": "0",  # page 0 of the high account's owner directory
         "PreviousTxnID": _ZERO_TXN,
         "PreviousTxnLgrSeq": 0,
@@ -122,28 +131,38 @@ def directory_node_entry(owner_address: str, indexes) -> dict:
     }
 
 
-def generate(num_accounts: int, balance_drops: str = "1000000000",
-             num_trustlines: int = 0, currency: str = "USD",
-             prefix: bytes = b"perf-iac-") -> Tuple[List[dict], List[str]]:
+def generate(
+    num_accounts: int,
+    balance_drops: str = "1000000000",
+    num_trustlines: int = 0,
+    currency: str = "USD",
+    prefix: bytes = b"perf-iac-",
+) -> Tuple[List[dict], List[str]]:
     """Return ``(accountState_entries, seeds)``.
 
     Trustlines link account 0 (a hub/issuer) with accounts 1..num_trustlines.
     """
     wallets = [make_wallet(i, prefix) for i in range(num_accounts)]
-    owned: dict = {w.classic_address: [] for w in wallets}  # account -> [RippleState index]
+    owned: dict = {
+        w.classic_address: [] for w in wallets
+    }  # account -> [RippleState index]
 
     rs_entries: List[dict] = []
     if num_accounts and num_trustlines:
         hub = wallets[0]
         n = min(num_trustlines, num_accounts - 1)
         for i in range(1, n + 1):
-            rs = ripple_state_entry(hub.classic_address, wallets[i].classic_address, currency)
+            rs = ripple_state_entry(
+                hub.classic_address, wallets[i].classic_address, currency
+            )
             rs_entries.append(rs)
             owned[hub.classic_address].append(rs["index"])
             owned[wallets[i].classic_address].append(rs["index"])
 
     states: List[dict] = [
-        account_root_entry(w.classic_address, balance_drops, owner_count=len(owned[w.classic_address]))
+        account_root_entry(
+            w.classic_address, balance_drops, owner_count=len(owned[w.classic_address])
+        )
         for w in wallets
     ]
     states.extend(rs_entries)
@@ -151,7 +170,9 @@ def generate(num_accounts: int, balance_drops: str = "1000000000",
     # account_lines and count toward reserve). Single page suffices at small counts.
     for w in wallets:
         if owned[w.classic_address]:
-            states.append(directory_node_entry(w.classic_address, owned[w.classic_address]))
+            states.append(
+                directory_node_entry(w.classic_address, owned[w.classic_address])
+            )
     return states, [w.seed for w in wallets]
 
 
@@ -184,18 +205,30 @@ def merge_into_genesis(genesis: dict, entries: List[dict]) -> dict:
 
 
 def _main(argv=None):
-    p = argparse.ArgumentParser(description="Generate prefunded genesis state + wallets.")
+    p = argparse.ArgumentParser(
+        description="Generate prefunded genesis state + wallets."
+    )
     p.add_argument("--accounts", type=int, required=True)
     p.add_argument("--trustlines", type=int, default=0)
-    p.add_argument("--balance", default="1000000000", help="drops per account (default 1000 XRP)")
+    p.add_argument(
+        "--balance", default="1000000000", help="drops per account (default 1000 XRP)"
+    )
     p.add_argument("--currency", default="USD")
     p.add_argument("--prefix", default="perf-iac-", help="deterministic seed namespace")
-    p.add_argument("--out-state", required=True, help="JSON file: accountState entries array")
-    p.add_argument("--out-wallets", required=True, help="JSON file: seed list (loadtester format)")
+    p.add_argument(
+        "--out-state", required=True, help="JSON file: accountState entries array"
+    )
+    p.add_argument(
+        "--out-wallets", required=True, help="JSON file: seed list (loadtester format)"
+    )
     args = p.parse_args(argv)
 
     states, seeds = generate(
-        args.accounts, args.balance, args.trustlines, args.currency, args.prefix.encode()
+        args.accounts,
+        args.balance,
+        args.trustlines,
+        args.currency,
+        args.prefix.encode(),
     )
     with open(args.out_state, "w") as f:
         json.dump(states, f)
