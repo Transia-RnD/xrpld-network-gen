@@ -1,0 +1,291 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xrpld node status</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0f1115; --panel: #171a21; --line: #262b36; --text: #e6e9ef;
+    --dim: #8b93a7; --accent: #4da3ff; --accent2: #ffb454; --ok: #3ddc97;
+    --warn: #ffcc66; --bad: #ff6b6b;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f6f7f9; --panel: #fff; --line: #e2e5ea; --text: #1a1d23; --dim: #5f6673; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+           padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  .sub { color: var(--dim); font-family: var(--mono); font-size: 12px; }
+  .spacer { flex: 1; }
+  /* A native select renders its popup with OS chrome the page cannot size, so the range
+     picker is buttons. */
+  .range { display: flex; gap: 2px; padding: 2px; background: var(--bg);
+           border: 1px solid var(--line); border-radius: 7px; }
+  .range button { border: 0; background: transparent; color: var(--dim); cursor: pointer;
+                  font-family: var(--mono); font-size: 12px; padding: 4px 9px;
+                  border-radius: 5px; }
+  .range button:hover { color: var(--text); }
+  .range button.on { background: var(--panel); color: var(--text);
+                     box-shadow: 0 0 0 1px var(--line); }
+  .badge { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 999px;
+           border: 1px solid var(--line); }
+  .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+  .badge.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+  .badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+  main { padding: 16px 20px 40px; }
+  .stats { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+           margin-bottom: 16px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+          padding: 10px 12px; }
+  .stat .k { color: var(--dim); font-size: 11px; text-transform: uppercase;
+             letter-spacing: .06em; }
+  .stat .v { font-family: var(--mono); font-size: 18px; margin-top: 3px; }
+  .stat .v small { font-size: 12px; color: var(--dim); }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+           padding: 10px 12px 6px; }
+  .panel h2 { font-size: 12px; margin: 0 0 2px; font-weight: 600; color: var(--dim);
+              text-transform: uppercase; letter-spacing: .06em;
+              display: flex; justify-content: space-between; }
+  .panel h2 .cur { font-family: var(--mono); color: var(--text); text-transform: none;
+                   letter-spacing: 0; }
+  canvas { width: 100%; height: 150px; display: block; }
+  .legend { display: flex; gap: 12px; font-size: 11px; color: var(--dim);
+            font-family: var(--mono); padding: 0 2px 6px; }
+  .legend i { display: inline-block; width: 9px; height: 2px; vertical-align: middle;
+              margin-right: 4px; }
+  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  td { padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  td:first-child { color: var(--dim); white-space: nowrap; }
+  .err { color: var(--bad); font-family: var(--mono); font-size: 12px; }
+</style>
+
+<header>
+  <h1>xrpld node status</h1>
+  <span class="sub" id="host"></span>
+  <span class="badge" id="state">…</span>
+  <span class="spacer"></span>
+  <span class="sub" id="updated"></span>
+  <div class="range" id="window" role="group" aria-label="Time range">
+    <button data-window="3600">1h</button>
+    <button data-window="21600" class="on">6h</button>
+    <button data-window="86400">24h</button>
+    <button data-window="604800">7d</button>
+    <button data-window="2592000">30d</button>
+  </div>
+</header>
+
+<main>
+  <div class="stats" id="stats"></div>
+  <div class="grid" id="charts"></div>
+  <div class="panel" style="margin-top:12px">
+    <h2>Recent events</h2>
+    <table id="events"></table>
+  </div>
+  <p class="err" id="err"></p>
+</main>
+
+<script>
+const CHARTS = [
+  { title: 'CPU', unit: '%', max: 100,
+    series: [{ key: 'cpu_pct', label: 'busy', color: '#4da3ff' },
+             { key: 'cpu_iowait_pct', label: 'iowait', color: '#ffb454' }] },
+  { title: 'Load average', unit: '',
+    series: [{ key: 'load1', label: '1m', color: '#4da3ff' },
+             { key: 'load5', label: '5m', color: '#a78bfa' },
+             { key: 'load15', label: '15m', color: '#8b93a7' }] },
+  { title: 'Memory', unit: 'bytes', fmt: 'bytes',
+    series: [{ key: 'mem_used', label: 'used', color: '#4da3ff' },
+             { key: 'swap_used', label: 'swap', color: '#ff6b6b' },
+             { key: 'xrpld_rss', label: 'xrpld rss', color: '#3ddc97' }] },
+  { title: 'Disk used', unit: 'bytes', fmt: 'bytes',
+    series: [{ key: 'disk_used', label: 'used', color: '#4da3ff' }] },
+  { title: 'Disk IO', unit: 'B/s', fmt: 'rate',
+    series: [{ key: 'disk_read_bps', label: 'read', color: '#4da3ff' },
+             { key: 'disk_write_bps', label: 'write', color: '#ffb454' }] },
+  { title: 'Network', unit: 'B/s', fmt: 'rate',
+    series: [{ key: 'net_rx_bps', label: 'rx', color: '#4da3ff' },
+             { key: 'net_tx_bps', label: 'tx', color: '#ffb454' }] },
+  { title: 'Peers', unit: '',
+    series: [{ key: 'peers', label: 'peers', color: '#3ddc97' }] },
+  { title: 'Consensus close time', unit: 'ms',
+    series: [{ key: 'converge_ms', label: 'converge', color: '#a78bfa' }] },
+  { title: 'IO latency', unit: 'ms',
+    series: [{ key: 'io_latency_ms', label: 'latency', color: '#ffb454' }] },
+  { title: 'Job queue overflow', unit: '',
+    series: [{ key: 'jq_overflow', label: 'jq_trans_overflow', color: '#ff6b6b' }] },
+  { title: 'Ledgers held', unit: '',
+    series: [{ key: 'ledger_span', label: 'span', color: '#4da3ff' }] },
+  { title: 'Validated ledger', unit: '',
+    series: [{ key: 'validated_seq', label: 'seq', color: '#3ddc97' }] },
+  // Reported only by a build carrying DatagramMonitor; empty until one runs.
+  { title: 'Proposers', unit: '', xdgm: true,
+    series: [{ key: 'proposers', label: 'proposers', color: '#a78bfa' }] },
+  { title: 'Cache hit rate', unit: '%', max: 100, xdgm: true,
+    series: [{ key: 'sle_hit_rate', label: 'SLE', color: '#4da3ff' },
+             { key: 'ledger_hit_rate', label: 'ledger', color: '#3ddc97' }] },
+  { title: 'Node store IO', unit: '', xdgm: true,
+    series: [{ key: 'node_write_count', label: 'writes', color: '#ffb454' },
+             { key: 'node_fetch_count', label: 'fetches', color: '#4da3ff' }] },
+  { title: 'Tree node cache', unit: '', xdgm: true,
+    series: [{ key: 'treenode_cache_size', label: 'entries', color: '#a78bfa' }] },
+];
+
+const fmtBytes = v => {
+  if (v == null) return '–';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return v.toFixed(v < 10 && i > 0 ? 1 : 0) + ' ' + u[i];
+};
+const fmtNum = v => v == null ? '–' :
+  (Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : (+v).toFixed(Math.abs(v) < 10 ? 2 : 0));
+const fmtVal = (v, fmt) => fmt === 'bytes' ? fmtBytes(v)
+  : fmt === 'rate' ? fmtBytes(v) + '/s' : fmtNum(v);
+const fmtDur = s => {
+  if (s == null) return '–';
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
+};
+
+// One canvas per panel, redrawn from the series on every poll. Device-pixel aware so the
+// lines stay sharp on a retina display.
+function draw(canvas, points, spec) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const css = getComputedStyle(document.documentElement);
+  const gridColor = css.getPropertyValue('--line').trim();
+  const dim = css.getPropertyValue('--dim').trim();
+  const pad = { l: 46, r: 6, t: 8, b: 16 };
+
+  const values = [];
+  for (const s of spec.series) for (const p of points) {
+    const v = p[s.key]; if (v != null) values.push(v);
+  }
+  let max = spec.max != null ? spec.max : Math.max(...values, 0);
+  if (!isFinite(max) || max <= 0) max = 1;
+  max *= spec.max != null ? 1 : 1.15;
+  const t0 = points.length ? points[0].ts : 0;
+  const t1 = points.length ? points[points.length - 1].ts : 1;
+  const span = Math.max(t1 - t0, 1);
+  const x = t => pad.l + (w - pad.l - pad.r) * (t - t0) / span;
+  const y = v => pad.t + (h - pad.t - pad.b) * (1 - Math.min(v, max) / max);
+
+  ctx.strokeStyle = gridColor; ctx.fillStyle = dim;
+  ctx.lineWidth = 1; ctx.font = '10px ui-monospace, monospace'; ctx.textBaseline = 'middle';
+  for (let i = 0; i <= 2; i++) {
+    const v = max * i / 2, yy = Math.round(y(v)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(pad.l, yy); ctx.lineTo(w - pad.r, yy); ctx.stroke();
+    ctx.fillText(fmtVal(v, spec.fmt), 2, yy);
+  }
+
+  for (const s of spec.series) {
+    ctx.strokeStyle = s.color; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let pen = false;
+    for (const p of points) {
+      const v = p[s.key];
+      if (v == null) { pen = false; continue; }
+      const px = x(p.ts), py = y(v);
+      if (pen) ctx.lineTo(px, py); else { ctx.moveTo(px, py); pen = true; }
+    }
+    ctx.stroke();
+  }
+}
+
+function buildPanels() {
+  const host = document.getElementById('charts');
+  for (const spec of CHARTS) {
+    const el = document.createElement('div');
+    el.className = 'panel';
+    el.innerHTML = `<h2>${spec.title}<span class="cur"></span></h2>
+      <div class="legend">${spec.series.map(s =>
+        `<span><i style="background:${s.color}"></i>${s.label}</span>`).join('')}</div>
+      <canvas></canvas>`;
+    host.appendChild(el);
+    spec.el = el;
+  }
+}
+
+function renderStats(latest) {
+  const okBadge = v => v == null ? '–' : v ? '<span class="badge ok">up</span>' : '<span class="badge bad">down</span>';
+  const memPct = latest.mem_total ? 100 * latest.mem_used / latest.mem_total : null;
+  const swapPct = latest.swap_total ? 100 * latest.swap_used / latest.swap_total : null;
+  const diskPct = latest.disk_total ? 100 * latest.disk_used / latest.disk_total : null;
+  const cells = [
+    ['build', latest.build_version || '–'],
+    ['uptime', fmtDur(latest.uptime)],
+    ['time to sync', latest.initial_sync_s ? fmtDur(latest.initial_sync_s) +
+      ` <small>${Math.round(latest.initial_sync_s)}s</small>` : '–'],
+    ['peers', fmtNum(latest.peers)],
+    ['validated ledger', latest.validated_seq ? fmtNum(latest.validated_seq) : '–'],
+    ['ledgers held', `${fmtNum(latest.ledger_span)} <small>${latest.complete_ledgers || ''}</small>`],
+    ['memory', `${memPct == null ? '–' : memPct.toFixed(0) + '%'} <small>${fmtBytes(latest.mem_used)} / ${fmtBytes(latest.mem_total)}</small>`],
+    ['swap', `${swapPct == null ? '–' : swapPct.toFixed(0) + '%'} <small>${fmtBytes(latest.swap_used)} / ${fmtBytes(latest.swap_total)}</small>`],
+    ['disk', `${diskPct == null ? '–' : diskPct.toFixed(0) + '%'} <small>${fmtBytes(latest.disk_used)} / ${fmtBytes(latest.disk_total)}</small>`],
+    ['xrpld', okBadge(latest.xrpld_ok)],
+    ['debug stream', okBadge(latest.debugstream_ok)],
+    ['redis', okBadge(latest.redis_ok)],
+    ['xdgm packets', latest.xdgm_ok ? '<span class="badge ok">receiving</span>'
+      : '<span class="badge warn">none</span>'],
+  ];
+  document.getElementById('stats').innerHTML = cells.map(
+    ([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+
+  const state = latest.server_state || 'unknown';
+  const badge = document.getElementById('state');
+  badge.textContent = state;
+  badge.className = 'badge ' + (state === 'full' ? 'ok'
+    : ['unreachable', 'unknown', 'disconnected'].includes(state) ? 'bad' : 'warn');
+  document.getElementById('updated').textContent = latest.ts
+    ? 'updated ' + new Date(latest.ts * 1000).toLocaleTimeString() : '';
+}
+
+const rangeEl = document.getElementById('window');
+const currentWindow = () => rangeEl.querySelector('button.on').dataset.window;
+
+async function poll() {
+  const win = currentWindow();
+  try {
+    const [latest, series, events] = await Promise.all([
+      fetch('api/latest').then(r => r.json()),
+      fetch('api/series?window=' + win).then(r => r.json()),
+      fetch('api/events?limit=25').then(r => r.json()),
+    ]);
+    document.getElementById('err').textContent = '';
+    renderStats(latest);
+    const points = series.points || [];
+    for (const spec of CHARTS) {
+      draw(spec.el.querySelector('canvas'), points, spec);
+      const last = [...points].reverse().find(p => p[spec.series[0].key] != null);
+      spec.el.querySelector('.cur').textContent = last ? fmtVal(last[spec.series[0].key], spec.fmt)
+        : spec.xdgm ? 'no XDGM packets' : '';
+    }
+    document.getElementById('events').innerHTML = (events.events || []).map(e =>
+      `<tr><td>${new Date(e.ts * 1000).toLocaleString()}</td><td>${e.kind}</td>
+       <td>${e.detail}</td></tr>`).join('') || '<tr><td>no events recorded</td></tr>';
+  } catch (err) {
+    document.getElementById('err').textContent = 'cannot reach the metrics API: ' + err.message;
+  }
+}
+
+document.getElementById('host').textContent = location.host;
+buildPanels();
+rangeEl.addEventListener('click', event => {
+  const button = event.target.closest('button');
+  if (!button) return;
+  rangeEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === button));
+  poll();
+});
+window.addEventListener('resize', () => poll());
+poll();
+setInterval(poll, 10000);
+</script>

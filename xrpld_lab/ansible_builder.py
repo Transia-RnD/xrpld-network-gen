@@ -2,7 +2,7 @@
 
 Generates a complete ansible directory for deploying xrpld clusters
 to remote servers, with optional per-host services (nginx, redis,
-faucet, stream, debug, compiler) and idempotent run.sh that skips
+faucet, stream, debug, compiler, status) and idempotent run.sh that skips
 already-completed playbook stages on rebuild.
 """
 
@@ -87,6 +87,8 @@ class AnsibleBuilder:
         self._write_clean_sh()
         if self.config.alloy:
             self._write_alloy()
+        if self.config.status_host:
+            self._write_status()
 
         for svc_host in self.config.services:
             self._write_services_host(svc_host)
@@ -170,6 +172,7 @@ class AnsibleBuilder:
                 "peer_port": node.ports.peer,
                 "ssh_port": self.config.ssh_port,
                 **self._alloy_host_vars(node),
+                **self._status_host_vars(node),
                 # /var/lib/xrpld/db is a Local NVMe mountpoint — excluded from the cleanup
                 # rmtree (can't delete a live mount; it's ephemeral and fresh on boot anyway).
                 "volumes": [
@@ -258,6 +261,126 @@ class AnsibleBuilder:
         shutil.copytree(a.source_dir, alloy_dir)
         self._file_write(os.path.join(self.ansible_dir, "alloy.yml"), _ALLOY_YML)
 
+    # ------------------------------------------------------------------
+    # Status sampler (every node) and network roll-up (services host)
+    # ------------------------------------------------------------------
+
+    STATUS_DIR = "/opt/xrpld-status"
+    STATUS_STATE_DIR = "/var/lib/xrpld-status"
+
+    def _status_url(self, node: AnsibleNode, host: ServicesHost) -> str:
+        # The services host's own sampler is reached over loopback, every other over its IP.
+        ip = "127.0.0.1" if node.ip == host.ip else node.ip
+        return f"http://{ip}:{host.status.port}"
+
+    def _status_network_nodes(self, host: ServicesHost) -> str:
+        return ",".join(
+            f"{n.name}={self._status_url(n, host)} role={n.role}" for n in self._nodes
+        )
+
+    def _status_host_vars(self, node: AnsibleNode) -> dict:
+        host = self.config.status_host
+        if not host:
+            return {}
+        st = host.status
+        local = node.ip == host.ip
+        env = {
+            "NODE_METRICS_DB": f"{self.STATUS_STATE_DIR}/metrics.db",
+            # Only nginx on the services host talks to its sampler; every other node's
+            # sampler is fetched across the network by the roll-up, so it binds all addresses.
+            "NODE_METRICS_HTTP_HOST": "127.0.0.1" if local else "0.0.0.0",
+            "NODE_METRICS_HTTP_PORT": str(st.port),
+            "NODE_METRICS_INTERVAL": str(st.interval),
+            "NODE_METRICS_DASHBOARD": f"{self.STATUS_DIR}/node-dashboard.html",
+            "NODE_METRICS_ADMIN_RPC": f"http://127.0.0.1:{node.ports.rpc_admin}/",
+            "NODE_METRICS_DEBUGSTREAM_HEALTH": (
+                f"http://127.0.0.1:{host.debug.port}/health" if local and host.debug else ""
+            ),
+            "NODE_METRICS_REDIS_PORT": "6379" if local and host.redis else "0",
+            "NODE_METRICS_DISK_PATH": st.disk_path,
+            "NODE_METRICS_PROCESS": st.process,
+            "NODE_METRICS_RETAIN_RAW_HOURS": str(st.retain_raw_hours),
+            "NODE_METRICS_RETAIN_5M_DAYS": str(st.retain_5m_days),
+            "NODE_METRICS_RETAIN_1H_DAYS": str(st.retain_1h_days),
+            # xrpld runs in a bridge-network container and sends XDGM to the host's own
+            # address, so the listener binds that address rather than loopback.
+            "NODE_METRICS_XDGM_HOST": node.ip,
+            "NODE_METRICS_XDGM_PORT": str(st.xdgm_port),
+        }
+        if local:
+            env["NODE_METRICS_NETWORK_NODES"] = self._status_network_nodes(host)
+            env["NODE_METRICS_NETWORK_FILE"] = f"{self.STATUS_DIR}/network.json"
+            env["NODE_METRICS_NETWORK_NAME"] = st.network_name or (
+                host.nginx.domain if host.nginx else ""
+            )
+        return {
+            "status_env": env,
+            "status_http_port": st.port,
+            "status_xdgm_port": st.xdgm_port,
+            # Source allowed through ufw to the sampler port; empty on the services host,
+            # whose sampler is loopback-only.
+            "status_allow_from": "" if local else host.ip,
+        }
+
+    def _write_status(self) -> None:
+        host = self.config.status_host
+        if self._node_for_ip(host.ip) is None:
+            raise ValueError(
+                f"status host {host.name} ({host.ip}) must be one of the nodes: its sampler "
+                "serves /status/api/ for the network page"
+            )
+        status_dir = os.path.join(self.ansible_dir, "status")
+        os.makedirs(status_dir, exist_ok=True)
+        for filename in ("node_metrics.py", "node-dashboard.html", "network-dashboard.html"):
+            shutil.copyfile(
+                os.path.join(_STATUS_SOURCE_DIR, filename), os.path.join(status_dir, filename)
+            )
+        self._file_write(os.path.join(self.ansible_dir, "status.yml"), _STATUS_YML)
+
+    def _write_status_site(self, host_dir: str, host: ServicesHost) -> None:
+        svc_dir = os.path.join(host_dir, "status")
+        os.makedirs(svc_dir, exist_ok=True)
+        self._write_vars(os.path.join(svc_dir, "vars.yml"), {
+            "STATUS_DIR": self.STATUS_DIR,
+            "STATUS_PORT": host.status.port,
+        })
+        self._file_write(
+            os.path.join(svc_dir, "main.yml"),
+            _STATUS_SITE_MAIN_TPL.format(group=host.name),
+        )
+
+    def _status_nginx_locations(self, host: ServicesHost) -> str:
+        """The /status/ locations inside the bare-domain server block."""
+        port = host.status.port
+        proxy = (
+            "                  limit_req zone=xrpld_status burst=40 nodelay;\n"
+            "                  proxy_pass {target};\n"
+            "                  proxy_http_version 1.1;\n"
+            "                  proxy_set_header Host $host;\n"
+            "                  proxy_set_header X-Real-IP $remote_addr;\n"
+            "                  proxy_read_timeout 30s;\n"
+        )
+        out = (
+            "              location = /status {\n"
+            "                  return 301 /status/;\n"
+            "              }\n"
+            "              location = /status/ {\n"
+            "                  limit_req zone=xrpld_status burst=40 nodelay;\n"
+            f"                  root {self.STATUS_DIR}/www;\n"
+            "                  try_files /network-dashboard.html =404;\n"
+            "              }\n"
+            "              location /status/api/ {\n"
+            + proxy.format(target=f"http://127.0.0.1:{port}/api/")
+            + "              }\n"
+        )
+        for node in self._nodes:
+            out += (
+                f"              location /status/nodes/{node.name}/ {{\n"
+                + proxy.format(target=f"{self._status_url(node, host)}/")
+                + "              }\n"
+            )
+        return out
+
     def _write_services_host(self, host: ServicesHost) -> None:
         host_dir = os.path.join(self.ansible_dir, "services", host.name)
         os.makedirs(host_dir, exist_ok=True)
@@ -266,6 +389,8 @@ class AnsibleBuilder:
             self._write_nginx(host_dir, host)
         if host.vl:
             self._write_vl(host_dir, host)
+        if host.status:
+            self._write_status_site(host_dir, host)
         if host.redis:
             self._write_redis(host_dir, host)
         if host.faucet:
@@ -350,6 +475,10 @@ class AnsibleBuilder:
             lines.append("")
             lines.append("# --- Telemetry sidecar (re-run after every node deploy) ---")
             lines.append("run_always alloy.yml")
+        if self.config.status_host:
+            lines.append("")
+            lines.append("# --- Status sampler on every node (re-run after every node deploy) ---")
+            lines.append("run_always status.yml")
 
         for host in self.config.services:
             n = host.name
@@ -364,6 +493,8 @@ class AnsibleBuilder:
             if host.vl:
                 # Always re-run: a rotated or re-signed list must reach the web root.
                 lines.append(f"run_always {prefix}/vl/main.yml")
+            if host.status:
+                lines.append(f"run_always {prefix}/status/main.yml")
             if host.redis:
                 lines.append(f"run_once {n}_redis {prefix}/redis/main.yml")
             if host.faucet:
@@ -451,7 +582,11 @@ class AnsibleBuilder:
         self._file_write(os.path.join(nginx_dir, "ssl.yml"), ssl_content)
         self._file_write(
             os.path.join(nginx_dir, "main.yml"),
-            _NGINX_MAIN_TPL.format(group=host.name),
+            _NGINX_MAIN_TPL.format(
+                group=host.name,
+                status_zone=_STATUS_NGINX_ZONE if host.status else "",
+                status_locations=self._status_nginx_locations(host) if host.status else "",
+            ),
         )
 
     def _write_vl(self, host_dir: str, host: ServicesHost) -> None:
@@ -798,6 +933,13 @@ _CLEAN_YML = """- hosts: all
   remote_user: root
 
   tasks:
+  - name: Stop the status sampler
+    systemd:
+      name: xrpld-status
+      state: stopped
+      enabled: no
+    when: status_http_port is defined
+    ignore_errors: yes
   - name: Remove the Alloy sidecar (its netns is the node container's)
     docker_container:
       name: "{{ alloy_container_name }}"
@@ -1008,7 +1150,7 @@ _NGINX_MAIN_TPL = """- hosts: {group}
         path: "/etc/nginx/sites-available/{{{{ SSL_CN }}}}_proxy.conf"
         marker: ""
         block: |
-          server {{
+{status_zone}          server {{
               listen 80;
               server_name "{{{{ SSL_CN }}}}";
               return 301 https://$host$request_uri;
@@ -1037,7 +1179,7 @@ _NGINX_MAIN_TPL = """- hosts: {group}
                   proxy_cache_bypass $http_upgrade;
                   add_header 'Access-Control-Allow-Origin' '*' always;
               }}
-          }}
+{status_locations}          }}
   - name: Link WSS proxy
     command:
       cmd: "ln -s /etc/nginx/sites-available/{{{{ SSL_CN }}}}_proxy.conf /etc/nginx/sites-enabled/{{{{ SSL_CN }}}}_proxy.conf"
@@ -1550,4 +1692,219 @@ _COMPILER_MAIN_TPL = """---
       state: started
       restart_policy: always
       image_name_mismatch: recreate
+"""
+
+# --- Status sampler + network roll-up ---
+
+_STATUS_SOURCE_DIR = os.path.join(os.path.dirname(__file__), "services", "status")
+
+# Rate limit shared by every /status/ location; sits above the server blocks (http context).
+_STATUS_NGINX_ZONE = (
+    "          limit_req_zone $binary_remote_addr zone=xrpld_status:10m rate=20r/s;\n"
+)
+
+# Plain string, not .format()-ed: the docker -f template keeps its braces under {% raw %}.
+# ufw on the nodes defaults to allow incoming, so each allow rule is followed by a deny.
+_STATUS_YML = """---
+- hosts: all
+  become: true
+  remote_user: root
+
+  handlers:
+  - name: restart xrpld-status
+    systemd:
+      name: xrpld-status
+      state: restarted
+      daemon_reload: yes
+
+  tasks:
+  - name: Create the xrpld-status group
+    group:
+      name: xrpld-status
+      system: yes
+  - name: Create the xrpld-status user
+    user:
+      name: xrpld-status
+      group: xrpld-status
+      system: yes
+      shell: /usr/sbin/nologin
+      create_home: no
+  - name: Create the sampler install directory
+    file:
+      path: /opt/xrpld-status
+      state: directory
+      owner: root
+      group: root
+      mode: "0755"
+  - name: Create the sampler state directory
+    file:
+      path: /var/lib/xrpld-status
+      state: directory
+      owner: xrpld-status
+      group: xrpld-status
+      mode: "0750"
+  - name: Install the sampler
+    copy:
+      src: status/node_metrics.py
+      dest: /opt/xrpld-status/node_metrics.py
+      owner: root
+      group: root
+      mode: "0755"
+    notify: restart xrpld-status
+  - name: Install the node dashboard
+    copy:
+      src: status/node-dashboard.html
+      dest: /opt/xrpld-status/node-dashboard.html
+      owner: root
+      group: root
+      mode: "0644"
+  - name: Write the sampler environment
+    copy:
+      dest: /opt/xrpld-status/node_metrics.env
+      owner: root
+      group: xrpld-status
+      mode: "0640"
+      content: |
+        {% for key, value in status_env.items() %}{{ key }}={{ value }}
+        {% endfor %}
+    notify: restart xrpld-status
+  - name: Install the xrpld-status systemd unit
+    copy:
+      dest: /etc/systemd/system/xrpld-status.service
+      owner: root
+      group: root
+      mode: "0644"
+      content: |
+        [Unit]
+        Description=xrpld status sampler and status site
+        After=network-online.target docker.service
+        Wants=network-online.target
+
+        [Service]
+        Type=simple
+        EnvironmentFile=/opt/xrpld-status/node_metrics.env
+        ExecStart=/usr/bin/python3 /opt/xrpld-status/node_metrics.py
+        Restart=always
+        RestartSec=5s
+        User=xrpld-status
+        Group=xrpld-status
+        NoNewPrivileges=true
+        ProtectSystem=strict
+        ReadWritePaths=/var/lib/xrpld-status
+        ProtectHome=true
+        PrivateTmp=true
+        RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+        SystemCallArchitectures=native
+
+        [Install]
+        WantedBy=multi-user.target
+    notify: restart xrpld-status
+  - name: Ensure UFW is installed
+    apt:
+      name: ufw
+      state: present
+  - name: Enable UFW
+    ufw:
+      state: enabled
+      policy: allow
+      direction: incoming
+  - name: Keep the SSH limit rule so the ruleset has a first position to insert before
+    ufw:
+      rule: limit
+      port: "{{ ssh_port }}"
+      proto: tcp
+  - name: Allow the services host to reach the sampler
+    ufw:
+      rule: allow
+      from_ip: "{{ status_allow_from }}"
+      port: "{{ status_http_port }}"
+      proto: tcp
+      insert: 1
+    when: status_allow_from | length > 0
+  - name: Refuse the sampler port from anywhere else
+    ufw:
+      rule: deny
+      port: "{{ status_http_port }}"
+      proto: tcp
+    when: status_allow_from | length > 0
+  - name: Read the node's docker network subnets
+    command: >-
+      docker network inspect "{{ docker_network_name }}"
+      -f '{% raw %}{{ range .IPAM.Config }}{{ .Subnet }} {{ end }}{% endraw %}'
+    register: status_docker_subnets
+    changed_when: false
+  - name: Allow XDGM datagrams from the node container network
+    ufw:
+      rule: allow
+      from_ip: "{{ item }}"
+      port: "{{ status_xdgm_port }}"
+      proto: udp
+      insert: 1
+    loop: "{{ status_docker_subnets.stdout.split() }}"
+  - name: Refuse XDGM datagrams from anywhere else
+    ufw:
+      rule: deny
+      port: "{{ status_xdgm_port }}"
+      proto: udp
+  - name: Enable and start xrpld-status
+    systemd:
+      name: xrpld-status
+      enabled: yes
+      state: started
+      daemon_reload: yes
+  - meta: flush_handlers
+  - name: Wait for the sampler API to answer
+    uri:
+      url: "http://127.0.0.1:{{ status_http_port }}/api/latest"
+      status_code: [200]
+    register: status_probe
+    retries: 10
+    delay: 3
+    until: status_probe.status == 200
+"""
+
+# Services host: the network page nginx serves at /status/ and the operator-written
+# network.json the sampler merges into /api/network. Re-run every deploy so a new
+# dashboard build lands; network.json is created empty once and never overwritten.
+_STATUS_SITE_MAIN_TPL = """---
+- hosts: {group}
+  become: true
+  remote_user: root
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+  - name: Create the network dashboard web root
+    file:
+      path: "{{{{ STATUS_DIR }}}}/www"
+      state: directory
+      owner: root
+      group: root
+      mode: "0755"
+  - name: Install the network dashboard
+    copy:
+      src: ../../../status/network-dashboard.html
+      dest: "{{{{ STATUS_DIR }}}}/www/network-dashboard.html"
+      owner: root
+      group: root
+      mode: "0644"
+  - name: Create an empty network.json for the operator to fill in after a deploy
+    copy:
+      dest: "{{{{ STATUS_DIR }}}}/network.json"
+      content: "{{{{ '{{}}' }}}}\n"
+      owner: root
+      group: root
+      mode: "0644"
+      force: no
+  - name: Confirm the roll-up answers
+    uri:
+      url: "http://127.0.0.1:{{{{ STATUS_PORT }}}}/api/network"
+      return_content: yes
+    register: status_network
+    retries: 5
+    delay: 3
+    until: status_network.status == 200
+  - debug:
+      msg: "status nodes: {{{{ (status_network.content | from_json).nodes | map(attribute='name') | join(',') }}}}"
 """

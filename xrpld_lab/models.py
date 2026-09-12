@@ -362,6 +362,28 @@ class CompilerConfig:
 
 
 @dataclass
+class StatusConfig:
+    """Per-node status sampler plus the network roll-up page at /status/ on the services host.
+
+    Every node runs node_metrics.py as the xrpld-status systemd unit; the services host's
+    copy also aggregates the others into /api/network for network-dashboard.html.
+    """
+
+    port: int = 8687
+    # UDP port the sampler's XDGM listener binds; each node's [datagram_monitor] targets it.
+    xdgm_port: int = 9999
+    interval: int = 10
+    # Process name the sampler looks for in /proc for xrpld's RSS.
+    process: str = "xrpld"
+    disk_path: str = "/var/lib/xrpld/db"
+    # Heading on the network dashboard; the nginx domain when empty.
+    network_name: str = ""
+    retain_raw_hours: int = 48
+    retain_5m_days: int = 30
+    retain_1h_days: int = 365
+
+
+@dataclass
 class ServicesHost:
     """A host that runs optional infrastructure services.
 
@@ -381,12 +403,15 @@ class ServicesHost:
     stream: Optional[StreamConfig] = None
     debug: Optional[DebugConfig] = None
     compiler: Optional[CompilerConfig] = None
+    status: Optional[StatusConfig] = None
 
     @property
     def enabled_services(self) -> List[str]:
         out: List[str] = []
         if self.nginx:
             out.append("nginx")
+        if self.status:
+            out.append("status")
         if self.redis:
             out.append("redis")
         if self.faucet:
@@ -417,6 +442,14 @@ class AnsibleConfig:
 
     def key_for(self, ip: str) -> str:
         return self.ssh_keys.get(ip, self.ssh_key_path)
+
+    @property
+    def status_host(self) -> Optional[ServicesHost]:
+        """The services host whose nginx serves /status/, or None when no host has it."""
+        for host in self.services:
+            if host.status:
+                return host
+        return None
 
 
 @dataclass
@@ -604,6 +637,17 @@ class LabConfig:
         if self.quorum is not None:
             return self.quorum
         return max(self.num_validators - 1, 1)
+
+    def datagram_monitor_for(self, node_ip: str) -> Optional[List[str]]:
+        """[datagram_monitor] lines for one node: the explicit sink when given, else the
+        node's own address and the status sampler's XDGM port. The node runs in a bridge
+        network container, so the host is reached at its own address, not at loopback."""
+        if self.datagram_monitor:
+            return [self.datagram_monitor]
+        host = self.ansible.status_host if self.ansible else None
+        if host and node_ip:
+            return [f"{node_ip} {host.status.xdgm_port}"]
+        return None
 
     def statsd_prefix_for(self, cluster: str, node_name: str) -> str:
         """[insight] prefix for one node. The Alloy mapping strips it, so it only has to
