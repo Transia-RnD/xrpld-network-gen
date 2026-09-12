@@ -430,21 +430,3 @@ done
         s += "echo 'Local network stopped.'\n"
 
         return s
-
-    @staticmethod
-    def local_node_start_cmd(
-        node_name: str,
-        binary_name: str = "xrpld",
-        genesis: bool = False,
-    ) -> str:
-        """Return the shell command to start a single local node.
-
-        With ``genesis=False`` (default) the node syncs from peers.
-        With ``genesis=True`` it loads the genesis ledger and marks it valid.
-        """
-        flags = " --ledgerfile config/genesis.json --valid" if genesis else ""
-        return (
-            f"cd {node_name} && "
-            f"nohup ./{binary_name} --conf config/xrpld.cfg{flags}"
-            f" > /dev/null 2>&1 & echo $! > xrpld.pid && cd .."
-        )

@@ -440,20 +440,21 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--node_id", type=int, required=True)
     p.add_argument("--node_type", required=True, choices=["validator", "peer"])
     p.add_argument(
-        "--build_server",
-        default=None,
-        help="raw-binary source (used with --build_version when --image is not given)",
-    )
-    p.add_argument(
         "--build_version",
         required=True,
         help="version label for the on-disk binary + Dockerfile COPY line",
     )
-    p.add_argument(
+    source = p.add_mutually_exclusive_group(required=True)
+    source.add_argument(
+        "--build_server",
+        default=None,
+        help="raw-binary source; the binary is fetched from "
+        "<build_server>/<build_version>",
+    )
+    source.add_argument(
         "--image",
         default=None,
-        help="docker image to extract /opt/xrpld/bin/xrpld from (local or GAR); "
-        "overrides --build_server",
+        help="docker image to extract the xrpld binary from (local or GAR)",
     )
     p.add_argument(
         "--workspace",
@@ -865,29 +866,32 @@ def main() -> None:
     if args.command in ("up:standalone", "create:network", "create:ansible"):
         lab = build_lab_config(args)
         generated = LabRunner(lab, workspace).run()
-        if args.command == "up:standalone":
-            run_start_script(workspace, generated)
+        if args.command == "up:standalone" and not run_start_script(
+            workspace, generated
+        ):
+            raise SystemExit(1)
         return
 
+    # Operational commands return True on success; anything else exits 1.
+    ok = True
     if args.command == "health":
         from xrpld_lab.health import check_consensus
 
         ok = check_consensus(
             args.vips, timeout_s=args.timeout, interval_s=args.interval
         )
-        raise SystemExit(0 if ok else 1)
     elif args.command == "deploy:ansible":
-        _deploy_ansible(workspace, args.name)
+        ok = _deploy_ansible(workspace, args.name)
     elif args.command == "up":
-        run_start_script(workspace, args.name)
+        ok = run_start_script(workspace, args.name)
     elif args.command == "down":
-        run_stop_script(workspace, args.name)
+        ok = run_stop_script(workspace, args.name)
     elif args.command == "remove":
-        remove_network(workspace, args.name)
+        ok = remove_network(workspace, args.name)
     elif args.command == "down:standalone":
-        stop_standalone(workspace, args.name, args.protocol, args.version)
+        ok = stop_standalone(workspace, args.name, args.protocol, args.version)
     elif args.command == "up:local":
-        start_local(
+        ok = start_local(
             protocol=args.protocol,
             network_type=args.network_type,
             network_id=args.network_id,
@@ -896,9 +900,9 @@ def main() -> None:
             public_key=args.public_key,
         )
     elif args.command == "down:local":
-        stop_local()
+        ok = stop_local()
     elif args.command == "update:node":
-        update_node_binary(
+        ok = update_node_binary(
             workspace,
             args.name,
             args.node_id,
@@ -908,7 +912,7 @@ def main() -> None:
             image=args.image,
         )
     elif args.command == "enable:amendment":
-        enable_amendment(
+        ok = enable_amendment(
             args.name,
             args.amendment_name,
             args.node_id,
@@ -916,7 +920,7 @@ def main() -> None:
             workspace,
         )
     elif args.command == "node:stall":
-        node_stall(
+        ok = node_stall(
             args.name,
             args.node_id,
             args.node_type,
@@ -925,15 +929,17 @@ def main() -> None:
             args.clear,
         )
     elif args.command == "node:restart":
-        restart_local_node(args.node_name, genesis=args.genesis)
+        ok = restart_local_node(args.node_name, genesis=args.genesis)
     elif args.command == "logs:local":
         view_local_logs(args.node)
     elif args.command == "logs:standalone":
         view_standalone_logs(args.protocol)
+    if not ok:
+        raise SystemExit(1)
 
 
-def _deploy_ansible(workspace: Workspace, name: str) -> None:
-    """Run the ansible deployment for an existing cluster."""
+def _deploy_ansible(workspace: Workspace, name: str) -> bool:
+    """Run the ansible deployment for an existing cluster; True when run.sh exits 0."""
     import os
     import subprocess
 
@@ -944,6 +950,6 @@ def _deploy_ansible(workspace: Workspace, name: str) -> None:
     if not os.path.exists(run_sh):
         print(f"No ansible deployment found at {ansible_dir}")
         print("Run 'xrpld-lab create:ansible' first to generate deployment files.")
-        return
+        return False
 
-    subprocess.run(["bash", run_sh], cwd=ansible_dir, check=False)
+    return subprocess.run(["bash", run_sh], cwd=ansible_dir).returncode == 0

@@ -323,19 +323,6 @@ class TestScriptBuilderLocalNetwork:
         assert 'cp "$BINARY_PATH" vnode1/rippled' in result
         assert "nohup ./rippled" in result
 
-    def test_local_node_start_cmd_sync(self):
-        """Single node restart: syncs from network, no genesis flags."""
-        result = ScriptBuilder.local_node_start_cmd("vnode3")
-        assert "--conf config/xrpld.cfg" in result
-        assert "--ledgerfile" not in result
-        assert "--valid" not in result
-        assert "vnode3" in result
-
-    def test_local_node_start_cmd_genesis(self):
-        """Single node start with genesis."""
-        result = ScriptBuilder.local_node_start_cmd("vnode1", genesis=True)
-        assert "--ledgerfile config/genesis.json --valid" in result
-
     def test_local_network_stop(self):
         """PID kill, pkill fallback, Docker stop."""
         result = ScriptBuilder.local_network_stop(

@@ -4,7 +4,7 @@ import hashlib
 import subprocess
 import shlex
 import shutil
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 
 class bcolors:
@@ -39,51 +39,37 @@ def write_executable(path: str, content: str) -> None:
     os.chmod(path, 0o755)
 
 
-def run_command(cwd: str, command: str) -> None:
-    """Run a shell command in the given directory."""
+def run_command(cwd: str, command: str) -> int:
+    """Run a command in *cwd* with inherited stdout/stderr and return its exit code."""
     try:
-        args = shlex.split(command)
-        result = subprocess.run(
-            args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd
-        )
-        if result.stdout:
-            print(result.stdout.decode())
-        if result.stderr:
-            print(result.stderr.decode())
-    except subprocess.CalledProcessError as e:
-        if e.stdout:
-            print(e.stdout.decode())
-        if e.stderr:
-            print(e.stderr.decode())
-        print(f"{bcolors.RED}Command failed: {e}{bcolors.END}")
+        code = subprocess.run(shlex.split(command), cwd=cwd).returncode
     except FileNotFoundError:
         print(f"{bcolors.RED}Command not found: {command}{bcolors.END}")
+        return 127
     except OSError as e:
         print(f"{bcolors.RED}OS error: {e}{bcolors.END}")
+        return 127
+    if code != 0:
+        print(f"{bcolors.RED}Command failed (exit {code}): {command}{bcolors.END}")
+    return code
 
 
-def run_subprocess(cmd: List[str], error_msg: str = "Command failed") -> bool:
-    """Run a subprocess, return True on success."""
-    try:
-        result = subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
-        return result.returncode == 0
-    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
-        print(f"{bcolors.RED}{error_msg}: {e}{bcolors.END}")
-        return False
-
-
-def remove_directory(path: str) -> None:
-    """Remove a directory tree, with error handling."""
+def remove_directory(path: str) -> bool:
+    """Remove a directory tree; return True when it is gone."""
     try:
         shutil.rmtree(path)
-        name = os.path.basename(path)
-        print(f"{bcolors.CYAN}Directory {name} removed.{bcolors.END}")
     except FileNotFoundError:
         print(f"{bcolors.RED}Not found: {path}{bcolors.END}")
+        return False
     except PermissionError:
         print(f"{bcolors.RED}Permission denied: {path}{bcolors.END}")
+        return False
     except OSError as e:
         print(f"{bcolors.RED}Error: {e}{bcolors.END}")
+        return False
+    name = os.path.basename(path)
+    print(f"{bcolors.CYAN}Directory {name} removed.{bcolors.END}")
+    return True
 
 
 def save_config(

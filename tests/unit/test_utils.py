@@ -1,5 +1,4 @@
 import json
-import subprocess
 import os
 import stat
 import pytest
@@ -11,6 +10,7 @@ from xrpld_lab.utils import (
     write_file,
     write_executable,
     read_json,
+    remove_directory,
     run_command,
 )
 
@@ -71,19 +71,36 @@ class TestReadJson:
 
 
 class TestRunCommand:
-    def test_failure_prints_the_captured_output(self, tmp_path, capsys):
-        error = subprocess.CalledProcessError(
-            1, ["bash", "start.sh"], output=b"build step 3/7\n", stderr=b"COPY failed\n"
-        )
-        with patch("xrpld_lab.utils.subprocess.run", side_effect=error):
+    def test_returns_zero_on_success(self, tmp_path):
+        assert run_command(str(tmp_path), "true") == 0
+
+    def test_returns_the_exit_code_on_failure(self, tmp_path, capsys):
+        assert run_command(str(tmp_path), "sh -c 'exit 7'") == 7
+        assert "Command failed (exit 7)" in capsys.readouterr().out
+
+    def test_missing_command_returns_127(self, tmp_path, capsys):
+        assert run_command(str(tmp_path), "no-such-command-xrpld-lab") == 127
+        assert "Command not found" in capsys.readouterr().out
+
+    def test_output_is_inherited_not_captured(self, tmp_path):
+        with patch("xrpld_lab.utils.subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 0
             run_command(str(tmp_path), "bash start.sh")
 
-        out = capsys.readouterr().out
-        assert "build step 3/7" in out
-        assert "COPY failed" in out
-        assert "Command failed" in out
+        assert mock_run.call_args.args[0] == ["bash", "start.sh"]
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs == {"cwd": str(tmp_path)}
 
-    def test_success_prints_the_output(self, tmp_path, capsys):
-        run_command(str(tmp_path), "echo hello")
 
-        assert "hello" in capsys.readouterr().out
+class TestRemoveDirectory:
+    def test_removes_and_returns_true(self, tmp_path):
+        target = tmp_path / "net"
+        target.mkdir()
+        (target / "f").write_text("x")
+
+        assert remove_directory(str(target)) is True
+        assert not target.exists()
+
+    def test_missing_returns_false(self, tmp_path, capsys):
+        assert remove_directory(str(tmp_path / "missing")) is False
+        assert "Not found" in capsys.readouterr().out
