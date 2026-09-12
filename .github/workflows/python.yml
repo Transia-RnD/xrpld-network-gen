@@ -1,145 +1,103 @@
-# This workflow will do a clean install of node dependencies, build the source code and run tests across different versions of node
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
-
 name: Python CI
 
 on:
   push:
-    branches: [main, 1.x]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 jobs:
-  build-and-lint:
+  lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    strategy:
-      matrix:
-        python-version: ['3.10']
-
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.10'
 
       - name: Install Poetry
-        run: |
-          pip install poetry
+        run: pip install poetry
 
-      - name: Cache Poetry virtual environment
-        uses: actions/cache@v3
+      - name: Cache virtual environment
+        uses: actions/cache@v6
         with:
-          path: ~/.cache/pypoetry/virtualenvs
-          key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-${{ matrix.python-version }}-
-            ${{ runner.os }}-poetry-
+          path: .venv
+          key: ${{ runner.os }}-venv-3.10-${{ hashFiles('poetry.lock') }}
 
-      - name: Install Dependencies
-        run: |
-          poetry install
+      - name: Install dependencies
+        run: poetry install
 
       - name: Lint with flake8
-        run: |
-          poetry run flake8 .
+        run: poetry run flake8 .
 
-  integration:
+  unit-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    strategy:
-      matrix:
-        python-version: ['3.10']
-
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.10'
 
       - name: Install Poetry
-        run: |
-          pip install poetry
+        run: pip install poetry
 
-      - name: Cache Poetry virtual environment
-        uses: actions/cache@v3
+      - name: Cache virtual environment
+        uses: actions/cache@v6
         with:
-          path: ~/.cache/pypoetry/virtualenvs
-          key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-${{ matrix.python-version }}-
-            ${{ runner.os }}-poetry-
+          path: .venv
+          key: ${{ runner.os }}-venv-3.10-${{ hashFiles('poetry.lock') }}
 
-      - name: Install Dependencies
-        run: |
-          poetry install
+      - name: Install dependencies
+        run: poetry install
 
-      - name: Run integration tests
-        run: |
-          # Add commands to run integration tests here
-          poetry run python3 test.py tests/integration
+      - name: Run unit tests with coverage
+        run: poetry run pytest tests --cov=xrpld_lab --cov-report=term
 
   cli-test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    strategy:
-      matrix:
-        python-version: ['3.10']
-
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Start Docker daemon
         run: |
           sudo systemctl start docker
-          sudo systemctl enable docker
           docker info
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.10'
 
       - name: Install Poetry
-        run: |
-          pip install poetry
+        run: pip install poetry
 
-      - name: Cache Poetry virtual environment
-        uses: actions/cache@v3
+      - name: Cache virtual environment
+        uses: actions/cache@v6
         with:
-          path: ~/.cache/pypoetry/virtualenvs
-          key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-${{ matrix.python-version }}-
-            ${{ runner.os }}-poetry-
+          path: .venv
+          key: ${{ runner.os }}-venv-3.10-${{ hashFiles('poetry.lock') }}
 
-      - name: Install Dependencies
-        run: |
-          poetry install
+      - name: Install dependencies
+        run: poetry install
 
-      - name: Test CLI --help
+      - name: CLI help
         run: |
           poetry run xrpld-lab --help
-
-      - name: Test CLI subcommand help
-        run: |
           poetry run xrpld-lab create:network --help
           poetry run xrpld-lab up:standalone --help
           poetry run xrpld-lab up:local --help
 
-      - name: Test CLI without args does not crash
+      - name: Standalone ledger starts and stops
         run: |
-          poetry run xrpld-lab || true
-          
-      - name: Test CLI command for xrpl
-        run: |
-          poetry run xrpld-lab up:standalone --protocol xrpl
+          poetry run xrpld-lab up:standalone
           sleep 5
           docker logs xrpl
           docker ps | grep xrpl
-          poetry run xrpld-lab down:standalone --protocol xrpl --version 3.3.0
+          poetry run xrpld-lab down:standalone --version 3.3.0
