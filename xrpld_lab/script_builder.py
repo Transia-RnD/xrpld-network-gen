@@ -172,22 +172,6 @@ class ScriptBuilder:
 
     # -- local (non-Docker single node) ------------------------------------
 
-    @staticmethod
-    def local_start(protocol: str, net_type: str) -> str:
-        """Start script for local (non-Docker) node.
-
-        Runs ``./xrpld`` with ``config/xrpld.cfg``.  Uses ``"-a"`` flag for
-        standalone *net_type*.
-        """
-        flag = "-a" if net_type == "standalone" else ""
-        return (
-            "#! /bin/bash\n"
-            "docker compose -f docker-compose.yml"
-            " up --build --force-recreate -d\n"
-            f"./xrpld {flag} --conf config/xrpld.cfg"
-            " --ledgerfile config/genesis.json\n"
-        )
-
     # -- network (Docker multi-node) ---------------------------------------
 
     @staticmethod

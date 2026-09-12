@@ -214,30 +214,6 @@ class TestScriptBuilderStandalone:
 
 
 # ---------------------------------------------------------------------------
-# ScriptBuilder — local start
-# ---------------------------------------------------------------------------
-
-
-class TestScriptBuilderLocalStart:
-    """Tests for local (non-Docker) start scripts."""
-
-    def test_local_start_xrpl_standalone(self):
-        """XRPL standalone: exe=xrpld, config=xrpld.cfg, -a flag."""
-        result = ScriptBuilder.local_start(protocol="xrpl", net_type="standalone")
-        assert "#! /bin/bash" in result
-        assert "docker compose -f docker-compose.yml" in result
-        assert "./xrpld -a --conf config/xrpld.cfg" in result
-        assert "--ledgerfile config/genesis.json" in result
-
-    def test_local_start_xrpl_network(self):
-        """XRPL network type: no -a flag."""
-        result = ScriptBuilder.local_start(protocol="xrpl", net_type="network")
-        assert "./xrpld" in result
-        assert "--conf config/xrpld.cfg" in result
-        assert "-a " not in result
-
-
-# ---------------------------------------------------------------------------
 # ScriptBuilder — network start/stop
 # ---------------------------------------------------------------------------
 

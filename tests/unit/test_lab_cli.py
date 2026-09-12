@@ -46,7 +46,6 @@ class TestBuildParser:
         args = parser.parse_args(["up:standalone"])
         assert args.command == "up:standalone"
         assert args.log_level == "trace"
-        assert args.build_type == "binary"
         assert args.public_key == _DEFAULT_VL_KEY
         assert args.protocol == "xrpl"
         assert args.network_id is None
@@ -1188,6 +1187,7 @@ class TestMain:
             main()
 
         mock_run.assert_called_once()
+        assert mock_run.call_args.kwargs["network_id"] is None
 
     @patch("xrpld_lab.cli.stop_local")
     @patch("xrpld_lab.cli.Workspace")
