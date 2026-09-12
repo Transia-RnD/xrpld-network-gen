@@ -2,7 +2,9 @@
 # coding: utf-8
 
 import json
+import socket
 import threading
+from types import SimpleNamespace
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
@@ -237,3 +239,42 @@ class TestNetworkRoutes:
         srv, _ = server
         nm.Handler.network = None
         assert self._get(srv, "/api/network")[0] == 404
+
+
+class TestXdgmListener:
+    def test_bind_failure_is_recorded_and_the_listener_exits(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        db = str(tmp_path / "metrics.db")
+        conn = nm.connect(db)
+        conn.executescript(nm.SCHEMA)
+        conn.close()
+        cfg = SimpleNamespace(db=db, xdgm_host="203.0.113.7", xdgm_port=9999)
+
+        class FailingSocket:
+            def __init__(self, *args):
+                pass
+
+            def setsockopt(self, *args):
+                pass
+
+            def bind(self, addr):
+                raise OSError(49, "Can't assign requested address")
+
+        monkeypatch.setattr(socket, "socket", FailingSocket)
+        monkeypatch.setattr(nm, "read_proc_stat", lambda: (0, 0, 0))
+        monkeypatch.setattr(nm, "read_diskstats", lambda: (0, 0))
+        monkeypatch.setattr(nm, "read_netdev", lambda: (0, 0))
+
+        nm.Sampler(cfg).listen_xdgm()
+
+        rows = nm.connect(db).execute("SELECT kind, detail FROM events").fetchall()
+        assert [r["kind"] for r in rows] == ["sampler_error"]
+        assert "xdgm bind 203.0.113.7:9999" in rows[0]["detail"]
+        assert "Can't assign requested address" in rows[0]["detail"]
+        assert "xdgm bind 203.0.113.7:9999" in capsys.readouterr().err
+
+    def test_default_host_is_every_interface(self, monkeypatch):
+        monkeypatch.delenv("NODE_METRICS_XDGM_HOST", raising=False)
+        monkeypatch.setattr("sys.argv", ["node_metrics.py"])
+        assert nm.parse_args().xdgm_host == "0.0.0.0"

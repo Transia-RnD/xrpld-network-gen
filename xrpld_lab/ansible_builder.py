@@ -311,9 +311,10 @@ class AnsibleBuilder:
             "NODE_METRICS_RETAIN_RAW_HOURS": str(st.retain_raw_hours),
             "NODE_METRICS_RETAIN_5M_DAYS": str(st.retain_5m_days),
             "NODE_METRICS_RETAIN_1H_DAYS": str(st.retain_1h_days),
-            # xrpld runs in a bridge-network container and sends XDGM to the host's own
-            # address, so the listener binds that address rather than loopback.
-            "NODE_METRICS_XDGM_HOST": node.ip,
+            # xrpld sends XDGM from its bridge-network container to the host address,
+            # which under 1:1 NAT is not on any local interface, so the listener binds
+            # every interface; ufw admits the port from the docker subnets only.
+            "NODE_METRICS_XDGM_HOST": "0.0.0.0",
             "NODE_METRICS_XDGM_PORT": str(st.xdgm_port),
         }
         if local:
@@ -487,12 +488,12 @@ class AnsibleBuilder:
             "ansible -i hosts.txt all -u ubuntu -m ping || true",
             "",
             "# Short-lived operator token so each node's docker can pull the private",
-            "# AR image.",
-            'AR_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"',
+            "# AR image; main.yml reads it from the environment, not from argv.",
+            'export AR_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"',
             "",
             "# --- Core playbooks ---",
             "run_once deps deps.yml",
-            'run_always main.yml -e ar_token="$AR_TOKEN"',
+            "run_always main.yml",
         ]
 
         if self.config.alloy:
@@ -887,9 +888,12 @@ _MAIN_DEPLOY_TASKS = """  - name: Create Docker Network
       state: present
   - name: Authenticate Docker to Artifact Registry with a fresh operator token
     shell: >-
-      echo "{{ ar_token }}" | docker login -u oauth2accesstoken
+      printf '%s' "$AR_TOKEN" | docker login -u oauth2accesstoken
       --password-stdin https://us-central1-docker.pkg.dev
-    when: ar_token | default('') | length > 0
+    environment:
+      AR_TOKEN: "{{ lookup('env', 'AR_TOKEN') }}"
+    no_log: true
+    when: lookup('env', 'AR_TOKEN') | length > 0
   - name: Pull base image (the binary-in-an-image)
     docker_image:
       name: "{{ docker_image_name }}"
@@ -966,7 +970,9 @@ _ALLOY_YML = """---
       restart_policy: always
       recreate: yes
   - name: Report the sidecar state
-    command: docker inspect -f '{{{{ .State.Status }}}}' "{{ alloy_container_name }}"
+    command: >-
+      docker inspect -f '{% raw %}{{ .State.Status }}{% endraw %}'
+      "{{ alloy_container_name }}"
     register: alloy_state
     changed_when: false
   - debug:
