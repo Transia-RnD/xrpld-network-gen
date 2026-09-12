@@ -166,6 +166,8 @@ class TestDockerfileBuilder:
             version="",
         )
         assert "FROM myimage:v1 as base" in result
+        assert result.index("USER root") > result.index("FROM myimage:v1 as base")
+        assert result.index("USER root") < result.index("COPY entrypoint")
         assert "WORKDIR /app" in result
         assert 'LABEL maintainer="dangell@transia.co"' in result
         assert "COPY entrypoint /entrypoint.sh" in result
