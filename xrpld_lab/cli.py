@@ -52,7 +52,7 @@ from xrpld_lab.workflows import LabRunner
 # Fallback versions (used when no --version / --build_version is provided)
 # ---------------------------------------------------------------------------
 
-_XRPL_RELEASE_FALLBACK: str = "3.2.0-rc2"
+_XRPL_RELEASE_FALLBACK: str = "3.3.0"
 _XAHAU_RELEASE_FALLBACK: str = "2025.7.9-release+1951"
 
 # ---------------------------------------------------------------------------
