@@ -20,7 +20,7 @@ from xrpld_lab.models import (
     PortSet,
     Protocol,
 )
-from xrpld_lab.protocol import get_spec, XRPL, XAHAU
+from xrpld_lab.protocol import get_spec, XRPL
 from xrpld_lab.workspace import Workspace
 from xrpld_lab.workflows import LabRunner
 
@@ -41,20 +41,6 @@ def xrpl_source():
         owner="XRPLF",
         repo="rippled",
         image="rippleci/xrpld:3.1.1",
-    )
-
-
-@pytest.fixture
-def xahau_source():
-    """BuildSource for Xahau binary build."""
-    return BuildSource(
-        protocol=Protocol.XAHAU,
-        build_type=BuildType.BINARY,
-        build_server="https://build.xahau.tech",
-        build_version="2025.7.9-release+1951",
-        owner="Xahau",
-        repo="xahaud",
-        image="ubuntu:jammy",
     )
 
 
@@ -157,16 +143,6 @@ class TestLabRunnerConstruction:
     def test_spec_matches_protocol_xrpl(self, standalone_lab):
         runner = LabRunner(standalone_lab)
         assert runner.spec is XRPL
-
-    def test_spec_matches_protocol_xahau(self, xahau_source):
-        lab = LabConfig(
-            protocol=Protocol.XAHAU,
-            mode=DeployMode.STANDALONE,
-            build_source=xahau_source,
-            network_id=21339,
-        )
-        runner = LabRunner(lab)
-        assert runner.spec is XAHAU
 
 
 # ===========================================================================
@@ -1151,15 +1127,15 @@ class TestStageBinary:
 
     def _source(self, build_type, binary_path=""):
         return BuildSource(
-            protocol=Protocol.XAHAU,
+            protocol=Protocol.XRPL,
             build_type=build_type,
-            build_server="https://build.xahau.tech",
-            build_version="2025.7.9-release+1951",
+            build_server="https://build.example.com",
+            build_version="3.3.0",
             binary_path=binary_path,
         )
 
     def test_copies_a_local_binary(self, standalone_lab, tmp_workspace, tmp_path):
-        local = tmp_path / "xahaud"
+        local = tmp_path / "xrpld"
         local.write_bytes(b"bin")
         dest = tmp_path / "out"
         runner = LabRunner(standalone_lab, workspace=tmp_workspace)
@@ -1175,7 +1151,7 @@ class TestStageBinary:
             runner._stage_binary(self._source(BuildType.BINARY), str(tmp_path / "b"))
 
         m.assert_called_once_with(
-            "https://build.xahau.tech/2025.7.9-release+1951", str(tmp_path / "b")
+            "https://build.example.com/3.3.0", str(tmp_path / "b")
         )
 
     def test_image_mode_stages_nothing(self, standalone_lab, tmp_workspace, tmp_path):

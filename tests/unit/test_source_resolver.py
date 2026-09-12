@@ -17,34 +17,6 @@ def resolver():
 
 
 @pytest.fixture
-def xahau_spec():
-    return ProtocolSpec(
-        name="xahau",
-        daemon_name="xahaud",
-        config_filename="xahaud.cfg",
-        github_owner="Xahau",
-        github_repo="xahaud",
-        feature_paths=[
-            "src/ripple/protocol/impl/Feature.cpp",
-            "include/xrpl/protocol/detail/features.macro",
-        ],
-        config_paths=[
-            "cfg/xahaud-example.cfg",
-            "cfg/rippled-example.cfg",
-        ],
-        entrypoint_file="xahau.entrypoint",
-        network_entrypoint_file="network.entrypoint",
-        amendment_majority_time="5 minutes",
-        default_build_server="https://build.xahau.tech",
-        default_build_version="2025.7.9-release+1951",
-        default_network_id=21339,
-        default_standalone_network_id=21339,
-        default_vl_key="ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
-        default_import_vl_key="ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
-    )
-
-
-@pytest.fixture
 def xrpl_spec():
     return ProtocolSpec(
         name="xrpl",
@@ -68,7 +40,6 @@ def xrpl_spec():
         default_network_id=21337,
         default_standalone_network_id=1,
         default_vl_key="ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
-        default_import_vl_key=None,
     )
 
 
@@ -82,13 +53,11 @@ class TestGetCommitHash:
         mock_response.text = "commit abc123def456\nother info"
         mock_get.return_value = mock_response
 
-        result = resolver.get_commit_hash(
-            "https://build.xahau.tech", "2025.1.1-release+1000"
-        )
+        result = resolver.get_commit_hash("https://build.example.com", "3.3.0")
 
         assert result == "abc123def456"
         mock_get.assert_called_once_with(
-            "https://build.xahau.tech/2025.1.1-release+1000.releaseinfo",
+            "https://build.example.com/3.3.0.releaseinfo",
             timeout=30,
         )
 
@@ -100,9 +69,7 @@ class TestGetCommitHash:
         mock_get.return_value = mock_response
 
         with pytest.raises(ValueError, match="Commit hash not found"):
-            resolver.get_commit_hash(
-                "https://build.xahau.tech", "2025.1.1-release+1000"
-            )
+            resolver.get_commit_hash("https://build.example.com", "3.3.0")
 
     @patch("xrpld_lab.source_resolver.requests.get")
     def test_http_error_raises(self, mock_get, resolver):
@@ -112,7 +79,7 @@ class TestGetCommitHash:
         mock_get.return_value = mock_response
 
         with pytest.raises(requests.HTTPError):
-            resolver.get_commit_hash("https://build.xahau.tech", "invalid-version")
+            resolver.get_commit_hash("https://build.example.com", "invalid-version")
 
     @patch("xrpld_lab.source_resolver.requests.get")
     def test_long_hash(self, mock_get, resolver):
@@ -121,9 +88,7 @@ class TestGetCommitHash:
         mock_response.text = "commit 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
         mock_get.return_value = mock_response
 
-        result = resolver.get_commit_hash(
-            "https://build.xahau.tech", "2025.1.1-release+1000"
-        )
+        result = resolver.get_commit_hash("https://build.example.com", "3.3.0")
 
         assert result == "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
 
@@ -313,16 +278,14 @@ class TestResolveRef:
     def test_http_build_server_reads_releaseinfo(self, mock_hash, resolver):
         mock_hash.return_value = "abc123"
         source = BuildSource(
-            protocol=Protocol.XAHAU,
+            protocol=Protocol.XRPL,
             build_type=BuildType.BINARY,
-            build_server="https://build.xahau.tech",
-            build_version="2025.7.9-release+1951",
+            build_server="https://build.example.com",
+            build_version="3.3.0",
         )
 
         assert resolver.resolve_ref(source) == "abc123"
-        mock_hash.assert_called_once_with(
-            "https://build.xahau.tech", "2025.7.9-release+1951"
-        )
+        mock_hash.assert_called_once_with("https://build.example.com", "3.3.0")
 
     @patch.object(SourceResolver, "get_commit_hash")
     def test_registry_namespace_uses_the_version_as_the_tag(self, mock_hash, resolver):
@@ -339,35 +302,6 @@ class TestResolveRef:
 
 class TestResolveFeatures:
     """Test feature resolution from build source."""
-
-    @patch.object(SourceResolver, "download_file_at_commit")
-    @patch.object(SourceResolver, "get_commit_hash")
-    def test_success(self, mock_hash, mock_download, resolver, xahau_spec):
-        mock_hash.return_value = "abc123"
-        mock_download.return_value = b"feature content lines"
-
-        source = BuildSource(
-            protocol=Protocol.XAHAU,
-            build_type=BuildType.BINARY,
-            build_server="https://build.xahau.tech",
-            build_version="2025.7.9-release+1951",
-            owner="Xahau",
-            repo="xahaud",
-        )
-
-        result = resolver.resolve_features(source, xahau_spec)
-
-        mock_hash.assert_called_once_with(
-            "https://build.xahau.tech", "2025.7.9-release+1951"
-        )
-        mock_download.assert_called_once_with(
-            "Xahau",
-            "xahaud",
-            "abc123",
-            "src/ripple/protocol/impl/Feature.cpp",
-            fallback_path="include/xrpl/protocol/detail/features.macro",
-        )
-        assert result == b"feature content lines"
 
     @patch.object(SourceResolver, "download_file_at_commit")
     @patch.object(SourceResolver, "get_commit_hash")
@@ -402,7 +336,7 @@ class TestResolveFeatures:
     @patch.object(SourceResolver, "download_file_at_commit")
     @patch.object(SourceResolver, "get_commit_hash")
     def test_fallback_path_used_when_primary_404s(
-        self, mock_hash, mock_download, resolver, xahau_spec
+        self, mock_hash, mock_download, resolver, xrpl_spec
     ):
         """Verify that download_file_at_commit is called with fallback_path,
         so the internal fallback mechanism can kick in on 404."""
@@ -410,19 +344,19 @@ class TestResolveFeatures:
         mock_download.return_value = b"fallback feature content"
 
         source = BuildSource(
-            protocol=Protocol.XAHAU,
+            protocol=Protocol.XRPL,
             build_type=BuildType.BINARY,
-            build_server="https://build.xahau.tech",
-            build_version="2025.7.9-release+1951",
-            owner="Xahau",
-            repo="xahaud",
+            build_server="https://build.example.com",
+            build_version="3.3.0",
+            owner="XRPLF",
+            repo="rippled",
         )
 
-        result = resolver.resolve_features(source, xahau_spec)
+        result = resolver.resolve_features(source, xrpl_spec)
 
         # The key assertion: fallback_path is passed through
         _, kwargs = mock_download.call_args
-        assert kwargs["fallback_path"] == "include/xrpl/protocol/detail/features.macro"
+        assert kwargs["fallback_path"] == "src/libxrpl/protocol/Feature.cpp"
         assert result == b"fallback feature content"
 
     @patch.object(SourceResolver, "download_file_at_commit")
@@ -448,7 +382,6 @@ class TestResolveFeatures:
             default_network_id=1,
             default_standalone_network_id=1,
             default_vl_key="TESTKEY",
-            default_import_vl_key=None,
         )
 
         source = BuildSource(

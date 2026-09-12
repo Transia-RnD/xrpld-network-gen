@@ -143,10 +143,3 @@ jobs:
           docker logs xrpl
           docker ps | grep xrpl
           poetry run xrpld-lab down:standalone --protocol xrpl --version 3.3.0
-
-      - name: Test CLI command for xahau
-        run: |
-          poetry run xrpld-lab up:standalone --protocol xahau
-          sleep 5
-          docker logs xahau
-          docker ps | grep xahau

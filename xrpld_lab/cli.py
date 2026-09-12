@@ -53,7 +53,6 @@ from xrpld_lab.workflows import LabRunner
 # ---------------------------------------------------------------------------
 
 _XRPL_RELEASE_FALLBACK: str = "3.3.0"
-_XAHAU_RELEASE_FALLBACK: str = "2025.7.9-release+1951"
 
 # ---------------------------------------------------------------------------
 # Default VL keys
@@ -61,9 +60,6 @@ _XAHAU_RELEASE_FALLBACK: str = "2025.7.9-release+1951"
 
 _DEFAULT_VL_KEY: str = (
     "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
-)
-_XAHAU_IMPORT_VL_KEY: str = (
-    "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1"
 )
 
 
@@ -269,7 +265,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--build_type", default="binary", choices=["image", "binary"])
     p.add_argument("--public_key", default=_DEFAULT_VL_KEY)
-    p.add_argument("--import_key", default=None)
     p.add_argument("--protocol", default="xrpl")
     p.add_argument(
         "--network_id",
@@ -426,7 +421,6 @@ def _build_parser() -> argparse.ArgumentParser:
         "--log_level", default="trace", choices=["warning", "debug", "trace"]
     )
     p.add_argument("--public_key", default=_DEFAULT_VL_KEY)
-    p.add_argument("--import_key", default=None)
     p.add_argument("--protocol", default="xrpl")
     p.add_argument("--network_type", default="standalone")
     p.add_argument(
@@ -667,7 +661,6 @@ def _build_standalone_config(args, protocol, spec):
     server = args.server
     version = args.version
     build_type = BuildType(args.build_type)
-    import_key = args.import_key
 
     # Load config overrides from file if provided
     config_overrides = {}
@@ -676,30 +669,24 @@ def _build_standalone_config(args, protocol, spec):
 
     commit_hash = ""
     image = ""
-    if protocol == Protocol.XAHAU:
-        server = server or spec.default_build_server
-        version = version or _XAHAU_RELEASE_FALLBACK
-        build_type = BuildType.BINARY
-        import_key = import_key or _XAHAU_IMPORT_VL_KEY
-    elif protocol == Protocol.XRPL:
-        build_type = BuildType.IMAGE
-        if args.commit:
-            # Run an "all amendments Supported::Yes" image published by CI, and
-            # resolve the amendment set from that same ref on GitHub. A semver
-            # ref (e.g. 3.2.0) maps to the version tag; anything else is treated
-            # as a commit sha -> sha-<short>.
-            ref = args.commit
-            if re.match(r"^v?\d+\.\d+", ref):
-                tag = ref.lstrip("v")
-            else:
-                tag = f"sha-{ref[:7]}"
-            image = f"ghcr.io/xrplf/xrpld/supported:{tag}"
-            version = ref
-            commit_hash = ref
+    build_type = BuildType.IMAGE
+    if args.commit:
+        # Run an "all amendments Supported::Yes" image published by CI, and
+        # resolve the amendment set from that same ref on GitHub. A semver
+        # ref (e.g. 3.2.0) maps to the version tag; anything else is treated
+        # as a commit sha -> sha-<short>.
+        ref = args.commit
+        if re.match(r"^v?\d+\.\d+", ref):
+            tag = ref.lstrip("v")
         else:
-            server = server or "rippleci"
-            version = version or _XRPL_RELEASE_FALLBACK
-            image = f"{server}/xrpld:{version}"
+            tag = f"sha-{ref[:7]}"
+        image = f"ghcr.io/xrplf/xrpld/supported:{tag}"
+        version = ref
+        commit_hash = ref
+    else:
+        server = server or "rippleci"
+        version = version or _XRPL_RELEASE_FALLBACK
+        image = f"{server}/xrpld:{version}"
 
     source = BuildSource(
         protocol=protocol,
@@ -721,7 +708,6 @@ def _build_standalone_config(args, protocol, spec):
         node_db_type=NodeDbType(args.nodedb_type),
         add_ipfs=args.ipfs,
         public_vl_key=args.public_key,
-        import_vl_key=import_key,
         config_overrides=config_overrides,
         datagram_monitor=getattr(args, "datagram_monitor", None),
         all_amendments=getattr(args, "all_amendments", False),
@@ -750,28 +736,23 @@ def _build_network_config(args, protocol, spec):
     owner = spec.github_owner
     repo = spec.github_repo
 
-    if protocol == Protocol.XAHAU:
-        server = server or spec.default_build_server
-        version = version or _XAHAU_RELEASE_FALLBACK
+    if server and server.startswith("https://github.com/"):
+        owner = server.split("https://github.com/")[1].split("/")[0]
+        tail = server.split(f"https://github.com/{owner}/")[1]
+        branch = tail.split("/tree/")[1] if "/tree/" in tail else tail
+        cluster_name = branch.replace("/", "-")
+        commit_hash = version or ""
+        binary_path = args.binary_path if args.binary_path else "./xrpld"
         build_type = BuildType.BINARY
-    elif protocol == Protocol.XRPL:
-        if server and server.startswith("https://github.com/"):
-            owner = server.split("https://github.com/")[1].split("/")[0]
-            tail = server.split(f"https://github.com/{owner}/")[1]
-            branch = tail.split("/tree/")[1] if "/tree/" in tail else tail
-            cluster_name = branch.replace("/", "-")
-            commit_hash = version or ""
-            binary_path = args.binary_path if args.binary_path else "./xrpld"
-            build_type = BuildType.BINARY
-            repo = "rippled"
-        elif has_local:
-            server = server or "https://github.com/XRPLF/xrpld/tree"
-            version = version or _XRPL_RELEASE_FALLBACK
-            build_type = BuildType.BINARY
-        else:
-            server = server or spec.default_build_server
-            version = version or _XRPL_RELEASE_FALLBACK
-            default_image = f"{server}/xrpld:{version}"
+        repo = "rippled"
+    elif has_local:
+        server = server or "https://github.com/XRPLF/xrpld/tree"
+        version = version or _XRPL_RELEASE_FALLBACK
+        build_type = BuildType.BINARY
+    else:
+        server = server or spec.default_build_server
+        version = version or _XRPL_RELEASE_FALLBACK
+        default_image = f"{server}/xrpld:{version}"
 
     # Explicit cluster name (workspace dir) overrides the branch-derived one.
     if getattr(args, "cluster", None):
@@ -848,7 +829,6 @@ def _build_network_config(args, protocol, spec):
         tree_cache_target_entries=getattr(args, "tree_cache_target_entries", 0),
         memory_limit=getattr(args, "memory_limit", None),
         binary_name=args.binary_name,
-        import_vl_key=spec.default_import_vl_key,
         key_algorithm=key_algorithm,
         config_overrides=config_overrides,
         datagram_monitor=getattr(args, "datagram_monitor", None),
@@ -917,7 +897,6 @@ def main() -> None:
             log_level=args.log_level,
             nodedb_type=args.nodedb_type,
             public_key=args.public_key,
-            import_key=args.import_key,
         )
     elif args.command == "down:local":
         stop_local()

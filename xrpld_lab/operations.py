@@ -102,11 +102,10 @@ def start_local(
     log_level: str = "trace",
     nodedb_type: str = "NuDB",
     public_key: str = None,
-    import_key: str = None,
 ) -> None:
     """Set up and start a local standalone node from the current directory.
 
-    Expects to be run from the build directory of a built xrpld/xahaud repo.
+    Expects to be run from the build directory of a built xrpld repo.
     Generates config/, db/, log/ dirs, writes xrpld.cfg, validators.txt,
     genesis.json, start.sh, and stop.sh, then launches the node.
     """
@@ -160,7 +159,6 @@ def start_local(
         log_level=log_level,
         node_db_type=NodeDbType(nodedb_type),
         vl_keys=[public_key] if public_key else [],
-        import_vl_keys=[import_key] if import_key else [],
     )
 
     # 5. Generate config files
@@ -611,7 +609,7 @@ def view_local_logs(node: str | None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def view_standalone_logs(protocol: str = "xahau") -> None:
+def view_standalone_logs(protocol: str = "xrpl") -> None:
     """Tail Docker logs for the standalone container."""
     container_name = protocol
     print(

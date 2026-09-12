@@ -6,7 +6,6 @@ from xrpld_lab.models import Protocol
 from xrpld_lab.protocol import (
     ProtocolSpec,
     XRPL,
-    XAHAU,
     get_spec,
 )
 
@@ -17,10 +16,6 @@ class TestGetSpec:
     def test_get_spec_xrpl(self):
         spec = get_spec(Protocol.XRPL)
         assert spec is XRPL
-
-    def test_get_spec_xahau(self):
-        spec = get_spec(Protocol.XAHAU)
-        assert spec is XAHAU
 
 
 class TestXrplSpec:
@@ -56,7 +51,7 @@ class TestXrplSpec:
         assert XRPL.default_build_server == "rippleci"
 
     def test_default_build_version(self):
-        assert XRPL.default_build_version == "3.2.0-rc2"
+        assert XRPL.default_build_version == "3.3.0"
 
     def test_default_network_id(self):
         assert XRPL.default_network_id == 1025
@@ -67,62 +62,6 @@ class TestXrplSpec:
     def test_default_vl_key(self):
         assert XRPL.default_vl_key == (
             "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
-        )
-
-    def test_default_import_vl_key(self):
-        assert XRPL.default_import_vl_key is None
-
-
-class TestXahauSpec:
-    """Test XAHAU protocol spec values."""
-
-    def test_daemon_name(self):
-        assert XAHAU.daemon_name == "xahaud"
-
-    def test_config_filename(self):
-        assert XAHAU.config_filename == "xahaud.cfg"
-
-    def test_github_owner(self):
-        assert XAHAU.github_owner == "Xahau"
-
-    def test_github_repo(self):
-        assert XAHAU.github_repo == "xahaud"
-
-    def test_feature_paths(self):
-        assert isinstance(XAHAU.feature_paths, list)
-        assert len(XAHAU.feature_paths) >= 1
-        assert "src/ripple/protocol/impl/Feature.cpp" in XAHAU.feature_paths
-        assert "include/xrpl/protocol/detail/features.macro" in XAHAU.feature_paths
-
-    def test_entrypoint_file(self):
-        assert XAHAU.entrypoint_file == "xahau.entrypoint"
-
-    def test_network_entrypoint_file(self):
-        assert XAHAU.network_entrypoint_file == "network.entrypoint"
-
-    def test_amendment_majority_time(self):
-        assert XAHAU.amendment_majority_time == "5 minutes"
-
-    def test_default_build_server(self):
-        assert XAHAU.default_build_server == "https://build.xahau.tech"
-
-    def test_default_build_version(self):
-        assert XAHAU.default_build_version == "2025.7.9-release+1951"
-
-    def test_default_network_id(self):
-        assert XAHAU.default_network_id == 21339
-
-    def test_default_standalone_network_id(self):
-        assert XAHAU.default_standalone_network_id == 21339
-
-    def test_default_vl_key(self):
-        assert XAHAU.default_vl_key == (
-            "ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501"
-        )
-
-    def test_default_import_vl_key(self):
-        assert XAHAU.default_import_vl_key == (
-            "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1"
         )
 
 
