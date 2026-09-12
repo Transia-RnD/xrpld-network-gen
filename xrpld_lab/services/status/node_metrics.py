@@ -28,6 +28,7 @@ import os
 import socket
 import sqlite3
 import struct
+import sys
 import threading
 import time
 import urllib.error
@@ -377,9 +378,21 @@ class Sampler:
         One packet arrives per second per sink, so the newest is the only one
         worth holding.
         """
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((self.cfg.xdgm_host, self.cfg.xdgm_port))
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.bind((self.cfg.xdgm_host, self.cfg.xdgm_port))
+        except OSError as exc:
+            # Without a socket the listener has nothing to do: record why and exit.
+            detail = f"xdgm bind {self.cfg.xdgm_host}:{self.cfg.xdgm_port}: {exc}"
+            print(detail, file=sys.stderr, flush=True)
+            conn = connect(self.cfg.db)
+            try:
+                conn.executescript(SCHEMA)
+                record_event(conn, "sampler_error", detail)
+            finally:
+                conn.close()
+            return
         while True:
             try:
                 data, _ = sock.recvfrom(65535)
@@ -921,7 +934,7 @@ def parse_args():
         "--disk-path", default=env("NODE_METRICS_DISK_PATH", "/var/lib/xrpld/db")
     )
     p.add_argument("--process", default=env("NODE_METRICS_PROCESS", "xrpld"))
-    p.add_argument("--xdgm-host", default=env("NODE_METRICS_XDGM_HOST", "127.0.0.1"))
+    p.add_argument("--xdgm-host", default=env("NODE_METRICS_XDGM_HOST", "0.0.0.0"))
     p.add_argument(
         "--xdgm-port", type=int, default=int(env("NODE_METRICS_XDGM_PORT", "9999"))
     )
