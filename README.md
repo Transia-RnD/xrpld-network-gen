@@ -67,7 +67,6 @@ xrpld-lab up:standalone [OPTIONS]
 | `--ipfs` | `false` | Include IPFS server |
 | `--server` | auto | Build server URL |
 | `--public_key` | default | Validator list public key |
-| `--import_key` | auto | Import VL key |
 | `--config_overrides` | none | Path to YAML/JSON config overrides |
 
 ### `create:network` -- Create a multi-node network

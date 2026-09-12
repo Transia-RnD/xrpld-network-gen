@@ -132,7 +132,7 @@ def update_genesis(
     features:
         ``{name: hash}`` mapping produced by :func:`parse_amendments`.
     protocol_name:
-        ``"xrpl"`` or ``"xahau"``.
+        ``"xrpl"``.
     genesis_path:
         Explicit path to a genesis JSON file.  When *None* the default
         package location ``xrpld_lab/genesis.<protocol>.json`` is used.

@@ -491,8 +491,6 @@ class ValidatorsTxtBuilder:
         else:
             out += self._vl_sites_and_keys()
 
-        out += self._import_vl_keys()
-
         return out
 
     def _genesis_validators(self) -> str:
@@ -513,12 +511,3 @@ class ValidatorsTxtBuilder:
             out += f"    {key}\n"
 
         return out
-
-    def _import_vl_keys(self) -> str:
-        ivl = self.config.import_vl_keys
-        if len(ivl) > 0:
-            out = "\n[import_vl_keys]\n"
-            for key in ivl:
-                out += f"    {key}\n"
-            return out
-        return ""

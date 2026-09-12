@@ -145,16 +145,16 @@ class TestLabConfig:
 
     def test_effective_quorum_1_validator(self):
         build = BuildSource(
-            protocol=Protocol.XAHAU,
-            build_type=BuildType.BINARY,
-            build_server="https://build.xahau.tech",
-            build_version="2025.7.9-release+1951",
+            protocol=Protocol.XRPL,
+            build_type=BuildType.IMAGE,
+            build_server="rippleci",
+            build_version="3.3.0",
         )
         lab = LabConfig(
-            protocol=Protocol.XAHAU,
+            protocol=Protocol.XRPL,
             mode=DeployMode.STANDALONE,
             build_source=build,
-            network_id=21339,
+            network_id=1,
             num_validators=1,
         )
         # max(1 - 1, 1) == 1
@@ -201,7 +201,6 @@ class TestNodeConfig:
         assert node.ips_fixed_urls == []
         assert node.vl_sites == []
         assert node.vl_keys == []
-        assert node.import_vl_keys == []
         assert node.amendments == {}
 
 
@@ -210,7 +209,6 @@ class TestEnums:
 
     def test_protocol_values(self):
         assert Protocol.XRPL.value == "xrpl"
-        assert Protocol.XAHAU.value == "xahau"
 
     def test_deploy_mode_values(self):
         assert DeployMode.STANDALONE.value == "standalone"

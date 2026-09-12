@@ -19,9 +19,7 @@ from xrpld_lab.cli import (
     main,
     _flatten_ips,
     _DEFAULT_VL_KEY,
-    _XAHAU_IMPORT_VL_KEY,
     _XRPL_RELEASE_FALLBACK,
-    _XAHAU_RELEASE_FALLBACK,
 )
 from xrpld_lab.models import (
     BuildType,
@@ -50,7 +48,6 @@ class TestBuildParser:
         assert args.log_level == "trace"
         assert args.build_type == "binary"
         assert args.public_key == _DEFAULT_VL_KEY
-        assert args.import_key is None
         assert args.protocol == "xrpl"
         assert args.network_id is None
         assert args.network_type == "standalone"
@@ -118,7 +115,6 @@ class TestBuildParser:
         assert args.command == "up:local"
         assert args.log_level == "trace"
         assert args.public_key == _DEFAULT_VL_KEY
-        assert args.import_key is None
         assert args.protocol == "xrpl"
         assert args.network_type == "standalone"
         assert args.network_id is None
@@ -373,28 +369,6 @@ class TestBuildLabConfigStandalone:
         parser = _build_parser()
         return parser.parse_args(["up:standalone", *extra_args])
 
-    # -- xahau defaults --
-
-    def test_xahau_defaults_build_server(self):
-        args = self._parse("--protocol", "xahau")
-        cfg = build_lab_config(args)
-        assert cfg.build_source.build_server == "https://build.xahau.tech"
-
-    def test_xahau_defaults_build_type_binary(self):
-        args = self._parse("--protocol", "xahau")
-        cfg = build_lab_config(args)
-        assert cfg.build_source.build_type == BuildType.BINARY
-
-    def test_xahau_defaults_import_key(self):
-        args = self._parse("--protocol", "xahau")
-        cfg = build_lab_config(args)
-        assert cfg.import_vl_key == _XAHAU_IMPORT_VL_KEY
-
-    def test_xahau_fallback_version(self):
-        args = self._parse("--protocol", "xahau")
-        cfg = build_lab_config(args)
-        assert cfg.build_source.build_version == _XAHAU_RELEASE_FALLBACK
-
     # -- xrpl defaults --
 
     def test_xrpl_defaults_build_server(self):
@@ -415,12 +389,12 @@ class TestBuildLabConfigStandalone:
     # -- custom overrides --
 
     def test_custom_version_overrides_fallback(self):
-        args = self._parse("--protocol", "xahau", "--version", "2099.1.1-custom")
+        args = self._parse("--protocol", "xrpl", "--version", "2099.1.1-custom")
         cfg = build_lab_config(args)
         assert cfg.build_source.build_version == "2099.1.1-custom"
 
     def test_custom_server_overrides_default(self):
-        args = self._parse("--protocol", "xahau", "--server", "https://custom.build")
+        args = self._parse("--protocol", "xrpl", "--server", "https://custom.build")
         cfg = build_lab_config(args)
         assert cfg.build_source.build_server == "https://custom.build"
 
@@ -464,12 +438,6 @@ class TestBuildLabConfigStandalone:
         assert cfg.build_source.image == f"rippleci/xrpld:{_XRPL_RELEASE_FALLBACK}"
 
     # -- github owner/repo from spec --
-
-    def test_xahau_owner_repo(self):
-        args = self._parse("--protocol", "xahau")
-        cfg = build_lab_config(args)
-        assert cfg.build_source.owner == "Xahau"
-        assert cfg.build_source.repo == "xahaud"
 
     def test_xrpl_owner_repo(self):
         args = self._parse("--protocol", "xrpl")
@@ -521,11 +489,6 @@ class TestBuildLabConfigNetwork:
         cfg = build_lab_config(args)
         assert cfg.build_source.image == "example/xrpld:dev"
 
-    def test_xahau_network_has_no_default_image(self):
-        cfg = build_lab_config(self._parse("--protocol", "xahau"))
-        assert cfg.build_source.build_type == BuildType.BINARY
-        assert cfg.build_source.image == ""
-
     def test_no_local_flag_sets_network_mode(self):
         args = self._parse()
         cfg = build_lab_config(args)
@@ -561,13 +524,6 @@ class TestBuildLabConfigNetwork:
 
     # -- protocol defaults --
 
-    def test_xahau_defaults(self):
-        args = self._parse("--protocol", "xahau")
-        cfg = build_lab_config(args)
-        assert cfg.build_source.build_server == "https://build.xahau.tech"
-        assert cfg.build_source.build_version == _XAHAU_RELEASE_FALLBACK
-        assert cfg.build_source.build_type == BuildType.BINARY
-
     def test_xrpl_with_local_uses_github_url(self):
         args = self._parse("--protocol", "xrpl", "--local")
         cfg = build_lab_config(args)
@@ -584,17 +540,6 @@ class TestBuildLabConfigNetwork:
         args = self._parse("--binary_name", "my-xrpld")
         cfg = build_lab_config(args)
         assert cfg.binary_name == "my-xrpld"
-
-    def test_import_vl_key_none_for_xrpl(self):
-        # XRPL spec has no import VL key; XRPL networks must emit no [import_vl_keys].
-        args = self._parse()
-        cfg = build_lab_config(args)
-        assert cfg.import_vl_key is None
-
-    def test_import_vl_key_for_xahau(self):
-        args = self._parse("--protocol", "xahau")
-        cfg = build_lab_config(args)
-        assert cfg.import_vl_key == _XAHAU_IMPORT_VL_KEY
 
     def test_network_id_from_spec_when_default(self):
         """A falsy --network_id falls back to the spec default via
@@ -779,12 +724,6 @@ class TestBuildLabConfigAnsible:
         args = self._parse()
         cfg = build_lab_config(args)
         assert cfg.mode == DeployMode.NETWORK
-
-    def test_xahau_defaults_applied(self):
-        args = self._parse("--protocol", "xahau")
-        cfg = build_lab_config(args)
-        assert cfg.build_source.build_server == "https://build.xahau.tech"
-        assert cfg.build_source.build_type == BuildType.BINARY
 
     def test_xrpl_defaults_applied(self):
         args = self._parse("--protocol", "xrpl")
@@ -1117,10 +1056,10 @@ class TestMain:
         mock_config = MagicMock()
         mock_build.return_value = mock_config
         mock_runner = MagicMock()
-        mock_runner.run.return_value = "xahau-2025.7.9"
+        mock_runner.run.return_value = "xrpl-3.3.0"
         mock_runner_cls.return_value = mock_runner
 
-        with patch("sys.argv", ["xrpld-lab", "up:standalone", "--protocol", "xahau"]):
+        with patch("sys.argv", ["xrpld-lab", "up:standalone", "--protocol", "xrpl"]):
             main()
 
         mock_build.assert_called_once()
@@ -1128,7 +1067,7 @@ class TestMain:
         assert mock_runner_cls.call_args.args[0] is mock_config
         mock_runner.run.assert_called_once()
         mock_start.assert_called_once()
-        assert mock_start.call_args.args[1] == "xahau-2025.7.9"
+        assert mock_start.call_args.args[1] == "xrpl-3.3.0"
 
     @patch("xrpld_lab.cli.run_start_script")
     @patch("xrpld_lab.cli.LabRunner")

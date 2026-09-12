@@ -161,15 +161,15 @@ class TestParseAmendments:
         lines = [
             "XRPL_FEATURE(XrplFeature, Supported::yes, DefaultVote::yes,",
             "XRPL_FIX(1234, Supported::yes, DefaultVote::yes,",
-            "REGISTER_FEATURE(XahauFeature, Supported::yes, DefaultVote::yes,",
-            "REGISTER_FIX(XahauFix, Supported::yes, DefaultVote::yes,",
+            "REGISTER_FEATURE(LegacyFeature, Supported::yes, DefaultVote::yes,",
+            "REGISTER_FIX(LegacyFix, Supported::yes, DefaultVote::yes,",
         ]
         result = parse_amendments(lines)
         assert len(result) == 4
         assert "XrplFeature" in result
         assert "fix1234" in result
-        assert "XahauFeature" in result
-        assert "XahauFix" in result
+        assert "LegacyFeature" in result
+        assert "LegacyFix" in result
 
     def test_hash_format_uppercase_hex_64_chars(self):
         lines = [

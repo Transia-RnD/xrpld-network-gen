@@ -34,34 +34,6 @@ def resolver():
 
 
 @pytest.fixture
-def xahau_spec():
-    return ProtocolSpec(
-        name="xahau",
-        daemon_name="xahaud",
-        config_filename="xahaud.cfg",
-        github_owner="Xahau",
-        github_repo="xahaud",
-        feature_paths=[
-            "src/ripple/protocol/impl/Feature.cpp",
-            "include/xrpl/protocol/detail/features.macro",
-        ],
-        config_paths=[
-            "cfg/xahaud-example.cfg",
-            "cfg/rippled-example.cfg",
-        ],
-        entrypoint_file="xahau.entrypoint",
-        network_entrypoint_file="network.entrypoint",
-        amendment_majority_time="5 minutes",
-        default_build_server="https://build.xahau.tech",
-        default_build_version="2025.7.9-release+1951",
-        default_network_id=21339,
-        default_standalone_network_id=21339,
-        default_vl_key="ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
-        default_import_vl_key="ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
-    )
-
-
-@pytest.fixture
 def xrpl_spec():
     return ProtocolSpec(
         name="xrpl",
@@ -85,19 +57,18 @@ def xrpl_spec():
         default_network_id=21337,
         default_standalone_network_id=1,
         default_vl_key="ED87E0EA91AAFFA130B78B75D2CC3E53202AA1BD8AB3D5E7BAC530C8440E328501",
-        default_import_vl_key=None,
     )
 
 
 @pytest.fixture
-def xahau_source():
+def xrpl_http_source():
     return BuildSource(
-        protocol=Protocol.XAHAU,
+        protocol=Protocol.XRPL,
         build_type=BuildType.BINARY,
-        build_server="https://build.xahau.tech",
-        build_version="2025.7.9-release+1951",
-        owner="Xahau",
-        repo="xahaud",
+        build_server="https://build.example.com",
+        build_version="3.3.0",
+        owner="XRPLF",
+        repo="rippled",
     )
 
 
@@ -351,23 +322,21 @@ class TestResolveRepoConfig:
     @patch.object(SourceResolver, "download_file_at_commit")
     @patch.object(SourceResolver, "get_commit_hash")
     def test_success_downloads_and_parses(
-        self, mock_hash, mock_download, resolver, xahau_spec, xahau_source
+        self, mock_hash, mock_download, resolver, xrpl_spec, xrpl_http_source
     ):
         mock_hash.return_value = "abc123"
         cfg_content = b"[node_size]\nhuge\n\n[node_db]\ntype=NuDB\n"
         mock_download.return_value = cfg_content
 
-        result = resolver.resolve_repo_config(xahau_source, xahau_spec)
+        result = resolver.resolve_repo_config(xrpl_http_source, xrpl_spec)
 
-        mock_hash.assert_called_once_with(
-            "https://build.xahau.tech", "2025.7.9-release+1951"
-        )
+        mock_hash.assert_called_once_with("https://build.example.com", "3.3.0")
         mock_download.assert_called_once_with(
-            "Xahau",
-            "xahaud",
+            "XRPLF",
+            "rippled",
             "abc123",
-            "cfg/xahaud-example.cfg",
-            fallback_path="cfg/rippled-example.cfg",
+            "cfg/rippled-example.cfg",
+            fallback_path="cfg/xrpld-example.cfg",
         )
         assert result["node_size"] == "huge"
         assert result["node_db"]["type"] == "NuDB"
@@ -375,12 +344,12 @@ class TestResolveRepoConfig:
     @patch.object(SourceResolver, "download_file_at_commit")
     @patch.object(SourceResolver, "get_commit_hash")
     def test_returns_empty_on_http_error(
-        self, mock_hash, mock_download, resolver, xahau_spec, xahau_source
+        self, mock_hash, mock_download, resolver, xrpl_spec, xrpl_http_source
     ):
         mock_hash.return_value = "abc123"
         mock_download.side_effect = requests.HTTPError("404 Not Found")
 
-        result = resolver.resolve_repo_config(xahau_source, xahau_spec)
+        result = resolver.resolve_repo_config(xrpl_http_source, xrpl_spec)
         assert result == {}
 
     @patch.object(SourceResolver, "download_file_at_commit")
@@ -414,7 +383,7 @@ class TestResolveRepoConfig:
     @patch.object(SourceResolver, "download_file_at_commit")
     @patch.object(SourceResolver, "get_commit_hash")
     def test_no_config_paths_returns_empty(
-        self, mock_hash, mock_download, resolver, xahau_source
+        self, mock_hash, mock_download, resolver, xrpl_http_source
     ):
         """When spec has no config_paths, return empty dict."""
         spec_no_config = ProtocolSpec(
@@ -433,10 +402,9 @@ class TestResolveRepoConfig:
             default_network_id=1,
             default_standalone_network_id=1,
             default_vl_key="TESTKEY",
-            default_import_vl_key=None,
         )
 
-        result = resolver.resolve_repo_config(xahau_source, spec_no_config)
+        result = resolver.resolve_repo_config(xrpl_http_source, spec_no_config)
         assert result == {}
 
 
@@ -493,7 +461,7 @@ class TestCliConfigOverrides:
             [
                 "up:standalone",
                 "--protocol",
-                "xahau",
+                "xrpl",
                 "--config_overrides",
                 overrides_path,
             ]
@@ -505,6 +473,6 @@ class TestCliConfigOverrides:
         from xrpld_lab.cli import _build_parser, build_lab_config
 
         parser = _build_parser()
-        args = parser.parse_args(["up:standalone", "--protocol", "xahau"])
+        args = parser.parse_args(["up:standalone", "--protocol", "xrpl"])
         cfg = build_lab_config(args)
         assert cfg.config_overrides == {}

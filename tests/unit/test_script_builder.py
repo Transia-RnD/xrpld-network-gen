@@ -229,14 +229,6 @@ class TestScriptBuilderLocalStart:
         assert "./xrpld -a --conf config/xrpld.cfg" in result
         assert "--ledgerfile config/genesis.json" in result
 
-    def test_local_start_xahau(self):
-        """Xahau: exe=rippled, config=xahaud.cfg, no -a flag for non-standalone."""
-        result = ScriptBuilder.local_start(protocol="xahau", net_type="network")
-        assert "./rippled" in result
-        assert "--conf config/xahaud.cfg" in result
-        # No -a flag for network type
-        assert "-a " not in result
-
     def test_local_start_xrpl_network(self):
         """XRPL network type: no -a flag."""
         result = ScriptBuilder.local_start(protocol="xrpl", net_type="network")

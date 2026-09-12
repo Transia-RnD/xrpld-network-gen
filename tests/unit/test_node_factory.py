@@ -27,11 +27,6 @@ def xrpl_spec():
 
 
 @pytest.fixture
-def xahau_spec():
-    return get_spec(Protocol.XAHAU)
-
-
-@pytest.fixture
 def three_validators():
     """Three dummy validator public keys."""
     return ["PUBKEY_V1", "PUBKEY_V2", "PUBKEY_V3"]
@@ -129,15 +124,6 @@ class TestCreateStandalone:
         assert node.amendment_majority_time == xrpl_spec.amendment_majority_time
         assert node.amendment_majority_time == "15 minutes"
 
-    def test_amendment_majority_time_xahau(self, xahau_spec):
-        node = NodeFactory.create_standalone(
-            protocol=Protocol.XAHAU,
-            name="standalone",
-            network_id=21339,
-        )
-        assert node.amendment_majority_time == xahau_spec.amendment_majority_time
-        assert node.amendment_majority_time == "5 minutes"
-
     def test_vl_sites_passed_through(self):
         node = NodeFactory.create_standalone(
             protocol=Protocol.XRPL,
@@ -155,15 +141,6 @@ class TestCreateStandalone:
             vl_keys=["KEY1", "KEY2"],
         )
         assert node.vl_keys == ["KEY1", "KEY2"]
-
-    def test_import_vl_keys_passed_through(self):
-        node = NodeFactory.create_standalone(
-            protocol=Protocol.XAHAU,
-            name="standalone",
-            network_id=21339,
-            import_vl_keys=["IVLKEY"],
-        )
-        assert node.import_vl_keys == ["IVLKEY"]
 
     def test_ips_urls_passed_through(self):
         node = NodeFactory.create_standalone(
@@ -209,13 +186,13 @@ class TestCreateStandalone:
 
     def test_name_and_network_id(self):
         node = NodeFactory.create_standalone(
-            protocol=Protocol.XAHAU,
+            protocol=Protocol.XRPL,
             name="my_standalone",
             network_id=42,
         )
         assert node.name == "my_standalone"
         assert node.network_id == 42
-        assert node.protocol == Protocol.XAHAU
+        assert node.protocol == Protocol.XRPL
 
     def test_custom_node_db_type_memory(self):
         node = NodeFactory.create_standalone(
@@ -358,32 +335,6 @@ class TestCreateValidator:
             vl_key="MY_VL_KEY",
         )
         assert node.vl_keys == ["MY_VL_KEY"]
-
-    def test_import_vl_keys_when_provided(self, three_validators):
-        node = NodeFactory.create_validator(
-            index=1,
-            protocol=Protocol.XAHAU,
-            name="vl1",
-            network_id=21339,
-            token="TOKEN1",
-            all_validators=three_validators,
-            vl_key="VL_KEY",
-            ivl_key="IVL_KEY",
-        )
-        assert node.import_vl_keys == ["IVL_KEY"]
-
-    def test_import_vl_keys_empty_when_none(self, three_validators):
-        node = NodeFactory.create_validator(
-            index=1,
-            protocol=Protocol.XRPL,
-            name="vl1",
-            network_id=21337,
-            token="TOKEN1",
-            all_validators=three_validators,
-            vl_key="VL_KEY",
-            ivl_key=None,
-        )
-        assert node.import_vl_keys == []
 
     def test_node_db_num_ledgers_256(self, three_validators):
         node = NodeFactory.create_validator(
@@ -550,18 +501,6 @@ class TestCreatePeer:
         )
         assert node.vl_sites == ["http://vl/vl.json"]
 
-    def test_import_vl_keys_when_provided(self, three_validators):
-        node = NodeFactory.create_peer(
-            index=1,
-            protocol=Protocol.XAHAU,
-            name="peer1",
-            network_id=21339,
-            validators=three_validators,
-            vl_key="VL_KEY",
-            ivl_key="IVL_KEY",
-        )
-        assert node.import_vl_keys == ["IVL_KEY"]
-
     def test_default_log_level_is_warning(self, three_validators):
         node = NodeFactory.create_peer(
             index=1,
@@ -584,16 +523,16 @@ class TestCreatePeer:
         )
         assert node.db_path == "/var/lib/xrpld/db/rdb"
 
-    def test_amendment_majority_time_xahau(self, three_validators):
+    def test_amendment_majority_time_from_spec(self, three_validators):
         node = NodeFactory.create_peer(
             index=1,
-            protocol=Protocol.XAHAU,
+            protocol=Protocol.XRPL,
             name="peer1",
-            network_id=21339,
+            network_id=21337,
             validators=three_validators,
             vl_key="VL_KEY",
         )
-        assert node.amendment_majority_time == "5 minutes"
+        assert node.amendment_majority_time == "15 minutes"
 
 
 # ---------------------------------------------------------------------------

@@ -12,7 +12,6 @@ from typing import List, Dict, Optional
 
 class Protocol(Enum):
     XRPL = "xrpl"
-    XAHAU = "xahau"
 
 
 class DeployMode(Enum):
@@ -259,7 +258,6 @@ class NodeConfig:
     datagram_monitor: List[str] = field(default_factory=list)
     vl_sites: List[str] = field(default_factory=list)
     vl_keys: List[str] = field(default_factory=list)
-    import_vl_keys: List[str] = field(default_factory=list)
     amendment_majority_time: Optional[str] = None
     amendments: Dict[str, str] = field(default_factory=dict)
 
@@ -630,7 +628,6 @@ class LabConfig:
     # [datagram_monitor] stanza. Must be the server's INTERNAL IP (firewall is
     # VPC-only).
     datagram_monitor: Optional[str] = None
-    import_vl_key: Optional[str] = None
     public_vl_key: Optional[str] = None
     # Publisher list URL the nodes fetch ([validator_list_sites]). None keeps the
     # compose-internal http://vl/vl.json, which only resolves inside a local cluster.

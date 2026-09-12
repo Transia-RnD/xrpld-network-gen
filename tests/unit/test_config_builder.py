@@ -780,38 +780,6 @@ class TestValidatorsTxtBuilderNonGenesis:
         assert "    https://vl.ripple.com\n\n" in output
 
 
-class TestValidatorsTxtBuilderImportVlKeys:
-    """Test [import_vl_keys] section."""
-
-    def test_import_vl_keys_present(self):
-        cfg = _make_standalone_config(
-            import_vl_keys=["ED_import_key_1", "ED_import_key_2"],
-            validators=["nHUkey1"],
-        )
-        builder = ValidatorsTxtBuilder(cfg, genesis=True)
-        output = builder.build()
-        assert "[import_vl_keys]\n" in output
-        assert "    ED_import_key_1\n" in output
-        assert "    ED_import_key_2\n" in output
-
-    def test_import_vl_keys_absent(self):
-        cfg = _make_standalone_config(validators=["nHUkey1"])
-        builder = ValidatorsTxtBuilder(cfg, genesis=True)
-        output = builder.build()
-        assert "[import_vl_keys]" not in output
-
-    def test_import_vl_keys_in_non_genesis(self):
-        cfg = _make_standalone_config(
-            vl_sites=["https://vl.ripple.com"],
-            vl_keys=["ED_vl_key_1"],
-            import_vl_keys=["ED_import_key_1"],
-        )
-        builder = ValidatorsTxtBuilder(cfg, genesis=False)
-        output = builder.build()
-        assert "[import_vl_keys]\n" in output
-        assert "    ED_import_key_1\n" in output
-
-
 # ===========================================================================
 # [insight] / [perf] — the telemetry stanzas the Alloy sidecar requires
 # ===========================================================================

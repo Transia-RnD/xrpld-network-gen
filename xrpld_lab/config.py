@@ -1,4 +1,4 @@
-"""Config parsing and merging for xrpld/xahaud configuration files.
+"""Config parsing and merging for xrpld configuration files.
 
 Reads INI-style .cfg files from the repo, parses them into structured dicts,
 and merges them with hardcoded defaults and local YAML/JSON overrides.

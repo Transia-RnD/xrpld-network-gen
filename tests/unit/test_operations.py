@@ -122,7 +122,7 @@ class TestStopStandalone:
     ):
         ws = MagicMock()
         ws.base = "/workspace"
-        stop_standalone(ws, "custom-name", "xahau", None)
+        stop_standalone(ws, "custom-name", "xrpl", None)
         mock_run.assert_called_once_with("/workspace/custom-name", "bash stop.sh")
         mock_rm.assert_called_once_with("/workspace/custom-name")
 
@@ -135,16 +135,16 @@ class TestStopStandalone:
     ):
         ws = MagicMock()
         ws.base = "/workspace"
-        stop_standalone(ws, None, "xahau", "1.0.0")
-        mock_run.assert_called_once_with("/workspace/xahau-1.0.0", "bash stop.sh")
-        mock_rm.assert_called_once_with("/workspace/xahau-1.0.0")
+        stop_standalone(ws, None, "xrpl", "1.0.0")
+        mock_run.assert_called_once_with("/workspace/xrpl-1.0.0", "bash stop.sh")
+        mock_rm.assert_called_once_with("/workspace/xrpl-1.0.0")
 
     @patch("xrpld_lab.operations.remove_directory")
     @patch("xrpld_lab.operations.run_command")
     def test_no_name_or_version_prints_error(self, mock_run, mock_rm, capsys):
         ws = MagicMock()
         ws.base = "/workspace"
-        stop_standalone(ws, None, "xahau", None)
+        stop_standalone(ws, None, "xrpl", None)
         mock_run.assert_not_called()
         mock_rm.assert_not_called()
         captured = capsys.readouterr()
@@ -444,8 +444,8 @@ class TestLogs:
 
     @patch("subprocess.run")
     def test_view_standalone_logs_tails_docker(self, mock_run):
-        view_standalone_logs("xahau")
+        view_standalone_logs()
         mock_run.assert_called_once()
         call_args = mock_run.call_args[0][0]
         assert "docker" in call_args
-        assert "xahau" in call_args
+        assert "xrpl" in call_args

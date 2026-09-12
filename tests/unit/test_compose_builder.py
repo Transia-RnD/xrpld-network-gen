@@ -128,14 +128,6 @@ class TestAddStandaloneService:
         svc = builder.services["xrpl"]
         assert svc["networks"] == ["standalone-network"]
 
-    def test_xahau_protocol(self):
-        builder = ComposeBuilder("standalone-network")
-        ports = _default_ports()
-        builder.add_standalone_service("xahau", ports)
-        svc = builder.services["xahau"]
-        assert svc["container_name"] == "xahau"
-        assert "${PWD}/xahau/config:/etc/opt/ripple" in svc["volumes"]
-
 
 # ===========================================================================
 # add_node_service (validator)
@@ -462,13 +454,6 @@ class TestAddIpfsService:
         builder.add_ipfs_service("xrpl")
         svc = builder.services["ipfs"]
         assert svc["networks"] == ["standalone-network"]
-
-    def test_xahau_protocol(self):
-        builder = ComposeBuilder("standalone-network")
-        builder.add_ipfs_service("xahau")
-        svc = builder.services["ipfs"]
-        assert "${PWD}/xahau/ipfs_staging:/export" in svc["volumes"]
-        assert "${PWD}/xahau/ipfs_data:/data/ipfs" in svc["volumes"]
 
 
 # ===========================================================================

@@ -40,7 +40,7 @@ class DockerfileBuilder:
         Parameters
         ----------
         protocol:
-            Protocol name (``"xrpl"`` or ``"xahau"``).
+            Protocol name (``"xrpl"``).
         ports:
             Port assignments for the node.
         image_name:
@@ -176,19 +176,15 @@ class ScriptBuilder:
     def local_start(protocol: str, net_type: str) -> str:
         """Start script for local (non-Docker) node.
 
-        Uses correct exe_filename: ``"xrpld"`` for xrpl, ``"rippled"`` for
-        xahau.  Uses correct config_filename: ``"xrpld.cfg"`` for xrpl,
-        ``"xahaud.cfg"`` for xahau.  Uses ``"-a"`` flag for standalone
-        *net_type*.
+        Runs ``./xrpld`` with ``config/xrpld.cfg``.  Uses ``"-a"`` flag for
+        standalone *net_type*.
         """
-        exe_filename: str = "xrpld" if protocol == "xrpl" else "rippled"
-        config_filename: str = "xrpld.cfg" if protocol == "xrpl" else "xahaud.cfg"
         flag = "-a" if net_type == "standalone" else ""
         return (
             "#! /bin/bash\n"
             "docker compose -f docker-compose.yml"
             " up --build --force-recreate -d\n"
-            f"./{exe_filename} {flag} --conf config/{config_filename}"
+            f"./xrpld {flag} --conf config/xrpld.cfg"
             " --ledgerfile config/genesis.json\n"
         )
 
