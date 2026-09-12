@@ -67,6 +67,8 @@ class DockerfileBuilder:
         dockerfile = f"""
     FROM {image_name} as base
 
+    USER root
+
     WORKDIR /app
 
     LABEL maintainer="dangell@transia.co"
