@@ -1,9 +1,18 @@
 import json
+import subprocess
 import os
 import stat
 import pytest
 
-from xrpld_lab.utils import sha512_half, write_file, write_executable, read_json
+from unittest.mock import patch
+
+from xrpld_lab.utils import (
+    sha512_half,
+    write_file,
+    write_executable,
+    read_json,
+    run_command,
+)
 
 
 class TestSha512Half:
@@ -59,3 +68,22 @@ class TestReadJson:
             json.dump(data, f)
         result = read_json(path)
         assert result["outer"]["inner"] == [1, 2, 3]
+
+
+class TestRunCommand:
+    def test_failure_prints_the_captured_output(self, tmp_path, capsys):
+        error = subprocess.CalledProcessError(
+            1, ["bash", "start.sh"], output=b"build step 3/7\n", stderr=b"COPY failed\n"
+        )
+        with patch("xrpld_lab.utils.subprocess.run", side_effect=error):
+            run_command(str(tmp_path), "bash start.sh")
+
+        out = capsys.readouterr().out
+        assert "build step 3/7" in out
+        assert "COPY failed" in out
+        assert "Command failed" in out
+
+    def test_success_prints_the_output(self, tmp_path, capsys):
+        run_command(str(tmp_path), "echo hello")
+
+        assert "hello" in capsys.readouterr().out

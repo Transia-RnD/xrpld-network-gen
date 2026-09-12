@@ -51,6 +51,10 @@ def run_command(cwd: str, command: str) -> None:
         if result.stderr:
             print(result.stderr.decode())
     except subprocess.CalledProcessError as e:
+        if e.stdout:
+            print(e.stdout.decode())
+        if e.stderr:
+            print(e.stderr.decode())
         print(f"{bcolors.RED}Command failed: {e}{bcolors.END}")
     except FileNotFoundError:
         print(f"{bcolors.RED}Command not found: {command}{bcolors.END}")
