@@ -13,9 +13,12 @@ from xrpld_lab.compose_builder import ComposeBuilder
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _default_ports() -> PortSet:
     """Return a default PortSet for testing."""
-    return PortSet(rpc_public=5007, rpc_admin=5005, ws_public=6008, ws_admin=6006, peer=51235)
+    return PortSet(
+        rpc_public=5007, rpc_admin=5005, ws_public=6008, ws_admin=6006, peer=51235
+    )
 
 
 def _validator_ports(index: int = 1) -> PortSet:
@@ -490,7 +493,11 @@ class TestMultipleServices:
 
         result = builder.build()
         assert set(result["services"].keys()) == {
-            "vnode1", "vnode2", "pnode1", "vl", "network-explorer"
+            "vnode1",
+            "vnode2",
+            "pnode1",
+            "vl",
+            "network-explorer",
         }
 
     def test_standalone_with_explorer_and_ipfs(self):
@@ -535,7 +542,9 @@ class TestChaining:
 
     def test_add_node_service_returns_self(self):
         builder = ComposeBuilder("testnet-network")
-        result = builder.add_node_service("vnode1", _validator_ports(1), NodeRole.VALIDATOR)
+        result = builder.add_node_service(
+            "vnode1", _validator_ports(1), NodeRole.VALIDATOR
+        )
         assert result is builder
 
     def test_add_explorer_service_returns_self(self):
@@ -557,8 +566,7 @@ class TestChaining:
         """Chain all methods together."""
         builder = ComposeBuilder("standalone-network")
         result = (
-            builder
-            .add_standalone_service("xrpl", _default_ports())
+            builder.add_standalone_service("xrpl", _default_ports())
             .add_explorer_service(ws_port=6006, standalone=True)
             .add_ipfs_service("xrpl")
         )

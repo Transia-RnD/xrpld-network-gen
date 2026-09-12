@@ -461,8 +461,14 @@ class TestXrpldCfgBuilderAmendments:
         output = XrpldCfgBuilder(cfg).build()
         assert "[amendments]\n" in output
         # Format is: {hash} {name} - i.e. value then key
-        assert "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789 fix1543\n" in output
-        assert "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF FlowCross\n" in output
+        assert (
+            "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789 fix1543\n"
+            in output
+        )
+        assert (
+            "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF FlowCross\n"
+            in output
+        )
 
     def test_amendments_absent(self):
         cfg = _make_standalone_config()

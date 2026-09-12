@@ -290,7 +290,9 @@ class TestUpdateGenesis:
         assert "FeeSettings" in types
 
     def test_replaces_existing_amendments(self, tmp_path):
-        genesis_path = self._make_genesis(tmp_path, amendments=["OLD_HASH1", "OLD_HASH2"])
+        genesis_path = self._make_genesis(
+            tmp_path, amendments=["OLD_HASH1", "OLD_HASH2"]
+        )
         features = {"NewFeature": "NEW_HASH"}
         result = update_genesis(features, "xrpl", genesis_path=genesis_path)
         for entry in result["ledger"]["accountState"]:

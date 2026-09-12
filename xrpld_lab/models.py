@@ -164,10 +164,14 @@ class TransactionQueueConfig:
     minimum_queue_size: int = 2000
     retry_sequence_percent: int = 25
     minimum_escalation_multiplier: int = 500
-    # Open-ledger caps raised so the fee market stays FLAT for perf runs: the open ledger
-    # accepts every txn at base fee up to 100k/ledger, so nothing escalates or queues, and the
-    # measured bottleneck is the node's apply rate (real capacity) not a fee-market artifact.
-    # (A hard cap of 10k was filling at peak load and queueing every overflow regardless of fee.)
+    # Open-ledger caps raised so the fee market stays FLAT for perf runs: the open
+    # ledger
+    # accepts every txn at base fee up to 100k/ledger, so nothing escalates or
+    # queues, and the
+    # measured bottleneck is the node's apply rate (real capacity) not a fee-
+    # market artifact.
+    # (A hard cap of 10k was filling at peak load and queueing every overflow
+    # regardless of fee.)
     minimum_txn_in_ledger: int = 100000
     minimum_txn_in_ledger_standalone: int = 100000
     target_txn_in_ledger: int = 100000
@@ -223,7 +227,8 @@ class NodeConfig:
     db_path: str = "/opt/ripple/lib/db"
     debug_path: str = "/opt/ripple/log/debug.log"
     # [insight] StatsD sink as "<ip>:<port>"; None omits the stanza. The Alloy sidecar
-    # shares the node container's network namespace, so it listens on this same loopback.
+    # shares the node container's network namespace, so it listens on this same
+    # loopback.
     statsd_address: Optional[str] = None
     statsd_prefix: str = "rippled"
     # [perf] perf_log path; None omits the stanza. Alloy requires this file to exist.
@@ -242,7 +247,8 @@ class NodeConfig:
     consensus_reserve_threads: int = 2
     log_level: str = "trace"
     private_peer: bool = False
-    max_transactions: int = 100000  # JobQueue JtTransaction cap; raised kMaxJobQueueTx clamps to [100,100000]
+    # JobQueue JtTransaction cap; raised kMaxJobQueueTx clamps to [100,100000]
+    max_transactions: int = 100000
     validator: Optional[ValidatorIdentity] = None
     validators: List[str] = field(default_factory=list)
     cluster_nodes: List[str] = field(default_factory=list)
@@ -312,7 +318,8 @@ class VlConfig:
     record resolves.
     """
 
-    # Signed list, relative to the cluster dir. xrpld-lab writes it here at generate time.
+    # Signed list, relative to the cluster dir. xrpld-lab writes it here at
+    # generate time.
     source: str = "vl/vl.json"
     filename: str = "vl.json"
     # Serve the host's own domain root too, not just vl.<domain>.
@@ -363,14 +370,16 @@ class CompilerConfig:
 
 @dataclass
 class StatusConfig:
-    """Per-node status sampler plus the network roll-up page at /status/ on the services host.
+    """Per-node status sampler plus the network roll-up page at /status/.
 
-    Every node runs node_metrics.py as the xrpld-status systemd unit; the services host's
-    copy also aggregates the others into /api/network for network-dashboard.html.
+    Every node runs node_metrics.py as the xrpld-status systemd unit; the copy
+    on the services host also aggregates the others into /api/network for
+    network-dashboard.html.
     """
 
     port: int = 8687
-    # UDP port the sampler's XDGM listener binds; each node's [datagram_monitor] targets it.
+    # UDP port the sampler's XDGM listener binds; each node's [datagram_monitor]
+    # targets it.
     xdgm_port: int = 9999
     interval: int = 10
     # Process name the sampler looks for in /proc for xrpld's RSS.
@@ -445,7 +454,8 @@ class AnsibleConfig:
 
     @property
     def status_host(self) -> Optional[ServicesHost]:
-        """The services host whose nginx serves /status/, or None when no host has it."""
+        """The services host whose nginx serves /status/, or None when no
+        host has it."""
         for host in self.services:
             if host.status:
                 return host
@@ -461,13 +471,16 @@ class AlloyConfig:
     """
 
     push_host: str
-    # Build context holding docker/alloy.Dockerfile + alloy/ from the xrpl-monitoring repo.
+    # Build context holding docker/alloy.Dockerfile + alloy/ from the xrpl-
+    # monitoring repo.
     source_dir: str
     # Cluster-wide Basic Auth, used for any node absent from `credentials`.
     username: str = ""
     password: str = ""
-    # Per-node Basic Auth keyed by node name: {"vnode1": {"username": .., "password": ..}}.
-    # The monitoring backend maps each credential to its own tenant, so one credential per
+    # Per-node Basic Auth keyed by node name: {"vnode1": {"username": ..,
+    # "password": ..}}.
+    # The monitoring backend maps each credential to its own tenant, so one
+    # credential per
     # node keeps a leaked node credential from carrying the whole network's telemetry.
     credentials: Dict[str, Dict[str, str]] = field(default_factory=dict)
     image: str = "xrpl-monitoring-alloy:local"
@@ -483,7 +496,11 @@ class AlloyConfig:
     statsd_relay_addr: str = ""
 
     def node_label(self, node_name: str) -> str:
-        return f"{self.node_label_prefix}{node_name}" if self.node_label_prefix else node_name
+        return (
+            f"{self.node_label_prefix}{node_name}"
+            if self.node_label_prefix
+            else node_name
+        )
 
     def creds_for(self, node_name: str) -> Dict[str, str]:
         c = self.credentials.get(node_name, {})
@@ -526,7 +543,9 @@ class GcpConfig:
     """
 
     project: str
-    validator_zones: List[str] = field(default_factory=lambda: list(_DEFAULT_VALIDATOR_ZONES))
+    validator_zones: List[str] = field(
+        default_factory=lambda: list(_DEFAULT_VALIDATOR_ZONES)
+    )
     peer_zones: List[str] = field(default_factory=lambda: list(_DEFAULT_PEER_ZONES))
     machine_type: str = "n2-standard-8"
     disk_gb: int = 100
@@ -547,7 +566,8 @@ class GcpConfig:
 
     @property
     def region(self) -> str:
-        """Provider region derived from the first validator zone (us-central1-a → us-central1)."""
+        """Provider region derived from the first validator zone (us-
+        central1-a → us-central1)."""
         zone = self.validator_zones[0]
         return zone.rsplit("-", 1)[0]
 
@@ -589,7 +609,8 @@ class LabConfig:
     # the enabled amendment set exactly matches the binary. None = fetch remotely.
     features_file: Optional[str] = None
     # Custom genesis JSON (e.g. prefunded accounts). None = xrpld-lab's bundled
-    # genesis.<protocol>.json. The resolved amendments are merged into whichever is used.
+    # genesis.<protocol>.json. The resolved amendments are merged into whichever
+    # is used.
     genesis_file: Optional[str] = None
     quorum: Optional[int] = None
     node_db_type: NodeDbType = NodeDbType.NUDB
@@ -606,7 +627,8 @@ class LabConfig:
     memory_limit: Optional[int] = None
     binary_name: str = "xrpld"
     # Perf-server XDGM sink as "<ip> <port>" (e.g. "10.128.0.2 9876"); None disables the
-    # [datagram_monitor] stanza. Must be the server's INTERNAL IP (firewall is VPC-only).
+    # [datagram_monitor] stanza. Must be the server's INTERNAL IP (firewall is
+    # VPC-only).
     datagram_monitor: Optional[str] = None
     import_vl_key: Optional[str] = None
     public_vl_key: Optional[str] = None
@@ -616,7 +638,8 @@ class LabConfig:
     # Emit the static [validators] list alongside the publisher list so a fresh chain
     # reaches quorum before the VL site is up, then converges on the VL.
     bootstrap_vl: bool = False
-    # [insight] StatsD sink + [perf] log for the Alloy telemetry sidecar; None omits both.
+    # [insight] StatsD sink + [perf] log for the Alloy telemetry sidecar; None
+    # omits both.
     statsd_address: Optional[str] = None
     perf_path: Optional[str] = None
     add_ipfs: bool = False
@@ -641,7 +664,8 @@ class LabConfig:
     def datagram_monitor_for(self, node_ip: str) -> Optional[List[str]]:
         """[datagram_monitor] lines for one node: the explicit sink when given, else the
         node's own address and the status sampler's XDGM port. The node runs in a bridge
-        network container, so the host is reached at its own address, not at loopback."""
+        network container, so the host is reached at its own address, not at loopback.
+        """
         if self.datagram_monitor:
             return [self.datagram_monitor]
         host = self.ansible.status_host if self.ansible else None

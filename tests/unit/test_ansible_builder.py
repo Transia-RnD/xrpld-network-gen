@@ -55,9 +55,23 @@ def _build_basic(tmp_path) -> AnsibleBuilder:
         config=config,
         image_name="transia/cluster:abc123",
     )
-    builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-    builder.add_node("vnode2", "10.0.0.2", _validator_ports(2), f"{cluster_dir}/vnode2/config/", "validator")
-    builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+    builder.add_node(
+        "vnode1",
+        "10.0.0.1",
+        _validator_ports(1),
+        f"{cluster_dir}/vnode1/config/",
+        "validator",
+    )
+    builder.add_node(
+        "vnode2",
+        "10.0.0.2",
+        _validator_ports(2),
+        f"{cluster_dir}/vnode2/config/",
+        "validator",
+    )
+    builder.add_node(
+        "pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer"
+    )
     return builder
 
 
@@ -167,11 +181,27 @@ class TestHostsTxt:
         config = AnsibleConfig(
             vips=["10.0.0.1"],
             pips=["10.0.0.10"],
-            services=[_services_host("proxy", "10.0.0.10", nginx=NginxConfig(domain="test.example.com"))],
+            services=[
+                _services_host(
+                    "proxy", "10.0.0.10", nginx=NginxConfig(domain="test.example.com")
+                )
+            ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         builder.write()
         content = open(os.path.join(builder.ansible_dir, "hosts.txt")).read()
         assert "[proxy]" in content
@@ -185,14 +215,34 @@ class TestHostsTxt:
             vips=["10.0.0.1"],
             pips=["10.0.0.10", "10.0.0.11"],
             services=[
-                _services_host("proxy", "10.0.0.10", nginx=NginxConfig(domain="a.example.com")),
+                _services_host(
+                    "proxy", "10.0.0.10", nginx=NginxConfig(domain="a.example.com")
+                ),
                 _services_host("infra", "10.0.0.11", redis=RedisConfig()),
             ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
-        builder.add_node("pnode2", "10.0.0.11", _peer_ports(2), f"{cluster_dir}/pnode2/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
+        builder.add_node(
+            "pnode2",
+            "10.0.0.11",
+            _peer_ports(2),
+            f"{cluster_dir}/pnode2/config/",
+            "peer",
+        )
         builder.write()
         content = open(os.path.join(builder.ansible_dir, "hosts.txt")).read()
         assert "[proxy]" in content
@@ -380,34 +430,56 @@ class TestNginx:
             ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         return builder
 
     def test_creates_nginx_dir(self, tmp_path):
         builder = self._builder_with_nginx(tmp_path)
         builder.write()
-        assert os.path.isdir(os.path.join(builder.ansible_dir, "services", "proxy", "nginx"))
+        assert os.path.isdir(
+            os.path.join(builder.ansible_dir, "services", "proxy", "nginx")
+        )
 
     def test_creates_nginx_deps(self, tmp_path):
         builder = self._builder_with_nginx(tmp_path)
         builder.write()
-        assert os.path.exists(os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "deps.yml"))
+        assert os.path.exists(
+            os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "deps.yml")
+        )
 
     def test_creates_nginx_ssl(self, tmp_path):
         builder = self._builder_with_nginx(tmp_path)
         builder.write()
-        assert os.path.exists(os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml"))
+        assert os.path.exists(
+            os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml")
+        )
 
     def test_creates_nginx_main(self, tmp_path):
         builder = self._builder_with_nginx(tmp_path)
         builder.write()
-        assert os.path.exists(os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "main.yml"))
+        assert os.path.exists(
+            os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "main.yml")
+        )
 
     def test_creates_nginx_vars(self, tmp_path):
         builder = self._builder_with_nginx(tmp_path)
         builder.write()
-        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "vars.yml")
+        path = os.path.join(
+            builder.ansible_dir, "services", "proxy", "nginx", "vars.yml"
+        )
         assert os.path.exists(path)
         with open(path) as f:
             data = yaml.safe_load(f)
@@ -428,14 +500,18 @@ class TestNginx:
     def test_nginx_playbook_targets_host_group(self, tmp_path):
         builder = self._builder_with_nginx(tmp_path)
         builder.write()
-        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "main.yml")
+        path = os.path.join(
+            builder.ansible_dir, "services", "proxy", "nginx", "main.yml"
+        )
         content = open(path).read()
         assert "hosts: proxy" in content
 
     def test_ssl_all_selfsigned_by_default(self, tmp_path):
         builder = self._builder_with_nginx(tmp_path)
         builder.write()
-        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml")
+        path = os.path.join(
+            builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml"
+        )
         content = open(path).read()
         assert "certbot" not in content
         for label in ("WSS", "RPC", "Faucet", "Debug", "Compiler"):
@@ -463,8 +539,20 @@ class TestNginxLetsEncrypt:
             ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         return builder
 
     def test_ssl_yml_issues_letsencrypt_for_selected_services(self, tmp_path):
@@ -474,11 +562,18 @@ class TestNginxLetsEncrypt:
             letsencrypt_email="ops@example.com",
         )
         builder.write()
-        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml")
+        path = os.path.join(
+            builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml"
+        )
         content = open(path).read()
         assert "Install certbot" in content
-        assert "-m ops@example.com --cert-name rpc.test.example.com -d rpc.test.example.com" in content
-        assert "--cert-name faucet.test.example.com -d faucet.test.example.com" in content
+        assert (
+            "-m ops@example.com --cert-name rpc.test.example.com -d rpc.test.example.com"
+            in content
+        )
+        assert (
+            "--cert-name faucet.test.example.com -d faucet.test.example.com" in content
+        )
         # LE services get no self-signed cert; the rest keep theirs
         assert "Create RPC self-signed certificate" not in content
         assert "Create Faucet self-signed certificate" not in content
@@ -489,13 +584,27 @@ class TestNginxLetsEncrypt:
     def test_vars_point_at_letsencrypt_paths(self, tmp_path):
         builder = self._builder(tmp_path, letsencrypt_services=["rpc", "faucet"])
         builder.write()
-        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "vars.yml")
+        path = os.path.join(
+            builder.ansible_dir, "services", "proxy", "nginx", "vars.yml"
+        )
         with open(path) as f:
             data = yaml.safe_load(f)
-        assert data["RPC_SSL_CERT"] == "/etc/letsencrypt/live/rpc.test.example.com/fullchain.pem"
-        assert data["RPC_SSL_KEY"] == "/etc/letsencrypt/live/rpc.test.example.com/privkey.pem"
-        assert data["FAUCET_SSL_CERT"] == "/etc/letsencrypt/live/faucet.test.example.com/fullchain.pem"
-        assert data["FAUCET_SSL_KEY"] == "/etc/letsencrypt/live/faucet.test.example.com/privkey.pem"
+        assert (
+            data["RPC_SSL_CERT"]
+            == "/etc/letsencrypt/live/rpc.test.example.com/fullchain.pem"
+        )
+        assert (
+            data["RPC_SSL_KEY"]
+            == "/etc/letsencrypt/live/rpc.test.example.com/privkey.pem"
+        )
+        assert (
+            data["FAUCET_SSL_CERT"]
+            == "/etc/letsencrypt/live/faucet.test.example.com/fullchain.pem"
+        )
+        assert (
+            data["FAUCET_SSL_KEY"]
+            == "/etc/letsencrypt/live/faucet.test.example.com/privkey.pem"
+        )
         # untouched services keep self-signed paths
         assert data["SSL_CERT"] == "/etc/ssl/certs/test.example.com.csr.pem"
         assert data["DEBUG_SSL_CERT"] == "/etc/ssl/certs/debug.test.example.com.csr.pem"
@@ -503,17 +612,23 @@ class TestNginxLetsEncrypt:
     def test_no_email_registers_unsafely(self, tmp_path):
         builder = self._builder(tmp_path, letsencrypt_services=["rpc"])
         builder.write()
-        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml")
+        path = os.path.join(
+            builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml"
+        )
         content = open(path).read()
         assert "--register-unsafely-without-email" in content
 
     def test_wss_uses_bare_domain(self, tmp_path):
         builder = self._builder(tmp_path, letsencrypt_services=["wss"])
         builder.write()
-        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "vars.yml")
+        path = os.path.join(
+            builder.ansible_dir, "services", "proxy", "nginx", "vars.yml"
+        )
         with open(path) as f:
             data = yaml.safe_load(f)
-        assert data["SSL_CERT"] == "/etc/letsencrypt/live/test.example.com/fullchain.pem"
+        assert (
+            data["SSL_CERT"] == "/etc/letsencrypt/live/test.example.com/fullchain.pem"
+        )
 
     def test_unknown_service_raises(self, tmp_path):
         builder = self._builder(tmp_path, letsencrypt_services=["bogus"])
@@ -527,7 +642,9 @@ class TestNginxLetsEncrypt:
             letsencrypt_email="ops@example.com",
         )
         builder.write()
-        path = os.path.join(builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml")
+        path = os.path.join(
+            builder.ansible_dir, "services", "proxy", "nginx", "ssl.yml"
+        )
         with open(path) as f:
             plays = yaml.safe_load(f)
         assert plays[0]["hosts"] == "proxy"
@@ -551,14 +668,32 @@ class TestRedis:
             ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         builder.write()
 
-        assert os.path.exists(os.path.join(builder.ansible_dir, "services", "infra", "redis", "main.yml"))
-        assert os.path.exists(os.path.join(builder.ansible_dir, "services", "infra", "redis", "vars.yml"))
+        assert os.path.exists(
+            os.path.join(builder.ansible_dir, "services", "infra", "redis", "main.yml")
+        )
+        assert os.path.exists(
+            os.path.join(builder.ansible_dir, "services", "infra", "redis", "vars.yml")
+        )
 
-        with open(os.path.join(builder.ansible_dir, "services", "infra", "redis", "vars.yml")) as f:
+        with open(
+            os.path.join(builder.ansible_dir, "services", "infra", "redis", "vars.yml")
+        ) as f:
             data = yaml.safe_load(f)
         assert data["docker_image_name"] == "redis"
         assert data["docker_container_name"] == "alpha-redis-main"
@@ -572,10 +707,24 @@ class TestRedis:
             services=[ServicesHost(name="infra", ip="10.0.0.10", redis=RedisConfig())],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         builder.write()
-        content = open(os.path.join(builder.ansible_dir, "services", "infra", "redis", "main.yml")).read()
+        content = open(
+            os.path.join(builder.ansible_dir, "services", "infra", "redis", "main.yml")
+        ).read()
         assert "hosts: infra" in content
 
 
@@ -604,14 +753,32 @@ class TestFaucet:
             ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         builder.write()
 
-        assert os.path.exists(os.path.join(builder.ansible_dir, "services", "proxy", "faucet", "main.yml"))
-        with open(os.path.join(builder.ansible_dir, "services", "proxy", "faucet", "vars.yml")) as f:
+        assert os.path.exists(
+            os.path.join(builder.ansible_dir, "services", "proxy", "faucet", "main.yml")
+        )
+        with open(
+            os.path.join(builder.ansible_dir, "services", "proxy", "faucet", "vars.yml")
+        ) as f:
             data = yaml.safe_load(f)
-        assert data["docker_env_variables"]["XRPL_FAUCET_URL"] == "wss://test.example.com"
+        assert (
+            data["docker_env_variables"]["XRPL_FAUCET_URL"] == "wss://test.example.com"
+        )
         assert data["docker_env_variables"]["XRPL_NETWORK_ID"] == "21337"
 
 
@@ -636,12 +803,28 @@ class TestStream:
             ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         builder.write()
 
-        assert os.path.exists(os.path.join(builder.ansible_dir, "services", "proxy", "stream", "main.yml"))
-        with open(os.path.join(builder.ansible_dir, "services", "proxy", "stream", "vars.yml")) as f:
+        assert os.path.exists(
+            os.path.join(builder.ansible_dir, "services", "proxy", "stream", "main.yml")
+        )
+        with open(
+            os.path.join(builder.ansible_dir, "services", "proxy", "stream", "vars.yml")
+        ) as f:
             data = yaml.safe_load(f)
         assert data["websocketd_port"] == 1400
         assert data["docker_container_name"] == "pnode1"
@@ -669,12 +852,28 @@ class TestDebug:
             ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         builder.write()
 
-        assert os.path.exists(os.path.join(builder.ansible_dir, "services", "proxy", "debug", "main.yml"))
-        with open(os.path.join(builder.ansible_dir, "services", "proxy", "debug", "vars.yml")) as f:
+        assert os.path.exists(
+            os.path.join(builder.ansible_dir, "services", "proxy", "debug", "main.yml")
+        )
+        with open(
+            os.path.join(builder.ansible_dir, "services", "proxy", "debug", "vars.yml")
+        ) as f:
             data = yaml.safe_load(f)
         assert data["docker_image_name"] == "transia/debugstream"
         assert data["docker_env_variables"]["ENDPOINT"] == "ws://10.0.0.10:1400/"
@@ -697,15 +896,38 @@ class TestCompiler:
             ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         builder.write()
 
-        assert os.path.exists(os.path.join(builder.ansible_dir, "services", "infra", "compiler", "main.yml"))
-        with open(os.path.join(builder.ansible_dir, "services", "infra", "compiler", "vars.yml")) as f:
+        assert os.path.exists(
+            os.path.join(
+                builder.ansible_dir, "services", "infra", "compiler", "main.yml"
+            )
+        )
+        with open(
+            os.path.join(
+                builder.ansible_dir, "services", "infra", "compiler", "vars.yml"
+            )
+        ) as f:
             data = yaml.safe_load(f)
         assert data["docker_image_name"] == "transia/compiler-api:latest"
-        assert data["compiler_repo"] == "git@github.com:Transia-RnD/xrpl-hooks-compiler.git"
+        assert (
+            data["compiler_repo"]
+            == "git@github.com:Transia-RnD/xrpl-hooks-compiler.git"
+        )
 
 
 # ===========================================================================
@@ -750,9 +972,21 @@ class TestFullDeployment:
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc123")
         for i, ip in enumerate(config.vips, 1):
-            builder.add_node(f"vnode{i}", ip, _validator_ports(i), f"{cluster_dir}/vnode{i}/config/", "validator")
+            builder.add_node(
+                f"vnode{i}",
+                ip,
+                _validator_ports(i),
+                f"{cluster_dir}/vnode{i}/config/",
+                "validator",
+            )
         for i, ip in enumerate(config.pips, 1):
-            builder.add_node(f"pnode{i}", ip, _peer_ports(i), f"{cluster_dir}/pnode{i}/config/", "peer")
+            builder.add_node(
+                f"pnode{i}",
+                ip,
+                _peer_ports(i),
+                f"{cluster_dir}/pnode{i}/config/",
+                "peer",
+            )
         builder.write()
 
         run_sh = open(os.path.join(builder.ansible_dir, "run.sh")).read()
@@ -766,9 +1000,13 @@ class TestFullDeployment:
         assert "services/infra/compiler/main.yml" in run_sh
 
         for svc in ["nginx", "faucet", "stream", "debug"]:
-            assert os.path.isdir(os.path.join(builder.ansible_dir, "services", "proxy", svc))
+            assert os.path.isdir(
+                os.path.join(builder.ansible_dir, "services", "proxy", svc)
+            )
         for svc in ["redis", "compiler"]:
-            assert os.path.isdir(os.path.join(builder.ansible_dir, "services", "infra", svc))
+            assert os.path.isdir(
+                os.path.join(builder.ansible_dir, "services", "infra", svc)
+            )
 
         hosts = open(os.path.join(builder.ansible_dir, "hosts.txt")).read()
         assert "ansible_port=1988" in hosts
@@ -791,7 +1029,11 @@ class TestFullDeployment:
                     ip="10.0.0.10",
                     nginx=NginxConfig(domain="test.example.com"),
                     redis=RedisConfig(),
-                    faucet=FaucetConfig(ws_url="wss://test.example.com", network_id="21337", seed="sEdTest"),
+                    faucet=FaucetConfig(
+                        ws_url="wss://test.example.com",
+                        network_id="21337",
+                        seed="sEdTest",
+                    ),
                     stream=StreamConfig(),
                     debug=DebugConfig(),
                     compiler=CompilerConfig(),
@@ -799,12 +1041,26 @@ class TestFullDeployment:
             ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         builder.write()
 
         for svc in ["nginx", "redis", "faucet", "stream", "debug", "compiler"]:
-            assert os.path.isdir(os.path.join(builder.ansible_dir, "services", "main", svc))
+            assert os.path.isdir(
+                os.path.join(builder.ansible_dir, "services", "main", svc)
+            )
 
         run_sh = open(os.path.join(builder.ansible_dir, "run.sh")).read()
         for svc in ["nginx", "redis", "faucet", "stream", "debug", "compiler"]:
@@ -822,7 +1078,9 @@ class TestChaining:
         os.makedirs(cluster_dir, exist_ok=True)
         config = _basic_config()
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        result = builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
+        result = builder.add_node(
+            "vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/"
+        )
         assert result is builder
 
 
@@ -841,7 +1099,13 @@ class TestMainYmlGenesisModes:
             image_name="transia/cluster:abc123",
             genesis=genesis,
         )
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/", "validator")
+        builder.add_node(
+            "vnode1",
+            "10.0.0.1",
+            _validator_ports(1),
+            f"{cluster_dir}/vnode1/config/",
+            "validator",
+        )
         builder.write()
         with open(os.path.join(builder.ansible_dir, "main.yml")) as f:
             return f.read()
@@ -895,25 +1159,41 @@ class TestPerNodeSshKeys:
             ssh_keys=ssh_keys,
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc123")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
-        builder.add_node("vnode2", "10.0.0.2", _validator_ports(2), f"{cluster_dir}/vnode2/config/")
+        builder.add_node(
+            "vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/"
+        )
+        builder.add_node(
+            "vnode2", "10.0.0.2", _validator_ports(2), f"{cluster_dir}/vnode2/config/"
+        )
         return builder
 
     def test_each_node_gets_its_own_key(self, tmp_path):
-        builder = self._builder(tmp_path, {
-            "10.0.0.1": "~/.ssh/alphanet/vnode1",
-            "10.0.0.2": "~/.ssh/alphanet/vnode2",
-        })
+        builder = self._builder(
+            tmp_path,
+            {
+                "10.0.0.1": "~/.ssh/alphanet/vnode1",
+                "10.0.0.2": "~/.ssh/alphanet/vnode2",
+            },
+        )
         builder.write()
         hosts = open(os.path.join(builder.ansible_dir, "hosts.txt")).read()
-        assert "10.0.0.1 ansible_port=1988 ansible_user=root ansible_ssh_private_key_file=~/.ssh/alphanet/vnode1" in hosts
-        assert "10.0.0.2 ansible_port=1988 ansible_user=root ansible_ssh_private_key_file=~/.ssh/alphanet/vnode2" in hosts
+        assert (
+            "10.0.0.1 ansible_port=1988 ansible_user=root ansible_ssh_private_key_file=~/.ssh/alphanet/vnode1"
+            in hosts
+        )
+        assert (
+            "10.0.0.2 ansible_port=1988 ansible_user=root ansible_ssh_private_key_file=~/.ssh/alphanet/vnode2"
+            in hosts
+        )
 
     def test_unlisted_node_falls_back_to_cluster_key(self, tmp_path):
         builder = self._builder(tmp_path, {"10.0.0.1": "~/.ssh/alphanet/vnode1"})
         builder.write()
         hosts = open(os.path.join(builder.ansible_dir, "hosts.txt")).read()
-        assert "10.0.0.2 ansible_port=1988 ansible_user=root ansible_ssh_private_key_file=~/.ssh/xrpl-labs" in hosts
+        assert (
+            "10.0.0.2 ansible_port=1988 ansible_user=root ansible_ssh_private_key_file=~/.ssh/xrpl-labs"
+            in hosts
+        )
 
     def test_no_overrides_keeps_one_key_everywhere(self, tmp_path):
         builder = self._builder(tmp_path, {})
@@ -932,11 +1212,16 @@ class TestAlloySidecar:
         cluster_dir = str(tmp_path / "alloy-cluster")
         os.makedirs(cluster_dir, exist_ok=True)
         config = AnsibleConfig(
-            ssh_port=1988, ssh_user="root", ssh_key_path="~/.ssh/xrpl-labs",
-            vips=["10.0.0.1"], alloy=alloy,
+            ssh_port=1988,
+            ssh_user="root",
+            ssh_key_path="~/.ssh/xrpl-labs",
+            vips=["10.0.0.1"],
+            alloy=alloy,
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc123")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
+        builder.add_node(
+            "vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/"
+        )
         return builder
 
     def _alloy(self, tmp_path, **kw):
@@ -967,18 +1252,24 @@ class TestAlloySidecar:
     def test_build_context_copied(self, tmp_path):
         builder = self._builder(tmp_path, self._alloy(tmp_path))
         builder.write()
-        copied = os.path.join(builder.ansible_dir, "alloy", "docker", "alloy.Dockerfile")
+        copied = os.path.join(
+            builder.ansible_dir, "alloy", "docker", "alloy.Dockerfile"
+        )
         assert os.path.exists(copied)
 
     def test_host_vars_carry_credentials_and_node_label(self, tmp_path):
         builder = self._builder(tmp_path, self._alloy(tmp_path))
         builder.write()
         import yaml
+
         data = yaml.safe_load(
-            open(os.path.join(builder.ansible_dir, "host_vars", "10.0.0.1.yml")))
+            open(os.path.join(builder.ansible_dir, "host_vars", "10.0.0.1.yml"))
+        )
         env = data["alloy_env_variables"]
         assert env["ALLOY_NODE"] == "alphanet-vnode1"
-        assert env["ALLOY_PUSH_HOST"] == "xrpl-monitoring-push-staging.aws.peersyst.tech"
+        assert (
+            env["ALLOY_PUSH_HOST"] == "xrpl-monitoring-push-staging.aws.peersyst.tech"
+        )
         assert env["ALLOY_USERNAME"] == "alphanet"
         assert env["ALLOY_PASSWORD"] == "s3cret"
 
@@ -987,6 +1278,7 @@ class TestAlloySidecar:
         builder = self._builder(tmp_path, self._alloy(tmp_path, statsd_port=19125))
         builder.write()
         import yaml
+
         env = yaml.safe_load(
             open(os.path.join(builder.ansible_dir, "host_vars", "10.0.0.1.yml"))
         )["alloy_env_variables"]
@@ -1007,12 +1299,16 @@ class TestAlloySidecar:
         assert "alloy_container_name is defined" in clean
 
     def test_per_node_credentials_override_the_cluster_pair(self, tmp_path):
-        alloy = self._alloy(tmp_path, credentials={
-            "vnode1": {"username": "alphanet-1", "password": "code-1"},
-        })
+        alloy = self._alloy(
+            tmp_path,
+            credentials={
+                "vnode1": {"username": "alphanet-1", "password": "code-1"},
+            },
+        )
         builder = self._builder(tmp_path, alloy)
         builder.write()
         import yaml
+
         env = yaml.safe_load(
             open(os.path.join(builder.ansible_dir, "host_vars", "10.0.0.1.yml"))
         )["alloy_env_variables"]
@@ -1020,12 +1316,16 @@ class TestAlloySidecar:
         assert env["ALLOY_PASSWORD"] == "code-1"
 
     def test_unlisted_node_uses_the_cluster_pair(self, tmp_path):
-        alloy = self._alloy(tmp_path, credentials={
-            "vnode9": {"username": "other", "password": "nope"},
-        })
+        alloy = self._alloy(
+            tmp_path,
+            credentials={
+                "vnode9": {"username": "other", "password": "nope"},
+            },
+        )
         builder = self._builder(tmp_path, alloy)
         builder.write()
         import yaml
+
         env = yaml.safe_load(
             open(os.path.join(builder.ansible_dir, "host_vars", "10.0.0.1.yml"))
         )["alloy_env_variables"]
@@ -1052,13 +1352,24 @@ class TestVlVhost:
             letsencrypt_email="ops@example.com",
         )
         config = AnsibleConfig(
-            ssh_port=1988, ssh_user="root", ssh_key_path="~/.ssh/xrpl-labs",
-            vips=["10.0.0.1"], pips=["10.0.0.10"],
+            ssh_port=1988,
+            ssh_user="root",
+            ssh_key_path="~/.ssh/xrpl-labs",
+            vips=["10.0.0.1"],
+            pips=["10.0.0.10"],
             services=[ServicesHost(name="peer", ip="10.0.0.10", nginx=nginx, vl=vl)],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc123")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/"
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         return builder
 
     def _dir(self, builder):
@@ -1081,13 +1392,27 @@ class TestVlVhost:
         cluster_dir = str(tmp_path / "empty-cluster")
         os.makedirs(cluster_dir, exist_ok=True)
         config = AnsibleConfig(
-            ssh_port=1988, ssh_user="root", vips=["10.0.0.1"], pips=["10.0.0.10"],
-            services=[ServicesHost(name="peer", ip="10.0.0.10",
-                                   nginx=NginxConfig(domain="alphanet.xrpl.org"),
-                                   vl=VlConfig())],
+            ssh_port=1988,
+            ssh_user="root",
+            vips=["10.0.0.1"],
+            pips=["10.0.0.10"],
+            services=[
+                ServicesHost(
+                    name="peer",
+                    ip="10.0.0.10",
+                    nginx=NginxConfig(domain="alphanet.xrpl.org"),
+                    vl=VlConfig(),
+                )
+            ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         with pytest.raises(FileNotFoundError):
             builder.write()
 
@@ -1095,6 +1420,7 @@ class TestVlVhost:
         builder = self._builder(tmp_path, VlConfig())
         builder.write()
         import yaml
+
         v = yaml.safe_load(open(os.path.join(self._dir(builder), "vars.yml")))
         assert v["VL_SSL_CN"] == "vl.alphanet.xrpl.org"
 
@@ -1102,6 +1428,7 @@ class TestVlVhost:
         builder = self._builder(tmp_path, VlConfig())
         builder.write()
         import yaml
+
         v = yaml.safe_load(open(os.path.join(self._dir(builder), "vars.yml")))
         assert v["VL_TLS"] is False
         assert "VL_SSL_CERT" not in v
@@ -1110,15 +1437,21 @@ class TestVlVhost:
         builder = self._builder(tmp_path, VlConfig(), le=["vl"])
         builder.write()
         import yaml
+
         v = yaml.safe_load(open(os.path.join(self._dir(builder), "vars.yml")))
         assert v["VL_TLS"] is True
-        assert v["VL_SSL_CERT"] == "/etc/letsencrypt/live/vl.alphanet.xrpl.org/fullchain.pem"
+        assert (
+            v["VL_SSL_CERT"]
+            == "/etc/letsencrypt/live/vl.alphanet.xrpl.org/fullchain.pem"
+        )
 
     def test_vl_is_a_valid_letsencrypt_service(self, tmp_path):
         """`vl` must be accepted in letsencrypt_services, not rejected as unknown."""
         builder = self._builder(tmp_path, VlConfig(), le=["vl", "rpc"])
         builder.write()
-        ssl = open(os.path.join(builder.ansible_dir, "services", "peer", "nginx", "ssl.yml")).read()
+        ssl = open(
+            os.path.join(builder.ansible_dir, "services", "peer", "nginx", "ssl.yml")
+        ).read()
         assert "vl.alphanet.xrpl.org" in ssl
 
     def test_run_sh_always_reruns_vl(self, tmp_path):
@@ -1146,22 +1479,47 @@ class TestStatusService:
         os.makedirs(cluster_dir, exist_ok=True)
         nginx = NginxConfig(domain="alphanet.xrpl.org")
         config = AnsibleConfig(
-            ssh_port=1988, ssh_user="root", ssh_key_path="~/.ssh/xrpl-labs",
-            vips=["10.0.0.1", "10.0.0.2"], pips=["10.0.0.10"],
-            services=[ServicesHost(name="pnode1", ip="10.0.0.10", nginx=nginx,
-                                   debug=debug, redis=redis, status=status)],
+            ssh_port=1988,
+            ssh_user="root",
+            ssh_key_path="~/.ssh/xrpl-labs",
+            vips=["10.0.0.1", "10.0.0.2"],
+            pips=["10.0.0.10"],
+            services=[
+                ServicesHost(
+                    name="pnode1",
+                    ip="10.0.0.10",
+                    nginx=nginx,
+                    debug=debug,
+                    redis=redis,
+                    status=status,
+                )
+            ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc123")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
-        builder.add_node("vnode2", "10.0.0.2", _validator_ports(2), f"{cluster_dir}/vnode2/config/")
-        builder.add_node("pnode1", "10.0.0.10", _peer_ports(1), f"{cluster_dir}/pnode1/config/", "peer")
+        builder.add_node(
+            "vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/"
+        )
+        builder.add_node(
+            "vnode2", "10.0.0.2", _validator_ports(2), f"{cluster_dir}/vnode2/config/"
+        )
+        builder.add_node(
+            "pnode1",
+            "10.0.0.10",
+            _peer_ports(1),
+            f"{cluster_dir}/pnode1/config/",
+            "peer",
+        )
         return builder
 
     def _host_vars(self, builder, ip):
-        return yaml.safe_load(open(os.path.join(builder.ansible_dir, "host_vars", f"{ip}.yml")))
+        return yaml.safe_load(
+            open(os.path.join(builder.ansible_dir, "host_vars", f"{ip}.yml"))
+        )
 
     def _nginx_main(self, builder):
-        return open(os.path.join(builder.ansible_dir, "services", "pnode1", "nginx", "main.yml")).read()
+        return open(
+            os.path.join(builder.ansible_dir, "services", "pnode1", "nginx", "main.yml")
+        ).read()
 
     def test_nothing_written_when_unconfigured(self, tmp_path):
         builder = self._builder(tmp_path, None)
@@ -1170,14 +1528,19 @@ class TestStatusService:
         assert not os.path.isdir(os.path.join(builder.ansible_dir, "status"))
         assert "status_env" not in self._host_vars(builder, "10.0.0.1")
         assert "/status/" not in self._nginx_main(builder)
-        assert "status.yml" not in open(os.path.join(builder.ansible_dir, "run.sh")).read()
+        assert (
+            "status.yml" not in open(os.path.join(builder.ansible_dir, "run.sh")).read()
+        )
 
     def test_sampler_files_staged_beside_the_playbook(self, tmp_path):
         builder = self._builder(tmp_path, StatusConfig())
         builder.write()
         staged = os.path.join(builder.ansible_dir, "status")
         assert sorted(os.listdir(staged)) == [
-            "network-dashboard.html", "node-dashboard.html", "node_metrics.py"]
+            "network-dashboard.html",
+            "node-dashboard.html",
+            "node_metrics.py",
+        ]
         assert "def decode_xdgm" in open(os.path.join(staged, "node_metrics.py")).read()
 
     def test_status_yml_installs_unit_env_and_firewall_on_every_node(self, tmp_path):
@@ -1199,21 +1562,28 @@ class TestStatusService:
         assert "EnvironmentFile=/opt/xrpld-status/node_metrics.env" in content
         assert "notify: restart xrpld-status" in content
 
-    def test_remote_node_binds_all_addresses_and_admits_only_the_services_host(self, tmp_path):
+    def test_remote_node_binds_all_addresses_and_admits_only_the_services_host(
+        self, tmp_path
+    ):
         builder = self._builder(tmp_path, StatusConfig(port=8700))
         builder.write()
         hv = self._host_vars(builder, "10.0.0.1")
         env = hv["status_env"]
         assert env["NODE_METRICS_HTTP_HOST"] == "0.0.0.0"
         assert env["NODE_METRICS_HTTP_PORT"] == "8700"
-        assert env["NODE_METRICS_ADMIN_RPC"] == f"http://127.0.0.1:{_validator_ports(1).rpc_admin}/"
+        assert (
+            env["NODE_METRICS_ADMIN_RPC"]
+            == f"http://127.0.0.1:{_validator_ports(1).rpc_admin}/"
+        )
         assert env["NODE_METRICS_DEBUGSTREAM_HEALTH"] == ""
         assert env["NODE_METRICS_REDIS_PORT"] == "0"
         assert "NODE_METRICS_NETWORK_NODES" not in env
         assert hv["status_allow_from"] == "10.0.0.10"
         assert hv["status_http_port"] == 8700
 
-    def test_xdgm_listener_binds_the_node_address_the_container_can_reach(self, tmp_path):
+    def test_xdgm_listener_binds_the_node_address_the_container_can_reach(
+        self, tmp_path
+    ):
         builder = self._builder(tmp_path, StatusConfig(xdgm_port=9998))
         builder.write()
         hv = self._host_vars(builder, "10.0.0.2")
@@ -1222,8 +1592,9 @@ class TestStatusService:
         assert hv["status_xdgm_port"] == 9998
 
     def test_services_host_sampler_is_loopback_and_aggregates(self, tmp_path):
-        builder = self._builder(tmp_path, StatusConfig(), debug=DebugConfig(port=8081),
-                                redis=RedisConfig())
+        builder = self._builder(
+            tmp_path, StatusConfig(), debug=DebugConfig(port=8081), redis=RedisConfig()
+        )
         builder.write()
         hv = self._host_vars(builder, "10.0.0.10")
         env = hv["status_env"]
@@ -1242,14 +1613,22 @@ class TestStatusService:
     def test_network_name_override(self, tmp_path):
         builder = self._builder(tmp_path, StatusConfig(network_name="alphanet"))
         builder.write()
-        assert self._host_vars(builder, "10.0.0.10")["status_env"]["NODE_METRICS_NETWORK_NAME"] == "alphanet"
+        assert (
+            self._host_vars(builder, "10.0.0.10")["status_env"][
+                "NODE_METRICS_NETWORK_NAME"
+            ]
+            == "alphanet"
+        )
 
     def test_nginx_serves_the_page_the_api_and_every_node(self, tmp_path):
         builder = self._builder(tmp_path, StatusConfig())
         builder.write()
         main = self._nginx_main(builder)
         yaml.safe_load(main)
-        assert "limit_req_zone $binary_remote_addr zone=xrpld_status:10m rate=20r/s;" in main
+        assert (
+            "limit_req_zone $binary_remote_addr zone=xrpld_status:10m rate=20r/s;"
+            in main
+        )
         assert "location = /status/ {" in main
         assert "try_files /network-dashboard.html =404;" in main
         assert "location /status/api/ {" in main
@@ -1261,11 +1640,17 @@ class TestStatusService:
         assert "proxy_pass http://127.0.0.1:8687/;" in main
         assert main.count("limit_req zone=xrpld_status burst=40 nodelay;") == 5
         # The locations sit inside the bare-domain server block, before its closing brace.
-        wss = main[main.index("Write WSS proxy config"):main.index("  - name: Link WSS proxy")]
+        wss = main[
+            main.index("Write WSS proxy config") : main.index(
+                "  - name: Link WSS proxy"
+            )
+        ]
         assert "location /status/api/" in wss
         assert wss.rstrip().endswith("}")
 
-    def test_services_host_playbook_installs_the_page_and_seeds_network_json(self, tmp_path):
+    def test_services_host_playbook_installs_the_page_and_seeds_network_json(
+        self, tmp_path
+    ):
         builder = self._builder(tmp_path, StatusConfig())
         builder.write()
         svc_dir = os.path.join(builder.ansible_dir, "services", "pnode1", "status")
@@ -1279,13 +1664,16 @@ class TestStatusService:
         assert v["STATUS_DIR"] == "/opt/xrpld-status"
         assert v["STATUS_PORT"] == 8687
 
-    def test_run_sh_reruns_the_sampler_after_main_and_the_page_after_nginx(self, tmp_path):
+    def test_run_sh_reruns_the_sampler_after_main_and_the_page_after_nginx(
+        self, tmp_path
+    ):
         builder = self._builder(tmp_path, StatusConfig())
         builder.write()
         run = open(os.path.join(builder.ansible_dir, "run.sh")).read()
         assert run.index("run_always main.yml") < run.index("run_always status.yml")
-        assert run.index("run_once pnode1_nginx services/pnode1/nginx/main.yml") \
-            < run.index("run_always services/pnode1/status/main.yml")
+        assert run.index(
+            "run_once pnode1_nginx services/pnode1/nginx/main.yml"
+        ) < run.index("run_always services/pnode1/status/main.yml")
 
     def test_clean_stops_the_sampler(self, tmp_path):
         builder = self._builder(tmp_path, StatusConfig())
@@ -1299,11 +1687,18 @@ class TestStatusService:
         os.makedirs(cluster_dir, exist_ok=True)
         config = AnsibleConfig(
             vips=["10.0.0.1"],
-            services=[ServicesHost(name="infra", ip="10.0.0.50",
-                                   nginx=NginxConfig(domain="example.com"),
-                                   status=StatusConfig())],
+            services=[
+                ServicesHost(
+                    name="infra",
+                    ip="10.0.0.50",
+                    nginx=NginxConfig(domain="example.com"),
+                    status=StatusConfig(),
+                )
+            ],
         )
         builder = AnsibleBuilder(cluster_dir, config, "transia/cluster:abc")
-        builder.add_node("vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/")
+        builder.add_node(
+            "vnode1", "10.0.0.1", _validator_ports(1), f"{cluster_dir}/vnode1/config/"
+        )
         with pytest.raises(ValueError):
             builder.write()

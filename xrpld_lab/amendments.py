@@ -46,9 +46,7 @@ def get_feature_lines_from_content(content: bytes) -> list[str]:
     return content.decode("utf-8").splitlines()
 
 
-def parse_amendments(
-    lines: list, include_unsupported: bool = False
-) -> Dict[str, str]:
+def parse_amendments(lines: list, include_unsupported: bool = False) -> Dict[str, str]:
     """Parse C++ macro lines into ``{amendment_name: sha512_half_hash}``.
 
     Handles four macro styles:

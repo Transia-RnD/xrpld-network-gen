@@ -40,7 +40,9 @@ class NodeFactory:
         spec = get_spec(protocol)
         ports = PortSet.for_node(0, NodeRole.STANDALONE)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.STANDALONE)
-        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
+        node_db.num_ledgers = (
+            256  # realistic validator: online_delete on, keep ~256 ledgers
+        )
 
         return NodeConfig(
             name=name,
@@ -210,7 +212,9 @@ class NodeFactory:
         spec = get_spec(protocol)
         ports = PortSet.for_node(0, NodeRole.STANDALONE)
         node_db = NodeDbConfig.for_mode(node_db_type, DeployMode.LOCAL)
-        node_db.num_ledgers = 256   # realistic validator: online_delete on, keep ~256 ledgers
+        node_db.num_ledgers = (
+            256  # realistic validator: online_delete on, keep ~256 ledgers
+        )
 
         return NodeConfig(
             name=name,

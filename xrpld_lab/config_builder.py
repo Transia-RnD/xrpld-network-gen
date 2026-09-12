@@ -56,7 +56,6 @@ class XrpldCfgBuilder:
         self.config = config
 
     def build(self) -> str:
-        c = self.config
         out = ""
 
         out += self._server_section()
@@ -134,45 +133,45 @@ class XrpldCfgBuilder:
 
         if s.rpc_public:
             out += "\n"
-            out += f"[port_rpc_public]\n"
+            out += "[port_rpc_public]\n"
             out += f"port = {p.rpc_public}\n"
-            out += f"ip = 0.0.0.0\n"
-            out += f"admin = 0.0.0.0\n"
-            out += f"protocol = http\n"
+            out += "ip = 0.0.0.0\n"
+            out += "admin = 0.0.0.0\n"
+            out += "protocol = http\n"
             out += f"send_queue_limit = {s.send_queue_limit}\n"
 
         if s.rpc_admin:
             out += "\n"
-            out += f"[port_rpc_admin_local]\n"
+            out += "[port_rpc_admin_local]\n"
             out += f"port = {p.rpc_admin}\n"
-            out += f"ip = 0.0.0.0\n"
-            out += f"admin = 0.0.0.0\n"
-            out += f"protocol = http\n"
+            out += "ip = 0.0.0.0\n"
+            out += "admin = 0.0.0.0\n"
+            out += "protocol = http\n"
             out += f"send_queue_limit = {s.send_queue_limit}\n"
 
         if s.ws_public:
             out += "\n"
-            out += f"[port_ws_public]\n"
+            out += "[port_ws_public]\n"
             out += f"port = {p.ws_public}\n"
-            out += f"ip = 0.0.0.0\n"
-            out += f"protocol = ws\n"
+            out += "ip = 0.0.0.0\n"
+            out += "protocol = ws\n"
             out += f"send_queue_limit = {s.send_queue_limit}\n"
 
         if s.ws_admin:
             out += "\n"
-            out += f"[port_ws_admin_local]\n"
+            out += "[port_ws_admin_local]\n"
             out += f"port = {p.ws_admin}\n"
-            out += f"ip = 0.0.0.0\n"
-            out += f"admin = 0.0.0.0\n"
-            out += f"protocol = ws\n"
+            out += "ip = 0.0.0.0\n"
+            out += "admin = 0.0.0.0\n"
+            out += "protocol = ws\n"
             out += f"send_queue_limit = {s.send_queue_limit}\n"
 
         if s.peer:
             out += "\n"
-            out += f"[port_peer]\n"
+            out += "[port_peer]\n"
             out += f"port = {p.peer}\n"
-            out += f"ip = 0.0.0.0\n"
-            out += f"protocol = peer\n"
+            out += "ip = 0.0.0.0\n"
+            out += "protocol = peer\n"
             out += f"send_queue_limit = {s.send_queue_limit}\n"
 
         return out
@@ -191,22 +190,27 @@ class XrpldCfgBuilder:
 
     def _tree_cache_target_entries_section(self) -> str:
         if self.config.tree_cache_target_entries > 0:
-            return f"[tree_cache_target_entries]\n{self.config.tree_cache_target_entries}\n\n"
+            return (
+                "[tree_cache_target_entries]\n"
+                f"{self.config.tree_cache_target_entries}\n\n"
+            )
         return ""
 
     def _consensus_reserve_threads_section(self) -> str:
-        return f"[consensus_reserve_threads]\n{self.config.consensus_reserve_threads}\n\n"
+        return (
+            f"[consensus_reserve_threads]\n{self.config.consensus_reserve_threads}\n\n"
+        )
 
     def _node_db_section(self) -> str:
         from xrpld_lab.models import NodeDbType
 
         ndb = self.config.node_db
-        out = f"[node_db]\n"
+        out = "[node_db]\n"
         out += f"type={ndb.db_type.value}\n"
         if ndb.db_type != NodeDbType.RWDB:
             out += f"path={ndb.path}\n"
             if ndb.num_ledgers:
-                out += f"advisory_delete=0\n"
+                out += "advisory_delete=0\n"
                 out += f"online_delete={ndb.num_ledgers}\n"
         out += "\n"
         return out
@@ -379,14 +383,25 @@ class XrpldCfgBuilder:
         out += f"retry_sequence_percent = {tq.retry_sequence_percent}\n"
         out += f"minimum_escalation_multiplier = {tq.minimum_escalation_multiplier}\n"
         out += f"minimum_txn_in_ledger = {tq.minimum_txn_in_ledger}\n"
-        out += f"minimum_txn_in_ledger_standalone = {tq.minimum_txn_in_ledger_standalone}\n"
+        out += (
+            "minimum_txn_in_ledger_standalone = "
+            f"{tq.minimum_txn_in_ledger_standalone}\n"
+        )
         out += f"target_txn_in_ledger = {tq.target_txn_in_ledger}\n"
-        out += f"normal_consensus_increase_percent = {tq.normal_consensus_increase_percent}\n"
-        out += f"slow_consensus_decrease_percent = {tq.slow_consensus_decrease_percent}\n"
+        out += (
+            "normal_consensus_increase_percent = "
+            f"{tq.normal_consensus_increase_percent}\n"
+        )
+        out += (
+            f"slow_consensus_decrease_percent = {tq.slow_consensus_decrease_percent}\n"
+        )
         out += f"maximum_txn_in_ledger = {tq.maximum_txn_in_ledger}\n"
         out += f"maximum_txn_per_account = {tq.maximum_txn_per_account}\n"
         out += f"minimum_last_ledger_buffer = {tq.minimum_last_ledger_buffer}\n"
-        out += f"zero_basefee_transaction_feelevel = {tq.zero_basefee_transaction_feelevel}\n"
+        out += (
+            "zero_basefee_transaction_feelevel = "
+            f"{tq.zero_basefee_transaction_feelevel}\n"
+        )
         return out
 
     # -- workers --------------------------------------------------------------
@@ -395,13 +410,13 @@ class XrpldCfgBuilder:
         w = self.config.worker
         out = ""
         if w.workers:
-            out += f"[workers] \n"
+            out += "[workers] \n"
             out += f"{w.workers} \n"
         if w.io_workers:
-            out += f"[io_workers] \n"
+            out += "[io_workers] \n"
             out += f"{w.io_workers} \n"
         if w.prefetch_workers:
-            out += f"[prefetch_workers] \n"
+            out += "[prefetch_workers] \n"
             out += f"{w.prefetch_workers} \n"
         return out
 

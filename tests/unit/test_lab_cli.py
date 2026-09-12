@@ -131,14 +131,21 @@ class TestBuildParser:
 
     def test_update_node_args(self):
         parser = _build_parser()
-        args = parser.parse_args([
-            "update:node",
-            "--name", "my-net",
-            "--node_id", "2",
-            "--node_type", "validator",
-            "--build_server", "https://build.example.com",
-            "--build_version", "2.0.0",
-        ])
+        args = parser.parse_args(
+            [
+                "update:node",
+                "--name",
+                "my-net",
+                "--node_id",
+                "2",
+                "--node_type",
+                "validator",
+                "--build_server",
+                "https://build.example.com",
+                "--build_version",
+                "2.0.0",
+            ]
+        )
         assert args.command == "update:node"
         assert args.name == "my-net"
         assert args.node_id == 2
@@ -148,25 +155,38 @@ class TestBuildParser:
 
     def test_update_node_peer_type(self):
         parser = _build_parser()
-        args = parser.parse_args([
-            "update:node",
-            "--name", "my-net",
-            "--node_id", "1",
-            "--node_type", "peer",
-            "--build_server", "https://build.example.com",
-            "--build_version", "1.0.0",
-        ])
+        args = parser.parse_args(
+            [
+                "update:node",
+                "--name",
+                "my-net",
+                "--node_id",
+                "1",
+                "--node_type",
+                "peer",
+                "--build_server",
+                "https://build.example.com",
+                "--build_version",
+                "1.0.0",
+            ]
+        )
         assert args.node_type == "peer"
 
     def test_enable_amendment_args(self):
         parser = _build_parser()
-        args = parser.parse_args([
-            "enable:amendment",
-            "--name", "my-net",
-            "--amendment_name", "fixNFTokenRemint",
-            "--node_id", "1",
-            "--node_type", "validator",
-        ])
+        args = parser.parse_args(
+            [
+                "enable:amendment",
+                "--name",
+                "my-net",
+                "--amendment_name",
+                "fixNFTokenRemint",
+                "--node_id",
+                "1",
+                "--node_type",
+                "validator",
+            ]
+        )
         assert args.command == "enable:amendment"
         assert args.name == "my-net"
         assert args.amendment_name == "fixNFTokenRemint"
@@ -175,13 +195,19 @@ class TestBuildParser:
 
     def test_enable_amendment_peer_type(self):
         parser = _build_parser()
-        args = parser.parse_args([
-            "enable:amendment",
-            "--name", "my-net",
-            "--amendment_name", "SomeAmendment",
-            "--node_id", "3",
-            "--node_type", "peer",
-        ])
+        args = parser.parse_args(
+            [
+                "enable:amendment",
+                "--name",
+                "my-net",
+                "--amendment_name",
+                "SomeAmendment",
+                "--node_id",
+                "3",
+                "--node_type",
+                "peer",
+            ]
+        )
         assert args.node_type == "peer"
         assert args.node_id == 3
 
@@ -209,9 +235,17 @@ class TestBuildParser:
 
     def test_create_network_ansible_flag(self):
         parser = _build_parser()
-        args = parser.parse_args(["create:network", "--ansible",
-                                  "--vips", "10.0.0.1", "10.0.0.2",
-                                  "--pips", "10.0.0.3"])
+        args = parser.parse_args(
+            [
+                "create:network",
+                "--ansible",
+                "--vips",
+                "10.0.0.1",
+                "10.0.0.2",
+                "--pips",
+                "10.0.0.3",
+            ]
+        )
         assert args.ansible is True
         assert args.vips == ["10.0.0.1", "10.0.0.2"]
         assert args.pips == ["10.0.0.3"]
@@ -220,9 +254,9 @@ class TestBuildParser:
 
     def test_create_ansible_defaults(self):
         parser = _build_parser()
-        args = parser.parse_args(["create:ansible",
-                                  "--vips", "10.0.0.1",
-                                  "--pips", "10.0.0.2"])
+        args = parser.parse_args(
+            ["create:ansible", "--vips", "10.0.0.1", "--pips", "10.0.0.2"]
+        )
         assert args.command == "create:ansible"
         assert args.vips == ["10.0.0.1"]
         assert args.pips == ["10.0.0.2"]
@@ -231,12 +265,21 @@ class TestBuildParser:
 
     def test_create_ansible_with_ssh_args(self):
         parser = _build_parser()
-        args = parser.parse_args(["create:ansible",
-                                  "--vips", "10.0.0.1",
-                                  "--pips", "10.0.0.2",
-                                  "--ssh_port", "22",
-                                  "--ssh_user", "admin",
-                                  "--ssh_key", "/root/.ssh/key"])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "10.0.0.1",
+                "--pips",
+                "10.0.0.2",
+                "--ssh_port",
+                "22",
+                "--ssh_user",
+                "admin",
+                "--ssh_key",
+                "/root/.ssh/key",
+            ]
+        )
         assert args.ssh_port == 22
         assert args.ssh_user == "admin"
         assert args.ssh_key == "/root/.ssh/key"
@@ -269,27 +312,52 @@ class TestBuildParser:
         for cmd in expected_commands:
             # Should not raise SystemExit
             if cmd in (
-                "up:standalone", "down:standalone",
-                "up:local", "down:local", "logs:local", "logs:standalone",
+                "up:standalone",
+                "down:standalone",
+                "up:local",
+                "down:local",
+                "logs:local",
+                "logs:standalone",
             ):
                 args = parser.parse_args([cmd])
             elif cmd == "create:network":
                 args = parser.parse_args([cmd])
             elif cmd == "create:ansible":
-                args = parser.parse_args([cmd, "--vips", "1.2.3.4", "--pips", "5.6.7.8"])
+                args = parser.parse_args(
+                    [cmd, "--vips", "1.2.3.4", "--pips", "5.6.7.8"]
+                )
             elif cmd in ("up", "down", "remove", "deploy:ansible"):
                 args = parser.parse_args([cmd, "--name", "test"])
             elif cmd == "update:node":
-                args = parser.parse_args([
-                    cmd, "--name", "test", "--node_id", "1",
-                    "--node_type", "validator",
-                    "--build_server", "s", "--build_version", "v",
-                ])
+                args = parser.parse_args(
+                    [
+                        cmd,
+                        "--name",
+                        "test",
+                        "--node_id",
+                        "1",
+                        "--node_type",
+                        "validator",
+                        "--build_server",
+                        "s",
+                        "--build_version",
+                        "v",
+                    ]
+                )
             elif cmd == "enable:amendment":
-                args = parser.parse_args([
-                    cmd, "--name", "test", "--amendment_name", "x",
-                    "--node_id", "1", "--node_type", "validator",
-                ])
+                args = parser.parse_args(
+                    [
+                        cmd,
+                        "--name",
+                        "test",
+                        "--amendment_name",
+                        "x",
+                        "--node_id",
+                        "1",
+                        "--node_type",
+                        "validator",
+                    ]
+                )
             assert args.command == cmd
 
 
@@ -511,73 +579,98 @@ class TestBuildLabConfigNetwork:
 
     def test_github_url_extracts_cluster_name(self):
         args = self._parse(
-            "--protocol", "xrpl",
-            "--build_server", "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
-            "--build_version", "abc123",
+            "--protocol",
+            "xrpl",
+            "--build_server",
+            "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
+            "--build_version",
+            "abc123",
         )
         cfg = build_lab_config(args)
         assert cfg.build_source.cluster_name == "xrplf-smart-contracts"
 
     def test_github_url_sets_commit_hash(self):
         args = self._parse(
-            "--protocol", "xrpl",
-            "--build_server", "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
-            "--build_version", "abc123def456",
+            "--protocol",
+            "xrpl",
+            "--build_server",
+            "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
+            "--build_version",
+            "abc123def456",
         )
         cfg = build_lab_config(args)
         assert cfg.build_source.commit_hash == "abc123def456"
 
     def test_github_url_sets_binary_path(self):
         args = self._parse(
-            "--protocol", "xrpl",
-            "--build_server", "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
-            "--build_version", "abc123",
+            "--protocol",
+            "xrpl",
+            "--build_server",
+            "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
+            "--build_version",
+            "abc123",
         )
         cfg = build_lab_config(args)
         assert cfg.build_source.binary_path == "./xrpld"
 
     def test_github_url_custom_binary_path(self):
         args = self._parse(
-            "--protocol", "xrpl",
-            "--build_server", "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
-            "--build_version", "abc123",
-            "--binary_path", "/opt/builds/xrpld",
+            "--protocol",
+            "xrpl",
+            "--build_server",
+            "https://github.com/XRPLF/xrpld/tree/xrplf-smart-contracts",
+            "--build_version",
+            "abc123",
+            "--binary_path",
+            "/opt/builds/xrpld",
         )
         cfg = build_lab_config(args)
         assert cfg.build_source.binary_path == "/opt/builds/xrpld"
 
     def test_github_url_sets_build_type_binary(self):
         args = self._parse(
-            "--protocol", "xrpl",
-            "--build_server", "https://github.com/XRPLF/xrpld/tree/feature-branch",
-            "--build_version", "abc123",
+            "--protocol",
+            "xrpl",
+            "--build_server",
+            "https://github.com/XRPLF/xrpld/tree/feature-branch",
+            "--build_version",
+            "abc123",
         )
         cfg = build_lab_config(args)
         assert cfg.build_source.build_type == BuildType.BINARY
 
     def test_github_url_extracts_owner(self):
         args = self._parse(
-            "--protocol", "xrpl",
-            "--build_server", "https://github.com/Transia-RnD/rippled/tree/custom-branch",
-            "--build_version", "abc123",
+            "--protocol",
+            "xrpl",
+            "--build_server",
+            "https://github.com/Transia-RnD/rippled/tree/custom-branch",
+            "--build_version",
+            "abc123",
         )
         cfg = build_lab_config(args)
         assert cfg.build_source.owner == "Transia-RnD"
 
     def test_github_url_sets_repo_to_rippled(self):
         args = self._parse(
-            "--protocol", "xrpl",
-            "--build_server", "https://github.com/XRPLF/xrpld/tree/some-branch",
-            "--build_version", "abc123",
+            "--protocol",
+            "xrpl",
+            "--build_server",
+            "https://github.com/XRPLF/xrpld/tree/some-branch",
+            "--build_version",
+            "abc123",
         )
         cfg = build_lab_config(args)
         assert cfg.build_source.repo == "rippled"
 
     def test_github_url_branch_with_slashes(self):
         args = self._parse(
-            "--protocol", "xrpl",
-            "--build_server", "https://github.com/XRPLF/xrpld/tree/feature/my-branch",
-            "--build_version", "abc123",
+            "--protocol",
+            "xrpl",
+            "--build_server",
+            "https://github.com/XRPLF/xrpld/tree/feature/my-branch",
+            "--build_version",
+            "abc123",
         )
         cfg = build_lab_config(args)
         assert cfg.build_source.cluster_name == "feature-my-branch"
@@ -587,8 +680,12 @@ class TestBuildLabConfigNetwork:
     def test_ansible_flag_creates_ansible_config(self):
         args = self._parse(
             "--ansible",
-            "--vips", "10.0.0.1", "10.0.0.2", "10.0.0.3",
-            "--pips", "10.0.0.4",
+            "--vips",
+            "10.0.0.1",
+            "10.0.0.2",
+            "10.0.0.3",
+            "--pips",
+            "10.0.0.4",
         )
         cfg = build_lab_config(args)
         assert cfg.ansible is not None
@@ -603,11 +700,16 @@ class TestBuildLabConfigNetwork:
     def test_ansible_ssh_args_passed_through(self):
         args = self._parse(
             "--ansible",
-            "--vips", "10.0.0.1",
-            "--pips", "10.0.0.2",
-            "--ssh_port", "22",
-            "--ssh_user", "admin",
-            "--ssh_key", "/root/.ssh/key",
+            "--vips",
+            "10.0.0.1",
+            "--pips",
+            "10.0.0.2",
+            "--ssh_port",
+            "22",
+            "--ssh_user",
+            "admin",
+            "--ssh_key",
+            "/root/.ssh/key",
         )
         cfg = build_lab_config(args)
         assert cfg.ansible.ssh_port == 22
@@ -625,10 +727,17 @@ class TestBuildLabConfigAnsible:
 
     def _parse(self, *extra_args):
         parser = _build_parser()
-        return parser.parse_args(["create:ansible",
-                                  "--vips", "10.0.0.1", "10.0.0.2",
-                                  "--pips", "10.0.0.3",
-                                  *extra_args])
+        return parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "10.0.0.1",
+                "10.0.0.2",
+                "--pips",
+                "10.0.0.3",
+                *extra_args,
+            ]
+        )
 
     def test_creates_ansible_config(self):
         args = self._parse()
@@ -668,12 +777,17 @@ class TestBuildLabConfigAnsible:
             "pips:\n  - 192.168.1.3\n"
         )
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible",
-            "--vips", "ignored",
-            "--pips", "ignored",
-            "--ansible_config", str(config_file),
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "ignored",
+                "--pips",
+                "ignored",
+                "--ansible_config",
+                str(config_file),
+            ]
+        )
         cfg = build_lab_config(args)
         assert cfg.ansible.ssh_port == 22
         assert cfg.ansible.ssh_user == "admin"
@@ -693,12 +807,17 @@ class TestBuildLabConfigAnsible:
             "    redis: {}\n"
         )
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible",
-            "--vips", "ignored",
-            "--pips", "ignored",
-            "--ansible_config", str(config_file),
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "ignored",
+                "--pips",
+                "ignored",
+                "--ansible_config",
+                str(config_file),
+            ]
+        )
         cfg = build_lab_config(args)
         assert len(cfg.ansible.services) == 1
         assert cfg.ansible.services[0].ip == "10.0.0.3"
@@ -721,12 +840,17 @@ class TestBuildLabConfigAnsible:
             "      port: 8700\n"
         )
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible",
-            "--vips", "ignored",
-            "--pips", "ignored",
-            "--ansible_config", str(config_file),
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "ignored",
+                "--pips",
+                "ignored",
+                "--ansible_config",
+                str(config_file),
+            ]
+        )
         cfg = build_lab_config(args)
         status = cfg.ansible.services[0].status
         assert status is not None
@@ -747,10 +871,17 @@ class TestBuildLabConfigAnsible:
             "    status: {}\n"
         )
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible", "--vips", "ignored", "--pips", "ignored",
-            "--ansible_config", str(config_file),
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "ignored",
+                "--pips",
+                "ignored",
+                "--ansible_config",
+                str(config_file),
+            ]
+        )
         cfg = build_lab_config(args)
         assert cfg.ansible.services[0].status.port == 8687
 
@@ -767,12 +898,19 @@ class TestBuildLabConfigAnsible:
             "      container_name: pnode1\n"
         )
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible",
-            "--vips", "ignored", "--pips", "ignored",
-            "--log_level", "warning",
-            "--ansible_config", str(config_file),
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "ignored",
+                "--pips",
+                "ignored",
+                "--log_level",
+                "warning",
+                "--ansible_config",
+                str(config_file),
+            ]
+        )
         cfg = build_lab_config(args)
         assert cfg.log_level == "trace"
 
@@ -790,11 +928,17 @@ class TestBuildLabConfigAnsible:
             "      container_name: pnode1\n"
         )
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible",
-            "--vips", "ignored", "--pips", "ignored",
-            "--ansible_config", str(config_file),
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "ignored",
+                "--pips",
+                "ignored",
+                "--ansible_config",
+                str(config_file),
+            ]
+        )
         cfg = build_lab_config(args)
         assert cfg.ansible.services[0].debug is not None
         assert cfg.ansible.services[0].debug.endpoint == "ws://10.0.0.3:1400/"
@@ -812,11 +956,17 @@ class TestBuildLabConfigAnsible:
             "      port: 8081\n"
         )
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible",
-            "--vips", "ignored", "--pips", "ignored",
-            "--ansible_config", str(config_file),
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "ignored",
+                "--pips",
+                "ignored",
+                "--ansible_config",
+                str(config_file),
+            ]
+        )
         cfg = build_lab_config(args)
         assert cfg.ansible.services[0].stream is not None
 
@@ -834,11 +984,17 @@ class TestBuildLabConfigAnsible:
             "      container_name: pnode1\n"
         )
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible",
-            "--vips", "ignored", "--pips", "ignored",
-            "--ansible_config", str(config_file),
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "ignored",
+                "--pips",
+                "ignored",
+                "--ansible_config",
+                str(config_file),
+            ]
+        )
         cfg = build_lab_config(args)
         assert cfg.ansible.services[0].redis is not None
 
@@ -857,11 +1013,17 @@ class TestBuildLabConfigAnsible:
             "      port: 8081\n"
         )
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible",
-            "--vips", "ignored", "--pips", "ignored",
-            "--ansible_config", str(config_file),
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "ignored",
+                "--pips",
+                "ignored",
+                "--ansible_config",
+                str(config_file),
+            ]
+        )
         cfg = build_lab_config(args)
         assert cfg.ansible.services[0].debug.endpoint == "ws://10.0.0.3:1400/"
 
@@ -880,21 +1042,33 @@ class TestBuildLabConfigAnsible:
             "      endpoint: ws://custom:9999/\n"
         )
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible",
-            "--vips", "ignored", "--pips", "ignored",
-            "--ansible_config", str(config_file),
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "ignored",
+                "--pips",
+                "ignored",
+                "--ansible_config",
+                str(config_file),
+            ]
+        )
         cfg = build_lab_config(args)
         assert cfg.ansible.services[0].debug.endpoint == "ws://custom:9999/"
 
     def test_no_services_keeps_log_level(self):
         parser = _build_parser()
-        args = parser.parse_args([
-            "create:ansible",
-            "--vips", "10.0.0.1", "--pips", "10.0.0.2",
-            "--log_level", "warning",
-        ])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "10.0.0.1",
+                "--pips",
+                "10.0.0.2",
+                "--log_level",
+                "warning",
+            ]
+        )
         cfg = build_lab_config(args)
         assert cfg.log_level == "warning"
 
@@ -993,8 +1167,9 @@ class TestMain:
         mock_ws = MagicMock()
         mock_ws_cls.return_value = mock_ws
 
-        with patch("sys.argv", ["xrpld-lab", "down:standalone",
-                                  "--name", "my-standalone"]):
+        with patch(
+            "sys.argv", ["xrpld-lab", "down:standalone", "--name", "my-standalone"]
+        ):
             main()
 
         mock_run.assert_called_once_with(mock_ws, "my-standalone", "xrpl", None)
@@ -1005,8 +1180,17 @@ class TestMain:
         mock_ws = MagicMock()
         mock_ws_cls.return_value = mock_ws
 
-        with patch("sys.argv", ["xrpld-lab", "down:standalone",
-                                  "--protocol", "xrpl", "--version", "3.1.1"]):
+        with patch(
+            "sys.argv",
+            [
+                "xrpld-lab",
+                "down:standalone",
+                "--protocol",
+                "xrpl",
+                "--version",
+                "3.1.1",
+            ],
+        ):
             main()
 
         mock_run.assert_called_once_with(mock_ws, None, "xrpl", "3.1.1")
@@ -1033,17 +1217,33 @@ class TestMain:
         mock_ws = MagicMock()
         mock_ws_cls.return_value = mock_ws
 
-        with patch("sys.argv", ["xrpld-lab", "update:node",
-                                  "--name", "my-net",
-                                  "--node_id", "2",
-                                  "--node_type", "validator",
-                                  "--build_server", "https://build.example.com",
-                                  "--build_version", "2.0.0"]):
+        with patch(
+            "sys.argv",
+            [
+                "xrpld-lab",
+                "update:node",
+                "--name",
+                "my-net",
+                "--node_id",
+                "2",
+                "--node_type",
+                "validator",
+                "--build_server",
+                "https://build.example.com",
+                "--build_version",
+                "2.0.0",
+            ],
+        ):
             main()
 
         mock_run.assert_called_once_with(
-            mock_ws, "my-net", 2, "validator",
-            "https://build.example.com", "2.0.0", image=None,
+            mock_ws,
+            "my-net",
+            2,
+            "validator",
+            "https://build.example.com",
+            "2.0.0",
+            image=None,
         )
 
     @patch("xrpld_lab.cli.update_node_binary")
@@ -1052,17 +1252,33 @@ class TestMain:
         mock_ws = MagicMock()
         mock_ws_cls.return_value = mock_ws
 
-        with patch("sys.argv", ["xrpld-lab", "update:node",
-                                  "--name", "my-net",
-                                  "--node_id", "2",
-                                  "--node_type", "validator",
-                                  "--build_version", "3.3.0-rc1",
-                                  "--image", "rippleci/xrpld:3.3.0-rc1"]):
+        with patch(
+            "sys.argv",
+            [
+                "xrpld-lab",
+                "update:node",
+                "--name",
+                "my-net",
+                "--node_id",
+                "2",
+                "--node_type",
+                "validator",
+                "--build_version",
+                "3.3.0-rc1",
+                "--image",
+                "rippleci/xrpld:3.3.0-rc1",
+            ],
+        ):
             main()
 
         mock_run.assert_called_once_with(
-            mock_ws, "my-net", 2, "validator",
-            None, "3.3.0-rc1", image="rippleci/xrpld:3.3.0-rc1",
+            mock_ws,
+            "my-net",
+            2,
+            "validator",
+            None,
+            "3.3.0-rc1",
+            image="rippleci/xrpld:3.3.0-rc1",
         )
 
     @patch("xrpld_lab.cli.enable_amendment")
@@ -1071,15 +1287,29 @@ class TestMain:
         mock_ws = MagicMock()
         mock_ws_cls.return_value = mock_ws
 
-        with patch("sys.argv", ["xrpld-lab", "enable:amendment",
-                                  "--name", "my-net",
-                                  "--amendment_name", "fixNFTokenRemint",
-                                  "--node_id", "1",
-                                  "--node_type", "validator"]):
+        with patch(
+            "sys.argv",
+            [
+                "xrpld-lab",
+                "enable:amendment",
+                "--name",
+                "my-net",
+                "--amendment_name",
+                "fixNFTokenRemint",
+                "--node_id",
+                "1",
+                "--node_type",
+                "validator",
+            ],
+        ):
             main()
 
         mock_run.assert_called_once_with(
-            "my-net", "fixNFTokenRemint", 1, "validator", mock_ws,
+            "my-net",
+            "fixNFTokenRemint",
+            1,
+            "validator",
+            mock_ws,
         )
 
     @patch("xrpld_lab.cli.view_local_logs")
@@ -1109,8 +1339,7 @@ class TestMain:
     @patch("xrpld_lab.cli.view_standalone_logs")
     @patch("xrpld_lab.cli.Workspace")
     def test_logs_standalone_with_protocol(self, mock_ws_cls, mock_run):
-        with patch("sys.argv", ["xrpld-lab", "logs:standalone",
-                                  "--protocol", "xrpl"]):
+        with patch("sys.argv", ["xrpld-lab", "logs:standalone", "--protocol", "xrpl"]):
             main()
 
         mock_run.assert_called_once_with("xrpl")
@@ -1123,9 +1352,10 @@ class TestMain:
         mock_runner = MagicMock()
         mock_runner_cls.return_value = mock_runner
 
-        with patch("sys.argv", ["xrpld-lab", "create:ansible",
-                                  "--vips", "10.0.0.1",
-                                  "--pips", "10.0.0.2"]):
+        with patch(
+            "sys.argv",
+            ["xrpld-lab", "create:ansible", "--vips", "10.0.0.1", "--pips", "10.0.0.2"],
+        ):
             main()
 
         mock_build.assert_called_once()
@@ -1139,8 +1369,7 @@ class TestMain:
         mock_ws = MagicMock()
         mock_ws_cls.return_value = mock_ws
 
-        with patch("sys.argv", ["xrpld-lab", "deploy:ansible",
-                                  "--name", "my-cluster"]):
+        with patch("sys.argv", ["xrpld-lab", "deploy:ansible", "--name", "my-cluster"]):
             main()
 
         mock_deploy.assert_called_once_with(mock_ws, "my-cluster")
@@ -1154,8 +1383,12 @@ class TestFlattenIps:
 
     def test_single_joined_string(self):
         # nargs="+" caller passing --vips "a b c d" (or zsh no-word-split)
-        assert _flatten_ips(["10.0.0.1 10.0.0.2 10.0.0.3 10.0.0.4"]) == \
-            ["10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"]
+        assert _flatten_ips(["10.0.0.1 10.0.0.2 10.0.0.3 10.0.0.4"]) == [
+            "10.0.0.1",
+            "10.0.0.2",
+            "10.0.0.3",
+            "10.0.0.4",
+        ]
 
     def test_comma_and_mixed(self):
         assert _flatten_ips(["a,b", "c d"]) == ["a", "b", "c", "d"]
@@ -1196,20 +1429,31 @@ class TestWorkspaceOverride:
 
     def test_defaults_to_none(self):
         parser = _build_parser()
-        args = parser.parse_args(["create:ansible", "--vips", "10.0.0.1",
-                                  "--pips", "10.0.0.2"])
+        args = parser.parse_args(
+            ["create:ansible", "--vips", "10.0.0.1", "--pips", "10.0.0.2"]
+        )
         assert args.workspace is None
 
     def test_parsed_on_create_ansible(self):
         parser = _build_parser()
-        args = parser.parse_args(["create:ansible", "--vips", "10.0.0.1",
-                                  "--pips", "10.0.0.2", "--workspace", "/srv/ws"])
+        args = parser.parse_args(
+            [
+                "create:ansible",
+                "--vips",
+                "10.0.0.1",
+                "--pips",
+                "10.0.0.2",
+                "--workspace",
+                "/srv/ws",
+            ]
+        )
         assert args.workspace == "/srv/ws"
 
     def test_parsed_on_deploy_ansible(self):
         parser = _build_parser()
-        args = parser.parse_args(["deploy:ansible", "--name", "alphanet",
-                                  "--workspace", "/srv/ws"])
+        args = parser.parse_args(
+            ["deploy:ansible", "--name", "alphanet", "--workspace", "/srv/ws"]
+        )
         assert args.workspace == "/srv/ws"
 
     @patch("xrpld_lab.cli.LabRunner")
@@ -1217,8 +1461,19 @@ class TestWorkspaceOverride:
     def test_workspace_passed_to_runner(self, mock_build, mock_runner_cls, tmp_path):
         mock_build.return_value = MagicMock()
         base = str(tmp_path / "ws")
-        with patch("sys.argv", ["xrpld-lab", "create:ansible", "--vips", "10.0.0.1",
-                                "--pips", "10.0.0.2", "--workspace", base]):
+        with patch(
+            "sys.argv",
+            [
+                "xrpld-lab",
+                "create:ansible",
+                "--vips",
+                "10.0.0.1",
+                "--pips",
+                "10.0.0.2",
+                "--workspace",
+                base,
+            ],
+        ):
             main()
         passed = mock_runner_cls.call_args.args[1]
         assert passed.base == base

@@ -57,7 +57,8 @@ class AnsibleBuilder:
         self.config = config
         self.image_name = image_name
         self.network_name = network_name
-        # genesis=True: reset every node's state for a fresh chain, all hosts in parallel.
+        # genesis=True: reset every node's state for a fresh chain, all hosts
+        # in parallel.
         # genesis=False: preserve db/config and roll one host at a time (live network).
         self.genesis = genesis
         self.ansible_dir = os.path.join(cluster_dir, "ansible")
@@ -139,8 +140,10 @@ class AnsibleBuilder:
         for node in self._nodes:
             data = {
                 "config_path": node.config_path,
-                # Node build context (Dockerfile + entrypoint + genesis.json) — the parent of
-                # the config dir. The deploy builds this wrapper on the host, like standalone.
+                # Node build context (Dockerfile + entrypoint +
+                # genesis.json) — the parent of
+                # the config dir. The deploy builds this wrapper on
+                # the host, like standalone.
                 "build_context": os.path.dirname(node.config_path),
                 # Tag the wrapper by the base image's tag so each build gets a distinct
                 # name and the container RECREATES on a new image (a constant tag makes
@@ -173,8 +176,10 @@ class AnsibleBuilder:
                 "ssh_port": self.config.ssh_port,
                 **self._alloy_host_vars(node),
                 **self._status_host_vars(node),
-                # /var/lib/xrpld/db is a Local NVMe mountpoint — excluded from the cleanup
-                # rmtree (can't delete a live mount; it's ephemeral and fresh on boot anyway).
+                # /var/lib/xrpld/db is a Local NVMe mountpoint —
+                # excluded from the cleanup
+                # rmtree (can't delete a live mount; it's ephemeral
+                # and fresh on boot anyway).
                 "volumes": [
                     "/opt/ripple/config",
                     "/opt/ripple/log",
@@ -269,7 +274,8 @@ class AnsibleBuilder:
     STATUS_STATE_DIR = "/var/lib/xrpld-status"
 
     def _status_url(self, node: AnsibleNode, host: ServicesHost) -> str:
-        # The services host's own sampler is reached over loopback, every other over its IP.
+        # The services host's own sampler is reached over loopback, every
+        # other over its IP.
         ip = "127.0.0.1" if node.ip == host.ip else node.ip
         return f"http://{ip}:{host.status.port}"
 
@@ -287,14 +293,17 @@ class AnsibleBuilder:
         env = {
             "NODE_METRICS_DB": f"{self.STATUS_STATE_DIR}/metrics.db",
             # Only nginx on the services host talks to its sampler; every other node's
-            # sampler is fetched across the network by the roll-up, so it binds all addresses.
+            # sampler is fetched across the network by the roll-up, so it
+            # binds all addresses.
             "NODE_METRICS_HTTP_HOST": "127.0.0.1" if local else "0.0.0.0",
             "NODE_METRICS_HTTP_PORT": str(st.port),
             "NODE_METRICS_INTERVAL": str(st.interval),
             "NODE_METRICS_DASHBOARD": f"{self.STATUS_DIR}/node-dashboard.html",
             "NODE_METRICS_ADMIN_RPC": f"http://127.0.0.1:{node.ports.rpc_admin}/",
             "NODE_METRICS_DEBUGSTREAM_HEALTH": (
-                f"http://127.0.0.1:{host.debug.port}/health" if local and host.debug else ""
+                f"http://127.0.0.1:{host.debug.port}/health"
+                if local and host.debug
+                else ""
             ),
             "NODE_METRICS_REDIS_PORT": "6379" if local and host.redis else "0",
             "NODE_METRICS_DISK_PATH": st.disk_path,
@@ -317,7 +326,8 @@ class AnsibleBuilder:
             "status_env": env,
             "status_http_port": st.port,
             "status_xdgm_port": st.xdgm_port,
-            # Source allowed through ufw to the sampler port; empty on the services host,
+            # Source allowed through ufw to the sampler port; empty on the
+            # services host,
             # whose sampler is loopback-only.
             "status_allow_from": "" if local else host.ip,
         }
@@ -326,24 +336,32 @@ class AnsibleBuilder:
         host = self.config.status_host
         if self._node_for_ip(host.ip) is None:
             raise ValueError(
-                f"status host {host.name} ({host.ip}) must be one of the nodes: its sampler "
-                "serves /status/api/ for the network page"
+                f"status host {host.name} ({host.ip}) must be one of the nodes: "
+                "its sampler serves /status/api/ for the network page"
             )
         status_dir = os.path.join(self.ansible_dir, "status")
         os.makedirs(status_dir, exist_ok=True)
-        for filename in ("node_metrics.py", "node-dashboard.html", "network-dashboard.html"):
+        for filename in (
+            "node_metrics.py",
+            "node-dashboard.html",
+            "network-dashboard.html",
+        ):
             shutil.copyfile(
-                os.path.join(_STATUS_SOURCE_DIR, filename), os.path.join(status_dir, filename)
+                os.path.join(_STATUS_SOURCE_DIR, filename),
+                os.path.join(status_dir, filename),
             )
         self._file_write(os.path.join(self.ansible_dir, "status.yml"), _STATUS_YML)
 
     def _write_status_site(self, host_dir: str, host: ServicesHost) -> None:
         svc_dir = os.path.join(host_dir, "status")
         os.makedirs(svc_dir, exist_ok=True)
-        self._write_vars(os.path.join(svc_dir, "vars.yml"), {
-            "STATUS_DIR": self.STATUS_DIR,
-            "STATUS_PORT": host.status.port,
-        })
+        self._write_vars(
+            os.path.join(svc_dir, "vars.yml"),
+            {
+                "STATUS_DIR": self.STATUS_DIR,
+                "STATUS_PORT": host.status.port,
+            },
+        )
         self._file_write(
             os.path.join(svc_dir, "main.yml"),
             _STATUS_SITE_MAIN_TPL.format(group=host.name),
@@ -409,7 +427,8 @@ class AnsibleBuilder:
     def _write_run_sh(self) -> None:
         lines = [
             "#!/bin/bash",
-            "# Best-effort deploy: a failing host or playbook is logged but does NOT abort the",
+            "# Best-effort deploy: a failing host or playbook is logged but does NOT",
+            "# abort the",
             "# run, so the remaining nodes still deploy and the run reaches the end.",
             "",
             'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
@@ -452,18 +471,23 @@ class AnsibleBuilder:
             "",
             "export ANSIBLE_HOST_KEY_CHECKING=False",
             "",
-            "# SSH agent — optional: skip when SSH_PATH is unset (key already agent-loaded",
-            "# or inventory carries ansible_ssh_private_key_file). --apple-use-keychain is",
+            "# SSH agent — optional: skip when SSH_PATH is unset (key already agent-",
+            "# loaded",
+            "# or inventory carries ansible_ssh_private_key_file). --apple-use-",
+            "# keychain is",
             "# macOS-only; fall back to a plain ssh-add elsewhere.",
             'if [ -n "${SSH_PATH:-}" ]; then',
             '  eval "$(ssh-agent -s)"',
-            '  ssh-add --apple-use-keychain "$SSH_PATH" 2>/dev/null || ssh-add "$SSH_PATH"',
+            '  ssh-add --apple-use-keychain "$SSH_PATH" 2>/dev/null \\',
+            '    || ssh-add "$SSH_PATH"',
             "fi",
             "",
-            "# Ping all hosts (informational — unreachable hosts must not abort the run)",
+            "# Ping all hosts (informational — unreachable hosts must not abort the",
+            "# run)",
             "ansible -i hosts.txt all -u ubuntu -m ping || true",
             "",
-            "# Short-lived operator token so each node's docker can pull the private AR image.",
+            "# Short-lived operator token so each node's docker can pull the private",
+            "# AR image.",
             'AR_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"',
             "",
             "# --- Core playbooks ---",
@@ -477,7 +501,9 @@ class AnsibleBuilder:
             lines.append("run_always alloy.yml")
         if self.config.status_host:
             lines.append("")
-            lines.append("# --- Status sampler on every node (re-run after every node deploy) ---")
+            lines.append(
+                "# --- Status sampler on every node, re-run after each node deploy ---"
+            )
             lines.append("run_always status.yml")
 
         for host in self.config.services:
@@ -585,7 +611,9 @@ class AnsibleBuilder:
             _NGINX_MAIN_TPL.format(
                 group=host.name,
                 status_zone=_STATUS_NGINX_ZONE if host.status else "",
-                status_locations=self._status_nginx_locations(host) if host.status else "",
+                status_locations=(
+                    self._status_nginx_locations(host) if host.status else ""
+                ),
             ),
         )
 
@@ -596,14 +624,16 @@ class AnsibleBuilder:
         domain = host.nginx.domain if host.nginx else ""
         cn = _nginx_tls_cn("vl", domain)
 
-        # The signed list is produced in the cluster dir; stage a copy beside the playbook
+        # The signed list is produced in the cluster dir; stage a copy beside
+        # the playbook
         # so `copy: src=` resolves relative to it.
         src = os.path.join(self.cluster_dir, cfg.source)
         staged = os.path.join(svc_dir, cfg.filename)
         if os.path.exists(src):
             shutil.copyfile(src, staged)
         else:
-            # A missing list must fail the deploy, not silently serve a 404 that every node
+            # A missing list must fail the deploy, not silently serve a
+            # 404 that every node
             # then treats as an unreachable VL site.
             raise FileNotFoundError(
                 f"no signed publisher list at {src} — generate the cluster before "
@@ -630,12 +660,15 @@ class AnsibleBuilder:
         svc_dir = os.path.join(host_dir, "redis")
         os.makedirs(svc_dir, exist_ok=True)
         cfg = host.redis
-        self._write_vars(os.path.join(svc_dir, "vars.yml"), {
-            "docker_network_name": cfg.network_name,
-            "docker_image_name": cfg.image,
-            "docker_container_name": cfg.container_name,
-            "docker_container_ports": ["6379:6379"],
-        })
+        self._write_vars(
+            os.path.join(svc_dir, "vars.yml"),
+            {
+                "docker_network_name": cfg.network_name,
+                "docker_image_name": cfg.image,
+                "docker_container_name": cfg.container_name,
+                "docker_container_ports": ["6379:6379"],
+            },
+        )
         self._file_write(
             os.path.join(svc_dir, "main.yml"),
             _REDIS_MAIN_TPL.format(group=host.name),
@@ -645,16 +678,19 @@ class AnsibleBuilder:
         svc_dir = os.path.join(host_dir, "faucet")
         os.makedirs(svc_dir, exist_ok=True)
         cfg = host.faucet
-        self._write_vars(os.path.join(svc_dir, "vars.yml"), {
-            "docker_image_name": cfg.image,
-            "docker_container_name": "faucet",
-            "docker_container_ports": [f"{cfg.port}:{cfg.port}"],
-            "docker_env_variables": {
-                "XRPL_FAUCET_URL": cfg.ws_url,
-                "XRPL_NETWORK_ID": cfg.network_id,
-                "XRPL_FAUCET_SEED": cfg.seed,
+        self._write_vars(
+            os.path.join(svc_dir, "vars.yml"),
+            {
+                "docker_image_name": cfg.image,
+                "docker_container_name": "faucet",
+                "docker_container_ports": [f"{cfg.port}:{cfg.port}"],
+                "docker_env_variables": {
+                    "XRPL_FAUCET_URL": cfg.ws_url,
+                    "XRPL_NETWORK_ID": cfg.network_id,
+                    "XRPL_FAUCET_SEED": cfg.seed,
+                },
             },
-        })
+        )
         self._file_write(
             os.path.join(svc_dir, "main.yml"),
             _FAUCET_MAIN_TPL.format(group=host.name),
@@ -664,14 +700,17 @@ class AnsibleBuilder:
         svc_dir = os.path.join(host_dir, "stream")
         os.makedirs(svc_dir, exist_ok=True)
         cfg = host.stream
-        self._write_vars(os.path.join(svc_dir, "vars.yml"), {
-            "websocketd_port": cfg.port,
-            "docker_container_name": cfg.container_name,
-            "log_path": cfg.log_path,
-        })
+        self._write_vars(
+            os.path.join(svc_dir, "vars.yml"),
+            {
+                "websocketd_port": cfg.port,
+                "docker_container_name": cfg.container_name,
+                "log_path": cfg.log_path,
+            },
+        )
         self._file_write(
             os.path.join(svc_dir, "main.yml"),
-            _STREAM_MAIN_TPL.format(group=host.name),
+            _STREAM_MAIN_TPL.format(websocketd_url=_WEBSOCKETD_URL, group=host.name),
         )
 
     def _write_debug(self, host_dir: str, host: ServicesHost) -> None:
@@ -682,19 +721,22 @@ class AnsibleBuilder:
         if not endpoint:
             stream_port = host.stream.port if host.stream else 1400
             endpoint = f"ws://{host.ip}:{stream_port}/"
-        self._write_vars(os.path.join(svc_dir, "vars.yml"), {
-            "docker_network_name": cfg.network_name,
-            "docker_image_name": cfg.image,
-            "docker_container_name": "debugstream",
-            "docker_container_ports": [f"{cfg.port}:{cfg.port}"],
-            "docker_env_variables": {
-                "PORT": str(cfg.port),
-                "ENDPOINT": endpoint,
-                "DEBUG": "stream*",
-                "REDIS_HOST": cfg.redis_host,
-                "REDIS_PORT": cfg.redis_port,
+        self._write_vars(
+            os.path.join(svc_dir, "vars.yml"),
+            {
+                "docker_network_name": cfg.network_name,
+                "docker_image_name": cfg.image,
+                "docker_container_name": "debugstream",
+                "docker_container_ports": [f"{cfg.port}:{cfg.port}"],
+                "docker_env_variables": {
+                    "PORT": str(cfg.port),
+                    "ENDPOINT": endpoint,
+                    "DEBUG": "stream*",
+                    "REDIS_HOST": cfg.redis_host,
+                    "REDIS_PORT": cfg.redis_port,
+                },
             },
-        })
+        )
         self._file_write(
             os.path.join(svc_dir, "main.yml"),
             _DEBUG_MAIN_TPL.format(group=host.name),
@@ -843,8 +885,10 @@ _MAIN_DEPLOY_TASKS = """  - name: Create Docker Network
     docker_network:
       name: "{{ docker_network_name }}"
       state: present
-  - name: Authenticate Docker to Artifact Registry (operator token, refreshed each deploy)
-    shell: echo "{{ ar_token }}" | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
+  - name: Authenticate Docker to Artifact Registry with a fresh operator token
+    shell: >-
+      echo "{{ ar_token }}" | docker login -u oauth2accesstoken
+      --password-stdin https://us-central1-docker.pkg.dev
     when: ar_token | default('') | length > 0
   - name: Pull base image (the binary-in-an-image)
     docker_image:
@@ -881,7 +925,8 @@ _MAIN_DEPLOY_TASKS = """  - name: Create Docker Network
 """
 
 # Alloy runs in the node container's network namespace, so rippled's [insight] loopback
-# address reaches it with no published port. A recreated node container tears the namespace
+# address reaches it with no published port. A recreated node container tears the
+# namespace
 # down, which is why this runs after every main.yml.
 _ALLOY_YML = """---
 - hosts: all
@@ -1034,7 +1079,8 @@ _NGINX_DEPS_TPL = """---
           ssl_ciphers "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH";
           ssl_ecdh_curve secp384r1;
           ssl_session_cache shared:SSL:10m;
-          add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
+          add_header Strict-Transport-Security
+            "max-age=63072000; includeSubDomains; preload";
           add_header X-Frame-Options DENY;
           add_header X-Content-Type-Options nosniff;
           add_header X-XSS-Protection "1; mode=block";
@@ -1105,15 +1151,18 @@ def _ssl_letsencrypt_tasks(cns: list, email: str) -> str:
     # HTTP-01 needs port 80, so nginx is stopped around issuance; the hooks
     # are persisted into the renewal config for the certbot systemd timer.
     email_arg = f"-m {email}" if email else "--register-unsafely-without-email"
-    parts = ["""  - name: Install certbot
+    parts = [
+        """  - name: Install certbot
     apt:
       name: certbot
       state: present
       update_cache: yes
-"""]
+"""
+    ]
     for cn in cns:
         reg = "le_" + re.sub(r"[^a-z0-9]", "_", cn.lower())
-        parts.append(f"""  - name: Check Let's Encrypt cert for {cn}
+        parts.append(
+            f"""  - name: Check Let's Encrypt cert for {cn}
     stat:
       path: /etc/letsencrypt/live/{cn}/fullchain.pem
     register: {reg}
@@ -1124,7 +1173,8 @@ def _ssl_letsencrypt_tasks(cns: list, email: str) -> str:
       --pre-hook "systemctl stop nginx || true"
       --post-hook "systemctl start nginx || true"
     when: not {reg}.stat.exists
-""")
+"""
+        )
     return "".join(parts)
 
 
@@ -1182,7 +1232,8 @@ _NGINX_MAIN_TPL = """- hosts: {group}
 {status_locations}          }}
   - name: Link WSS proxy
     command:
-      cmd: "ln -s /etc/nginx/sites-available/{{{{ SSL_CN }}}}_proxy.conf /etc/nginx/sites-enabled/{{{{ SSL_CN }}}}_proxy.conf"
+      cmd: "ln -s /etc/nginx/sites-available/{{{{ SSL_CN }}}}_proxy.conf
+        /etc/nginx/sites-enabled/{{{{ SSL_CN }}}}_proxy.conf"
     ignore_errors: yes
   # RPC reverse proxy
   - name: Delete existing RPC conf
@@ -1230,7 +1281,8 @@ _NGINX_MAIN_TPL = """- hosts: {group}
           }}
   - name: Link RPC proxy
     command:
-      cmd: "ln -s /etc/nginx/sites-available/{{{{ RPC_SSL_CN }}}}_proxy.conf /etc/nginx/sites-enabled/{{{{ RPC_SSL_CN }}}}_proxy.conf"
+      cmd: "ln -s /etc/nginx/sites-available/{{{{ RPC_SSL_CN }}}}_proxy.conf
+        /etc/nginx/sites-enabled/{{{{ RPC_SSL_CN }}}}_proxy.conf"
     ignore_errors: yes
   # Faucet reverse proxy
   - name: Delete existing Faucet conf
@@ -1277,7 +1329,8 @@ _NGINX_MAIN_TPL = """- hosts: {group}
           }}
   - name: Link Faucet proxy
     command:
-      cmd: "ln -s /etc/nginx/sites-available/{{{{ FAUCET_SSL_CN }}}}_proxy.conf /etc/nginx/sites-enabled/{{{{ FAUCET_SSL_CN }}}}_proxy.conf"
+      cmd: "ln -s /etc/nginx/sites-available/{{{{ FAUCET_SSL_CN }}}}_proxy.conf
+        /etc/nginx/sites-enabled/{{{{ FAUCET_SSL_CN }}}}_proxy.conf"
     ignore_errors: yes
   # Debug reverse proxy
   - name: Delete existing Debug conf
@@ -1324,7 +1377,8 @@ _NGINX_MAIN_TPL = """- hosts: {group}
           }}
   - name: Link Debug proxy
     command:
-      cmd: "ln -s /etc/nginx/sites-available/{{{{ DEBUG_SSL_CN }}}}_proxy.conf /etc/nginx/sites-enabled/{{{{ DEBUG_SSL_CN }}}}_proxy.conf"
+      cmd: "ln -s /etc/nginx/sites-available/{{{{ DEBUG_SSL_CN }}}}_proxy.conf
+        /etc/nginx/sites-enabled/{{{{ DEBUG_SSL_CN }}}}_proxy.conf"
     ignore_errors: yes
   # Compiler reverse proxy
   - name: Delete existing Compiler conf
@@ -1371,7 +1425,8 @@ _NGINX_MAIN_TPL = """- hosts: {group}
           }}
   - name: Link Compiler proxy
     command:
-      cmd: "ln -s /etc/nginx/sites-available/{{{{ COMPILER_SSL_CN }}}}_proxy.conf /etc/nginx/sites-enabled/{{{{ COMPILER_SSL_CN }}}}_proxy.conf"
+      cmd: "ln -s /etc/nginx/sites-available/{{{{ COMPILER_SSL_CN }}}}_proxy.conf
+        /etc/nginx/sites-enabled/{{{{ COMPILER_SSL_CN }}}}_proxy.conf"
     ignore_errors: yes
   - name: Restart NGINX
     service:
@@ -1383,8 +1438,10 @@ _NGINX_MAIN_TPL = """- hosts: {group}
 # --- Service templates (use {group} placeholder for hosts: directive) ---
 
 # Static publisher-list vhost. Serves plain http always and adds a TLS server block only
-# when the hostname has a Let's Encrypt cert, because LE cannot issue before the DNS record
-# exists while http serving works as soon as it resolves. The list is signed, so nodes verify
+# when the hostname has a Let's Encrypt cert, because LE cannot issue before the DNS
+# record
+# exists while http serving works as soon as it resolves. The list is signed, so nodes
+# verify
 # it against [validator_list_keys] regardless of transport.
 _VL_MAIN_TPL = """---
 - hosts: {group}
@@ -1458,7 +1515,8 @@ _VL_MAIN_TPL = """---
       return_content: yes
     register: vl_check
   - debug:
-      msg: "vl served: {{{{ (vl_check.content | from_json).public_key | default('NO PUBLIC KEY') }}}}"
+      msg: "vl served: {{{{ (vl_check.content | from_json).public_key
+        | default('NO PUBLIC KEY') }}}}"
 """
 
 _REDIS_MAIN_TPL = """- hosts: {group}
@@ -1534,6 +1592,11 @@ _FAUCET_MAIN_TPL = """- hosts: {group}
       image_name_mismatch: recreate
 """
 
+_WEBSOCKETD_URL = (
+    "https://github.com/joewalnes/websocketd/releases/download/v0.4.1/"
+    "websocketd-0.4.1-linux_amd64.zip"
+)
+
 _STREAM_MAIN_TPL = """---
 - hosts: {group}
   become: true
@@ -1545,7 +1608,7 @@ _STREAM_MAIN_TPL = """---
   tasks:
   - name: Download websocketd
     get_url:
-      url: "https://github.com/joewalnes/websocketd/releases/download/v0.4.1/websocketd-0.4.1-linux_amd64.zip"
+      url: "{websocketd_url}"
       dest: "/tmp/websocketd.zip"
   - name: Install unzip
     package:
@@ -1578,7 +1641,8 @@ _STREAM_MAIN_TPL = """---
 
         [Service]
         Type=simple
-        ExecStart=/usr/local/bin/websocketd --port={{{{ websocketd_port }}}} /usr/local/bin/node-logviewer.sh
+        ExecStart=/usr/local/bin/websocketd --port={{{{ websocketd_port }}}} \\
+          /usr/local/bin/node-logviewer.sh
         Restart=always
         RestartSec=10
 
@@ -1698,12 +1762,14 @@ _COMPILER_MAIN_TPL = """---
 
 _STATUS_SOURCE_DIR = os.path.join(os.path.dirname(__file__), "services", "status")
 
-# Rate limit shared by every /status/ location; sits above the server blocks (http context).
+# Rate limit shared by every /status/ location; sits above the server blocks (http
+# context).
 _STATUS_NGINX_ZONE = (
     "          limit_req_zone $binary_remote_addr zone=xrpld_status:10m rate=20r/s;\n"
 )
 
-# Plain string, not .format()-ed: the docker -f template keeps its braces under {% raw %}.
+# Plain string, not .format()-ed: the docker -f template keeps its braces under {% raw
+# %}.
 # ufw on the nodes defaults to allow incoming, so each allow rule is followed by a deny.
 _STATUS_YML = """---
 - hosts: all
@@ -1906,5 +1972,6 @@ _STATUS_SITE_MAIN_TPL = """---
     delay: 3
     until: status_network.status == 200
   - debug:
-      msg: "status nodes: {{{{ (status_network.content | from_json).nodes | map(attribute='name') | join(',') }}}}"
+      msg: "status nodes: {{{{ (status_network.content | from_json).nodes
+        | map(attribute='name') | join(',') }}}}"
 """

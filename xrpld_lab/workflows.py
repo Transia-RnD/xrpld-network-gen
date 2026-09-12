@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from typing import Dict, List
+from typing import List
 
 from xrpld_publisher.publisher import PublisherClient
 from xrpld_publisher.validator import ValidatorClient
@@ -19,12 +19,10 @@ from xrpld_lab.models import (
     BuildType,
     DeployMode,
     LabConfig,
-    NodeConfig,
     NodeRole,
     PortSet,
-    Protocol,
 )
-from xrpld_lab.protocol import get_spec, ProtocolSpec
+from xrpld_lab.protocol import get_spec
 from xrpld_lab.workspace import Workspace
 from xrpld_lab.node_factory import NodeFactory
 from xrpld_lab.config_builder import XrpldCfgBuilder, ValidatorsTxtBuilder
@@ -37,7 +35,6 @@ from xrpld_lab.amendments import (
     get_feature_lines_from_content,
     get_feature_lines_from_path,
 )
-from xrpld_lab.config import merge_config
 from xrpld_lab.ansible_builder import AnsibleBuilder
 from xrpld_lab.utils import write_file, save_config, write_executable
 
@@ -58,10 +55,14 @@ class LabRunner:
     # ------------------------------------------------------------------
 
     def _genesis(self, features, protocol_name):
-        """Build the genesis dict, merging prefunded accounts/trustlines when configured."""
-        return update_genesis(features, protocol_name,
-                              genesis_path=getattr(self.lab, "genesis_file", None),
-                              preload_entries=self._preload_entries())
+        """Build the genesis dict, merging prefunded accounts/trustlines when
+        configured."""
+        return update_genesis(
+            features,
+            protocol_name,
+            genesis_path=getattr(self.lab, "genesis_file", None),
+            preload_entries=self._preload_entries(),
+        )
 
     def _resolve_feature_lines(self, source, spec):
         """Return features.macro lines for amendment parsing.
@@ -94,19 +95,24 @@ class LabRunner:
             )
             self._cached_preload = entries
             self._cached_preload_seeds = seeds
-            print(f"  [xrpld-lab] preloading genesis with {self.lab.preload_accounts} "
-                  f"accounts + {self.lab.preload_trustlines} trustlines")
+            print(
+                f"  [xrpld-lab] preloading genesis with {self.lab.preload_accounts} "
+                f"accounts + {self.lab.preload_trustlines} trustlines"
+            )
         return self._cached_preload
 
     def _write_preload_wallets(self, out_dir):
-        """Write prefunded account seeds in the loadtester's wallets.sub.<node> format."""
+        """Write prefunded account seeds in the loadtester's
+        wallets.sub.<node> format."""
         if self._cached_preload_seeds:
             write_file(
                 os.path.join(out_dir, "wallets.sub.1.json"),
                 json.dumps(self._cached_preload_seeds),
             )
-            print(f"  [xrpld-lab] wrote {len(self._cached_preload_seeds)} prefunded "
-                  f"seeds -> {os.path.join(out_dir, 'wallets.sub.1.json')}")
+            print(
+                f"  [xrpld-lab] wrote {len(self._cached_preload_seeds)} prefunded "
+                f"seeds -> {os.path.join(out_dir, 'wallets.sub.1.json')}"
+            )
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -148,10 +154,6 @@ class LabRunner:
         # 1. Resolve features
         feature_lines = self._resolve_feature_lines(source, spec)
 
-        # 1b. Resolve repo config and merge with overrides
-        repo_config = self.resolver.resolve_repo_config(source, spec)
-        effective_config = merge_config({}, repo_config, lab.config_overrides)
-
         # 2. Create node config
         node = NodeFactory.create_standalone(
             protocol=lab.protocol,
@@ -171,7 +173,9 @@ class LabRunner:
         save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
         # 4. Amendments + genesis
-        features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
+        features = parse_amendments(
+            feature_lines, include_unsupported=self.lab.all_amendments
+        )
         genesis = self._genesis(features, protocol_name)
         write_file(
             os.path.join(base_dir, "genesis.json"),
@@ -247,10 +251,6 @@ class LabRunner:
         # 1. Resolve features
         feature_lines = self._resolve_feature_lines(source, spec)
 
-        # 1b. Resolve repo config and merge with overrides
-        repo_config = self.resolver.resolve_repo_config(source, spec)
-        effective_config = merge_config({}, repo_config, lab.config_overrides)
-
         # 1c. Binary: copy local or download from build server
         binary_name = f"xrpld.{name}"
         binary_dest = os.path.join(cluster_dir, binary_name)
@@ -262,7 +262,6 @@ class LabRunner:
             self.resolver.download_binary(url, binary_dest)
 
         # 2. Create VL keys
-        algo = lab.key_algorithm
         original_dir = os.getcwd()
         os.chdir(cluster_dir)
         try:
@@ -330,7 +329,11 @@ class LabRunner:
 
         for i in range(1, lab.num_validators + 1):
             node_name = f"vnode{i}"
-            node_ip = lab.ansible.vips[i - 1] if use_ansible and i <= len(lab.ansible.vips) else ""
+            node_ip = (
+                lab.ansible.vips[i - 1]
+                if use_ansible and i <= len(lab.ansible.vips)
+                else ""
+            )
             node = NodeFactory.create_validator(
                 index=i,
                 protocol=lab.protocol,
@@ -361,14 +364,16 @@ class LabRunner:
             # Config
             cfg_content = XrpldCfgBuilder(node).build()
             vl_content = ValidatorsTxtBuilder(
-                node, genesis=True, bootstrap_vl=lab.bootstrap_vl).build()
+                node, genesis=True, bootstrap_vl=lab.bootstrap_vl
+            ).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             # Amendments + genesis. A preserved network has no genesis to write: the
             # node boots from its existing db and takes amendments from the chain.
             if lab.genesis:
                 features = parse_amendments(
-                    feature_lines, include_unsupported=self.lab.all_amendments)
+                    feature_lines, include_unsupported=self.lab.all_amendments
+                )
                 genesis = self._genesis(features, protocol_name)
                 write_file(
                     os.path.join(node_dir, "genesis.json"),
@@ -394,22 +399,23 @@ class LabRunner:
 
             # Entrypoint
             entrypoint_src = os.path.join(
-                self.workspace.package_dir, "deploykit",
+                self.workspace.package_dir,
+                "deploykit",
                 spec.network_entrypoint_file,
             )
             if os.path.exists(entrypoint_src):
-                shutil.copy2(
-                    entrypoint_src, os.path.join(node_dir, "entrypoint")
-                )
+                shutil.copy2(entrypoint_src, os.path.join(node_dir, "entrypoint"))
 
             # Compose service
-            compose.add_node_service(
-                node_name, node.ports, node.role, network=True
-            )
+            compose.add_node_service(node_name, node.ports, node.role, network=True)
 
         for i in range(1, lab.num_peers + 1):
             node_name = f"pnode{i}"
-            node_ip = lab.ansible.pips[i - 1] if use_ansible and i <= len(lab.ansible.pips) else ""
+            node_ip = (
+                lab.ansible.pips[i - 1]
+                if use_ansible and i <= len(lab.ansible.pips)
+                else ""
+            )
             node = NodeFactory.create_peer(
                 index=i,
                 protocol=lab.protocol,
@@ -439,13 +445,15 @@ class LabRunner:
             # Config
             cfg_content = XrpldCfgBuilder(node).build()
             vl_content = ValidatorsTxtBuilder(
-                node, genesis=True, bootstrap_vl=lab.bootstrap_vl).build()
+                node, genesis=True, bootstrap_vl=lab.bootstrap_vl
+            ).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
             # Amendments + genesis (peers always get all amendments)
             if lab.genesis:
                 features = parse_amendments(
-                    feature_lines, include_unsupported=self.lab.all_amendments)
+                    feature_lines, include_unsupported=self.lab.all_amendments
+                )
                 genesis = self._genesis(features, protocol_name)
                 write_file(
                     os.path.join(node_dir, "genesis.json"),
@@ -471,18 +479,15 @@ class LabRunner:
 
             # Entrypoint
             entrypoint_src = os.path.join(
-                self.workspace.package_dir, "deploykit",
+                self.workspace.package_dir,
+                "deploykit",
                 spec.network_entrypoint_file,
             )
             if os.path.exists(entrypoint_src):
-                shutil.copy2(
-                    entrypoint_src, os.path.join(node_dir, "entrypoint")
-                )
+                shutil.copy2(entrypoint_src, os.path.join(node_dir, "entrypoint"))
 
             # Compose service
-            compose.add_node_service(
-                node_name, node.ports, node.role, network=True
-            )
+            compose.add_node_service(node_name, node.ports, node.role, network=True)
 
         # 8. VL + explorer services
         compose.add_vl_service()
@@ -504,7 +509,9 @@ class LabRunner:
 
         # Copy nginx dockerfile for VL
         nginx_src = os.path.join(
-            self.workspace.package_dir, "deploykit", "nginx.dockerfile",
+            self.workspace.package_dir,
+            "deploykit",
+            "nginx.dockerfile",
         )
         if os.path.exists(nginx_src):
             shutil.copyfile(nginx_src, os.path.join(vl_dir, "Dockerfile"))
@@ -512,15 +519,11 @@ class LabRunner:
         # 10. Scripts
         write_executable(
             os.path.join(cluster_dir, "start.sh"),
-            ScriptBuilder.network_start(
-                name, lab.num_validators, lab.num_peers
-            ),
+            ScriptBuilder.network_start(name, lab.num_validators, lab.num_peers),
         )
         write_executable(
             os.path.join(cluster_dir, "stop.sh"),
-            ScriptBuilder.network_stop(
-                name, lab.num_validators, lab.num_peers
-            ),
+            ScriptBuilder.network_stop(name, lab.num_validators, lab.num_peers),
         )
 
         # 10b. Prefunded wallet seeds for the loadtester (perf-iac genesis)
@@ -619,7 +622,6 @@ class LabRunner:
                 break
 
         # 2-3. Create VL + validator keys
-        algo = lab.key_algorithm
         original_dir = os.getcwd()
         os.chdir(cluster_dir)
         try:
@@ -672,7 +674,9 @@ class LabRunner:
                 ips_fixed=ips_fixed,
                 log_level=lab.log_level,
                 node_db_type=lab.node_db_type,
-                datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
+                datagram_monitor=(
+                    [lab.datagram_monitor] if lab.datagram_monitor else None
+                ),
                 num_ledgers=lab.online_delete,
                 tree_cache_target_entries=lab.tree_cache_target_entries,
                 memory_limit=lab.memory_limit,
@@ -685,10 +689,13 @@ class LabRunner:
 
             cfg_content = XrpldCfgBuilder(node).build()
             vl_content = ValidatorsTxtBuilder(
-                node, genesis=True, bootstrap_vl=lab.bootstrap_vl).build()
+                node, genesis=True, bootstrap_vl=lab.bootstrap_vl
+            ).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
-            features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
+            features = parse_amendments(
+                feature_lines, include_unsupported=self.lab.all_amendments
+            )
             genesis = self._genesis(features, protocol_name)
             write_file(
                 os.path.join(cfg_path, "genesis.json"),
@@ -708,7 +715,9 @@ class LabRunner:
                 ips_fixed=ips_fixed,
                 log_level=lab.log_level,
                 node_db_type=lab.node_db_type,
-                datagram_monitor=[lab.datagram_monitor] if lab.datagram_monitor else None,
+                datagram_monitor=(
+                    [lab.datagram_monitor] if lab.datagram_monitor else None
+                ),
                 num_ledgers=lab.online_delete,
                 tree_cache_target_entries=lab.tree_cache_target_entries,
                 memory_limit=lab.memory_limit,
@@ -721,10 +730,13 @@ class LabRunner:
 
             cfg_content = XrpldCfgBuilder(node).build()
             vl_content = ValidatorsTxtBuilder(
-                node, genesis=True, bootstrap_vl=lab.bootstrap_vl).build()
+                node, genesis=True, bootstrap_vl=lab.bootstrap_vl
+            ).build()
             save_config(protocol_name, cfg_path, cfg_content, vl_content)
 
-            features = parse_amendments(feature_lines, include_unsupported=self.lab.all_amendments)
+            features = parse_amendments(
+                feature_lines, include_unsupported=self.lab.all_amendments
+            )
             genesis = self._genesis(features, protocol_name)
             write_file(
                 os.path.join(cfg_path, "genesis.json"),
@@ -746,9 +758,7 @@ class LabRunner:
         )
         write_executable(
             os.path.join(cluster_dir, "stop.sh"),
-            ScriptBuilder.local_network_stop(
-                name, lab.num_validators, lab.num_peers
-            ),
+            ScriptBuilder.local_network_stop(name, lab.num_validators, lab.num_peers),
         )
 
         # 9. Sign UNL and write VL artifacts
@@ -766,7 +776,9 @@ class LabRunner:
 
         # Copy nginx dockerfile for VL
         nginx_src = os.path.join(
-            self.workspace.package_dir, "deploykit", "nginx.dockerfile",
+            self.workspace.package_dir,
+            "deploykit",
+            "nginx.dockerfile",
         )
         if os.path.exists(nginx_src):
             shutil.copyfile(nginx_src, os.path.join(vl_dir, "Dockerfile"))

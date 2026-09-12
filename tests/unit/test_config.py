@@ -12,7 +12,12 @@ from unittest.mock import patch, Mock
 
 import requests
 
-from xrpld_lab.config import parse_xrpld_cfg, load_overrides_file, merge_config, _deep_merge
+from xrpld_lab.config import (
+    parse_xrpld_cfg,
+    load_overrides_file,
+    merge_config,
+    _deep_merge,
+)
 from xrpld_lab.source_resolver import SourceResolver
 from xrpld_lab.models import BuildSource, Protocol, BuildType
 from xrpld_lab.protocol import ProtocolSpec
@@ -110,7 +115,9 @@ class TestParseXrpldCfg:
         assert result == {"node_size": "huge"}
 
     def test_section_with_key_value_pairs(self):
-        content = "[transaction_queue]\nledgers_in_queue = 20\nminimum_queue_size = 2000\n"
+        content = (
+            "[transaction_queue]\nledgers_in_queue = 20\nminimum_queue_size = 2000\n"
+        )
         result = parse_xrpld_cfg(content)
         assert result == {
             "transaction_queue": {
@@ -135,12 +142,7 @@ class TestParseXrpldCfg:
         assert result == {}
 
     def test_comments_ignored(self):
-        content = (
-            "# This is a comment\n"
-            "[node_size]\n"
-            "# Another comment\n"
-            "huge\n"
-        )
+        content = "# This is a comment\n" "[node_size]\n" "# Another comment\n" "huge\n"
         result = parse_xrpld_cfg(content)
         assert result == {"node_size": "huge"}
 
@@ -168,7 +170,9 @@ class TestParseXrpldCfg:
 
     def test_multiline_list_section(self):
         """Section with multiple lines (no =) should produce a list."""
-        content = "[ips_fixed]\n192.168.1.1 51235\n192.168.1.2 51335\n192.168.1.3 51435\n"
+        content = (
+            "[ips_fixed]\n192.168.1.1 51235\n192.168.1.2 51335\n192.168.1.3 51435\n"
+        )
         result = parse_xrpld_cfg(content)
         assert result == {
             "ips_fixed": [
@@ -446,46 +450,60 @@ class TestCliConfigOverrides:
 
     def test_standalone_accepts_config_overrides(self):
         from xrpld_lab.cli import _build_parser
+
         parser = _build_parser()
-        args = parser.parse_args(["up:standalone", "--config_overrides", "/tmp/my.yaml"])
+        args = parser.parse_args(
+            ["up:standalone", "--config_overrides", "/tmp/my.yaml"]
+        )
         assert args.config_overrides == "/tmp/my.yaml"
 
     def test_network_accepts_config_overrides(self):
         from xrpld_lab.cli import _build_parser
+
         parser = _build_parser()
-        args = parser.parse_args(["create:network", "--config_overrides", "/tmp/my.json"])
+        args = parser.parse_args(
+            ["create:network", "--config_overrides", "/tmp/my.json"]
+        )
         assert args.config_overrides == "/tmp/my.json"
 
     def test_standalone_default_is_none(self):
         from xrpld_lab.cli import _build_parser
+
         parser = _build_parser()
         args = parser.parse_args(["up:standalone"])
         assert args.config_overrides is None
 
     def test_network_default_is_none(self):
         from xrpld_lab.cli import _build_parser
+
         parser = _build_parser()
         args = parser.parse_args(["create:network"])
         assert args.config_overrides is None
 
     def test_overrides_loaded_into_lab_config(self, tmp_path):
         from xrpld_lab.cli import _build_parser, build_lab_config
+
         overrides_path = str(tmp_path / "overrides.yaml")
         data = {"node_size": "small", "voting": {"account_reserve": 500000}}
         with open(overrides_path, "w") as f:
             yaml.dump(data, f)
 
         parser = _build_parser()
-        args = parser.parse_args([
-            "up:standalone",
-            "--protocol", "xahau",
-            "--config_overrides", overrides_path,
-        ])
+        args = parser.parse_args(
+            [
+                "up:standalone",
+                "--protocol",
+                "xahau",
+                "--config_overrides",
+                overrides_path,
+            ]
+        )
         cfg = build_lab_config(args)
         assert cfg.config_overrides == data
 
     def test_no_overrides_gives_empty_dict(self):
         from xrpld_lab.cli import _build_parser, build_lab_config
+
         parser = _build_parser()
         args = parser.parse_args(["up:standalone", "--protocol", "xahau"])
         cfg = build_lab_config(args)

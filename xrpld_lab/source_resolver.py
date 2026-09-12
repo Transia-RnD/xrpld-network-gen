@@ -13,7 +13,8 @@ from xrpld_lab.protocol import ProtocolSpec
 
 
 class SourceResolver:
-    """Resolves build sources: downloads features from GitHub, handles binary downloads."""
+    """Resolves build sources: downloads features from GitHub, handles binary
+    downloads."""
 
     def get_commit_hash(self, server: str, version: str) -> str:
         """Download release info from build server and extract commit hash.
@@ -26,9 +27,7 @@ class SourceResolver:
         :raises ValueError: If commit hash is not found in the release info
         :raises requests.HTTPError: If the HTTP request fails
         """
-        response = requests.get(
-            f"{server}/{version}.releaseinfo", timeout=30
-        )
+        response = requests.get(f"{server}/{version}.releaseinfo", timeout=30)
 
         if response.status_code == 200:
             match = re.search(r"commit (\w+)", response.text)
@@ -49,7 +48,8 @@ class SourceResolver:
     ) -> bytes:
         """Download a file from GitHub at a specific commit/tag.
 
-        URL: https://raw.githubusercontent.com/{owner}/{repo}/{commit_or_tag}/{file_path}
+        URL: https://raw.githubusercontent.com/{owner}/{repo}/{commit_or_tag}/{f
+        ile_path}
         If 404 and fallback_path given, retry with fallback.
 
         :param owner: The repository owner (username or organization)
@@ -102,9 +102,7 @@ class SourceResolver:
         except requests.exceptions.RequestException as e:
             raise ValueError(f"An error occurred: {e}")
 
-    def resolve_features(
-        self, source: BuildSource, spec: ProtocolSpec
-    ) -> bytes:
+    def resolve_features(self, source: BuildSource, spec: ProtocolSpec) -> bytes:
         """Resolve feature content from the build source.
 
         Uses spec.feature_paths (ordered list) to try downloading feature files
@@ -117,15 +115,12 @@ class SourceResolver:
         :param spec: The protocol specification with feature paths
         :return: The raw feature file content as bytes
         """
-        commit_hash = (
-            source.commit_hash
-            or self.get_commit_hash(source.build_server, source.build_version)
+        commit_hash = source.commit_hash or self.get_commit_hash(
+            source.build_server, source.build_version
         )
 
         primary_path = spec.feature_paths[0]
-        fallback_path = (
-            spec.feature_paths[1] if len(spec.feature_paths) > 1 else None
-        )
+        fallback_path = spec.feature_paths[1] if len(spec.feature_paths) > 1 else None
 
         return self.download_file_at_commit(
             source.owner,
@@ -135,9 +130,7 @@ class SourceResolver:
             fallback_path=fallback_path,
         )
 
-    def resolve_repo_config(
-        self, source: BuildSource, spec: ProtocolSpec
-    ) -> dict:
+    def resolve_repo_config(self, source: BuildSource, spec: ProtocolSpec) -> dict:
         """Download and parse xrpld config from the repo at the resolved commit.
 
         Tries known config paths from ``spec.config_paths`` (ordered: primary,
@@ -151,17 +144,12 @@ class SourceResolver:
             return {}
 
         try:
-            commit_hash = (
-                source.commit_hash
-                or self.get_commit_hash(
-                    source.build_server, source.build_version
-                )
+            commit_hash = source.commit_hash or self.get_commit_hash(
+                source.build_server, source.build_version
             )
 
             primary_path = spec.config_paths[0]
-            fallback_path = (
-                spec.config_paths[1] if len(spec.config_paths) > 1 else None
-            )
+            fallback_path = spec.config_paths[1] if len(spec.config_paths) > 1 else None
 
             content = self.download_file_at_commit(
                 source.owner,

@@ -110,7 +110,7 @@ def tmp_workspace(tmp_path):
 @pytest.fixture
 def mock_features():
     """Fake feature content bytes."""
-    return b'XRPL_FEATURE(Feature1, Supported::yes, DefaultVote::yes)\n'
+    return b"XRPL_FEATURE(Feature1, Supported::yes, DefaultVote::yes)\n"
 
 
 @pytest.fixture
@@ -216,7 +216,9 @@ class TestRunStandalone:
         self.mocks = {}
 
         # SourceResolver.resolve_features
-        p = patch.object(self.runner.resolver, "resolve_features", return_value=mock_features)
+        p = patch.object(
+            self.runner.resolver, "resolve_features", return_value=mock_features
+        )
         self.mocks["resolve_features"] = p.start()
         self.patches["resolve_features"] = p
 
@@ -376,7 +378,8 @@ class TestRunStandalone:
         self.runner._run_standalone()
         # Find the write_file call for genesis.json
         genesis_calls = [
-            c for c in self.mocks["write_file"].call_args_list
+            c
+            for c in self.mocks["write_file"].call_args_list
             if "genesis.json" in str(c)
         ]
         assert len(genesis_calls) == 1
@@ -391,8 +394,7 @@ class TestRunStandalone:
     def test_writes_dockerfile(self):
         self.runner._run_standalone()
         dockerfile_calls = [
-            c for c in self.mocks["write_file"].call_args_list
-            if "Dockerfile" in str(c)
+            c for c in self.mocks["write_file"].call_args_list if "Dockerfile" in str(c)
         ]
         assert len(dockerfile_calls) == 1
 
@@ -408,8 +410,7 @@ class TestRunStandalone:
         self.mocks["script_start"].assert_called_once()
         # Verify start.sh was written
         start_calls = [
-            c for c in self.mocks["write_file"].call_args_list
-            if "start.sh" in str(c)
+            c for c in self.mocks["write_file"].call_args_list if "start.sh" in str(c)
         ]
         assert len(start_calls) == 1
 
@@ -417,8 +418,7 @@ class TestRunStandalone:
         self.runner._run_standalone()
         self.mocks["script_stop"].assert_called_once()
         stop_calls = [
-            c for c in self.mocks["write_file"].call_args_list
-            if "stop.sh" in str(c)
+            c for c in self.mocks["write_file"].call_args_list if "stop.sh" in str(c)
         ]
         assert len(stop_calls) == 1
 
@@ -463,7 +463,9 @@ class TestRunNetwork:
         self.mocks = {}
 
         # SourceResolver.resolve_features
-        p = patch.object(self.runner.resolver, "resolve_features", return_value=mock_features)
+        p = patch.object(
+            self.runner.resolver, "resolve_features", return_value=mock_features
+        )
         self.mocks["resolve_features"] = p.start()
         self.patches["resolve_features"] = p
 
@@ -654,8 +656,7 @@ class TestRunNetwork:
         self.runner._run_network()
         # Should copy nginx dockerfile for VL service
         copyfile_calls = [
-            c for c in self.mocks["copyfile"].call_args_list
-            if "nginx" in str(c)
+            c for c in self.mocks["copyfile"].call_args_list if "nginx" in str(c)
         ]
         assert len(copyfile_calls) == 1
 
@@ -904,7 +905,6 @@ class TestRunNetworkWithAnsible:
             ("parse_amendments", "xrpld_lab.workflows.parse_amendments"),
             ("update_genesis", "xrpld_lab.workflows.update_genesis"),
             ("get_lines", "xrpld_lab.workflows.get_feature_lines_from_content"),
-            ("merge_config", "xrpld_lab.workflows.merge_config"),
             ("write_file", "xrpld_lab.workflows.write_file"),
             ("save_config", "xrpld_lab.workflows.save_config"),
             ("write_executable", "xrpld_lab.workflows.write_executable"),
@@ -925,7 +925,6 @@ class TestRunNetworkWithAnsible:
         self.mocks["resolver"].return_value.resolve_features.return_value = b"feature"
         self.mocks["resolver"].return_value.resolve_repo_config.return_value = {}
         self.mocks["get_lines"].return_value = ["line"]
-        self.mocks["merge_config"].return_value = {}
         self.mocks["parse_amendments"].return_value = {}
         self.mocks["update_genesis"].return_value = {"ledger": {}}
         self.mocks["exists"].return_value = True
@@ -1041,7 +1040,6 @@ class TestRunNetworkWithoutAnsible:
             ("parse_amendments", "xrpld_lab.workflows.parse_amendments"),
             ("update_genesis", "xrpld_lab.workflows.update_genesis"),
             ("get_lines", "xrpld_lab.workflows.get_feature_lines_from_content"),
-            ("merge_config", "xrpld_lab.workflows.merge_config"),
             ("write_file", "xrpld_lab.workflows.write_file"),
             ("save_config", "xrpld_lab.workflows.save_config"),
             ("write_executable", "xrpld_lab.workflows.write_executable"),
@@ -1062,7 +1060,6 @@ class TestRunNetworkWithoutAnsible:
         self.mocks["resolver"].return_value.resolve_features.return_value = b"feature"
         self.mocks["resolver"].return_value.resolve_repo_config.return_value = {}
         self.mocks["get_lines"].return_value = ["line"]
-        self.mocks["merge_config"].return_value = {}
         self.mocks["parse_amendments"].return_value = {}
         self.mocks["update_genesis"].return_value = {"ledger": {}}
         self.mocks["exists"].return_value = True

@@ -24,8 +24,9 @@ _HEALTHY_STATES = {"proposing", "full", "validating"}
 def _server_state(url: str, timeout: float) -> tuple[str | None, int]:
     """Return (server_state, validated_seq) from a node's RPC, or (None, 0)."""
     payload = json.dumps({"method": "server_info", "params": [{}]}).encode()
-    req = urllib.request.Request(url, data=payload,
-                                 headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(
+        url, data=payload, headers={"Content-Type": "application/json"}
+    )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         info = json.loads(resp.read()).get("result", {}).get("info", {})
     seq = info.get("validated_ledger", {}).get("seq", 0)
@@ -54,8 +55,10 @@ def check_consensus(
     deadline = time.monotonic() + timeout_s
     first_seq: dict[int, int] = {}
 
-    print(f"{bcolors.CYAN}[health] waiting for consensus across "
-          f"{len(endpoints)} validators…{bcolors.END}")
+    print(
+        f"{bcolors.CYAN}[health] waiting for consensus across "
+        f"{len(endpoints)} validators…{bcolors.END}"
+    )
 
     while time.monotonic() < deadline:
         healthy = 0
@@ -70,19 +73,25 @@ def check_consensus(
             advanced = seq > first_seq[node_id]
             ok = state in _HEALTHY_STATES and advanced
             mark = (bcolors.GREEN + "OK") if ok else (bcolors.PURPLE + str(state))
-            print(f"  vnode{node_id} state={state} seq={seq} "
-                  f"{'(advanced)' if advanced else '(waiting)'} {mark}{bcolors.END}")
+            print(
+                f"  vnode{node_id} state={state} seq={seq} "
+                f"{'(advanced)' if advanced else '(waiting)'} {mark}{bcolors.END}"
+            )
             if ok:
                 healthy += 1
 
         if healthy == len(endpoints):
-            print(f"{bcolors.GREEN}[health] all {healthy} validators in consensus, "
-                  f"ledgers advancing.{bcolors.END}")
+            print(
+                f"{bcolors.GREEN}[health] all {healthy} validators in consensus, "
+                f"ledgers advancing.{bcolors.END}"
+            )
             return True
 
         print(f"  {healthy}/{len(endpoints)} healthy — retrying in {interval_s}s")
         time.sleep(interval_s)
 
-    print(f"{bcolors.RED}[health] timed out after {timeout_s}s waiting for "
-          f"consensus.{bcolors.END}")
+    print(
+        f"{bcolors.RED}[health] timed out after {timeout_s}s waiting for "
+        f"consensus.{bcolors.END}"
+    )
     return False
