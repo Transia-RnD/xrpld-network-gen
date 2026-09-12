@@ -372,8 +372,11 @@ class Sampler:
         self.latest = {}
 
     def listen_xdgm(self):
-        """Keep the most recent XDGM packet. One packet per second per sink, so the newest is
-        the only one worth holding."""
+        """Keep the most recent XDGM packet.
+
+        One packet arrives per second per sink, so the newest is the only one
+        worth holding.
+        """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((self.cfg.xdgm_host, self.cfg.xdgm_port))
@@ -470,8 +473,11 @@ class Sampler:
         return row
 
     def from_xdgm(self):
-        """Fields only xrpld can report, plus a fallback for every field the admin RPC would
-        have given if it had answered."""
+        """Fields only xrpld can report.
+
+        Also carries a fallback for every field the admin RPC would have given
+        if it had answered.
+        """
         rec = self.fresh_xdgm()
         if not rec:
             return {"xdgm_ok": 0}
