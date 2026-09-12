@@ -268,6 +268,13 @@ class TestScriptBuilderNetwork:
         assert "cp xrpld.testnet pnode1/xrpld.testnet" in result
         # Compose up
         assert "docker compose -f docker-compose.yml" in result
+
+    def test_network_start_image_mode_copies_nothing(self):
+        result = ScriptBuilder.network_start(
+            name="testnet", num_validators=2, num_peers=1, copy_binary=False
+        )
+        assert "cp " not in result
+        assert "docker compose -f docker-compose.yml" in result
         assert "up --build --force-recreate -d" in result
 
     def test_network_stop(self):

@@ -195,13 +195,16 @@ class ScriptBuilder:
     # -- network (Docker multi-node) ---------------------------------------
 
     @staticmethod
-    def network_start(name: str, num_validators: int, num_peers: int) -> str:
-        """Network docker start: copy binary to nodes, compose up."""
+    def network_start(
+        name: str, num_validators: int, num_peers: int, copy_binary: bool = True
+    ) -> str:
+        """Network docker start: copy the binary to nodes in binary mode, compose up."""
         content = "#! /bin/bash \n"
-        for i in range(1, num_validators + 1):
-            content += f"cp xrpld.{name} vnode{i}/xrpld.{name}\n"
-        for i in range(1, num_peers + 1):
-            content += f"cp xrpld.{name} pnode{i}/xrpld.{name}\n"
+        if copy_binary:
+            for i in range(1, num_validators + 1):
+                content += f"cp xrpld.{name} vnode{i}/xrpld.{name}\n"
+            for i in range(1, num_peers + 1):
+                content += f"cp xrpld.{name} pnode{i}/xrpld.{name}\n"
         content += (
             "docker compose -f docker-compose.yml" " up --build --force-recreate -d"
         )
