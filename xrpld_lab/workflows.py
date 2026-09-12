@@ -131,6 +131,20 @@ class LabRunner:
             self._run_local_network()
         return None
 
+    def _stage_binary(self, source, dest: str) -> None:
+        """Copy the local binary, or download it from the build server in binary mode.
+
+        :param source: The build source configuration
+        :param dest: Path the binary is written to
+        """
+        if source.binary_path:
+            shutil.copy2(source.binary_path, dest)
+            os.chmod(dest, 0o755)
+        elif source.build_type == BuildType.BINARY:
+            self.resolver.download_binary(
+                f"{source.build_server}/{source.build_version}", dest
+            )
+
     # ------------------------------------------------------------------
     # Standalone workflow
     # ------------------------------------------------------------------
@@ -188,7 +202,8 @@ class LabRunner:
             json.dumps(genesis, indent=4, sort_keys=True),
         )
 
-        # 5. Dockerfile
+        # 5. Binary + Dockerfile
+        self._stage_binary(source, os.path.join(base_dir, f"{protocol_name}d.{name}"))
         dockerfile = DockerfileBuilder.build(
             protocol=protocol_name,
             ports=node.ports,
@@ -260,14 +275,7 @@ class LabRunner:
         feature_lines = self._resolve_feature_lines(source, spec)
 
         # 1c. Binary: copy local or download from build server
-        binary_name = f"xrpld.{name}"
-        binary_dest = os.path.join(cluster_dir, binary_name)
-        if source.binary_path:
-            shutil.copy2(source.binary_path, binary_dest)
-            os.chmod(binary_dest, 0o755)
-        elif source.build_type == BuildType.BINARY:
-            url = f"{source.build_server}/{source.build_version}"
-            self.resolver.download_binary(url, binary_dest)
+        self._stage_binary(source, os.path.join(cluster_dir, f"xrpld.{name}"))
 
         # 2. Create VL keys
         original_dir = os.getcwd()

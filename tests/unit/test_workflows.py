@@ -330,6 +330,14 @@ class TestRunStandalone:
         for p in self.patches.values():
             p.stop()
 
+    def test_stages_the_binary_beside_the_dockerfile(self):
+        with patch.object(self.runner, "_stage_binary") as m:
+            name = self.runner._run_standalone()
+
+        dest = m.call_args.args[1]
+        assert os.path.basename(dest) == "xrpld.3.1.1"
+        assert os.path.basename(os.path.dirname(dest)) == name
+
     def test_calls_resolve_features(self):
         self.runner._run_standalone()
         self.mocks["resolve_features"].assert_called_once_with(
@@ -1136,3 +1144,44 @@ class TestNonGenesisNetwork(TestRunNetworkWithAnsible):
         self.mocks["exists"].return_value = False
         with pytest.raises(RuntimeError, match="would change the"):
             LabRunner(self.lab, self.workspace).run()
+
+
+class TestStageBinary:
+    """_stage_binary copies a local binary or downloads one in binary mode."""
+
+    def _source(self, build_type, binary_path=""):
+        return BuildSource(
+            protocol=Protocol.XAHAU,
+            build_type=build_type,
+            build_server="https://build.xahau.tech",
+            build_version="2025.7.9-release+1951",
+            binary_path=binary_path,
+        )
+
+    def test_copies_a_local_binary(self, standalone_lab, tmp_workspace, tmp_path):
+        local = tmp_path / "xahaud"
+        local.write_bytes(b"bin")
+        dest = tmp_path / "out"
+        runner = LabRunner(standalone_lab, workspace=tmp_workspace)
+
+        runner._stage_binary(self._source(BuildType.BINARY, str(local)), str(dest))
+
+        assert dest.read_bytes() == b"bin"
+        assert os.access(dest, os.X_OK)
+
+    def test_downloads_in_binary_mode(self, standalone_lab, tmp_workspace, tmp_path):
+        runner = LabRunner(standalone_lab, workspace=tmp_workspace)
+        with patch.object(runner.resolver, "download_binary") as m:
+            runner._stage_binary(self._source(BuildType.BINARY), str(tmp_path / "b"))
+
+        m.assert_called_once_with(
+            "https://build.xahau.tech/2025.7.9-release+1951", str(tmp_path / "b")
+        )
+
+    def test_image_mode_stages_nothing(self, standalone_lab, tmp_workspace, tmp_path):
+        runner = LabRunner(standalone_lab, workspace=tmp_workspace)
+        with patch.object(runner.resolver, "download_binary") as m:
+            runner._stage_binary(self._source(BuildType.IMAGE), str(tmp_path / "b"))
+
+        m.assert_not_called()
+        assert not (tmp_path / "b").exists()
