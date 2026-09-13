@@ -182,44 +182,41 @@ class TestBuildParser:
         )
         assert args.node_type == "peer"
 
-    def test_enable_amendment_args(self):
+    def test_vote_amendment_args(self):
         parser = _build_parser()
         args = parser.parse_args(
             [
-                "enable:amendment",
+                "vote:amendment",
                 "--name",
                 "my-net",
                 "--amendment_name",
                 "fixNFTokenRemint",
-                "--node_id",
-                "1",
-                "--node_type",
-                "validator",
             ]
         )
-        assert args.command == "enable:amendment"
+        assert args.command == "vote:amendment"
         assert args.name == "my-net"
         assert args.amendment_name == "fixNFTokenRemint"
-        assert args.node_id == 1
-        assert args.node_type == "validator"
+        assert args.node_id is None
 
-    def test_enable_amendment_peer_type(self):
-        parser = _build_parser()
-        args = parser.parse_args(
-            [
-                "enable:amendment",
-                "--name",
-                "my-net",
-                "--amendment_name",
-                "SomeAmendment",
-                "--node_id",
-                "3",
-                "--node_type",
-                "peer",
-            ]
+    def test_vote_amendment_single_validator(self):
+        args = _build_parser().parse_args(
+            ["vote:amendment", "--name", "n", "--amendment_name", "x", "--node_id", "3"]
         )
-        assert args.node_type == "peer"
         assert args.node_id == 3
+
+    def test_vote_amendment_rejects_node_type(self):
+        with pytest.raises(SystemExit):
+            _build_parser().parse_args(
+                [
+                    "vote:amendment",
+                    "--name",
+                    "n",
+                    "--amendment_name",
+                    "x",
+                    "--node_type",
+                    "peer",
+                ]
+            )
 
     def test_logs_local_defaults(self):
         parser = _build_parser()
@@ -315,7 +312,7 @@ class TestBuildParser:
             "up:local",
             "down:local",
             "update:node",
-            "enable:amendment",
+            "vote:amendment",
             "logs:local",
             "logs:standalone",
         ]
@@ -354,7 +351,7 @@ class TestBuildParser:
                         "v",
                     ]
                 )
-            elif cmd == "enable:amendment":
+            elif cmd == "vote:amendment":
                 args = parser.parse_args(
                     [
                         cmd,
@@ -364,8 +361,6 @@ class TestBuildParser:
                         "x",
                         "--node_id",
                         "1",
-                        "--node_type",
-                        "validator",
                     ]
                 )
             assert args.command == cmd
@@ -1312,35 +1307,30 @@ class TestMain:
             image="rippleci/xrpld:3.3.0-rc1",
         )
 
-    @patch("xrpld_lab.cli.enable_amendment")
+    @patch("xrpld_lab.cli.vote_amendment")
     @patch("xrpld_lab.cli.Workspace")
-    def test_enable_amendment_dispatches(self, mock_ws_cls, mock_run):
+    def test_vote_amendment_dispatches(self, mock_ws_cls, mock_run):
         mock_ws = MagicMock()
         mock_ws_cls.return_value = mock_ws
+        mock_run.return_value = True
 
         with patch(
             "sys.argv",
             [
                 "xrpld-lab",
-                "enable:amendment",
+                "vote:amendment",
                 "--name",
                 "my-net",
                 "--amendment_name",
                 "fixNFTokenRemint",
                 "--node_id",
                 "1",
-                "--node_type",
-                "validator",
             ],
         ):
             main()
 
         mock_run.assert_called_once_with(
-            "my-net",
-            "fixNFTokenRemint",
-            1,
-            "validator",
-            mock_ws,
+            "my-net", "fixNFTokenRemint", mock_ws, node_id=1
         )
 
     @patch("xrpld_lab.cli.view_local_logs")

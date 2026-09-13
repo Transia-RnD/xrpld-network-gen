@@ -511,59 +511,86 @@ def _admin_rpc_port(node_id: int, node_type: str) -> int:
     return PortSet.for_node(node_id, role).rpc_admin
 
 
-def _admin_rpc(url: str, method: str, params: dict) -> bool:
-    """POST one JSON-RPC command to *url*; True when the node reports success."""
+def _admin_rpc(url: str, method: str, params: dict) -> dict | None:
+    """POST one JSON-RPC command to *url*; the result dict, or None on failure."""
     try:
         resp = requests.post(
             url, json={"method": method, "params": [params]}, timeout=10
         )
     except requests.RequestException as e:
         print(f"{bcolors.RED}RPC request failed: {e}{bcolors.END}")
-        return False
+        return None
     if resp.status_code != 200:
         print(f"{bcolors.RED}RPC request failed: HTTP {resp.status_code}{bcolors.END}")
-        return False
+        return None
     try:
         result = resp.json().get("result", {})
     except ValueError:
         print(f"{bcolors.RED}RPC response is not JSON{bcolors.END}")
-        return False
+        return None
     if result.get("status") == "error":
         message = result.get("error_message") or result.get("error")
         print(f"{bcolors.RED}RPC error: {message}{bcolors.END}")
-        return False
-    return True
+        return None
+    return result
 
 
 # ---------------------------------------------------------------------------
-# enable:amendment
+# vote:amendment
 # ---------------------------------------------------------------------------
 
 
-def enable_amendment(
+def _validator_ids(workspace: Workspace, name: str) -> list[int]:
+    """Validator indexes in the cluster directory, from its vnode<N> subdirectories."""
+    ids = []
+    for path in glob.glob(os.path.join(workspace.base, name, "vnode*")):
+        suffix = os.path.basename(path)[len("vnode") :]
+        if suffix.isdigit():
+            ids.append(int(suffix))
+    return sorted(ids)
+
+
+def vote_amendment(
     name: str,
     amendment_name: str,
-    node_id: int,
-    node_type: str,
     workspace: Workspace,
+    node_id: int | None = None,
 ) -> bool:
-    """Enable an amendment on a running node via its JSON-RPC interface.
+    """Lift the veto on an amendment so the cluster's validators vote for it.
 
-    Computes the SHA-512-half of the amendment name, determines the node's
-    RPC admin port, and sends a ``feature`` RPC command with ``vetoed: false``.
-    Returns True when the node reports success.
+    Sends ``feature`` with ``vetoed: false`` to every validator's admin RPC,
+    or to one validator when *node_id* is given. Each validator then votes
+    yes at the next flag ledger; the amendment activates once the network's
+    supermajority has held for the majority time. Returns True when every
+    targeted validator accepted the command.
     """
     amendment_hash = sha512_half(amendment_name.encode("utf-8").hex())
-    url = f"http://localhost:{_admin_rpc_port(node_id, node_type)}"
-    print(
-        f"{bcolors.CYAN}Enabling amendment '{amendment_name}' "
-        f"(hash: {amendment_hash}) on {node_type} {node_id} "
-        f"at {url}...{bcolors.END}"
-    )
-    if not _admin_rpc(url, "feature", {"feature": amendment_hash, "vetoed": False}):
+    ids = [node_id] if node_id is not None else _validator_ids(workspace, name)
+    if not ids:
+        print(
+            f"{bcolors.RED}No validators found under "
+            f"{os.path.join(workspace.base, name)}{bcolors.END}"
+        )
         return False
-    print(f"{bcolors.GREEN}Amendment enabled.{bcolors.END}")
-    return True
+    ok = True
+    for i in ids:
+        url = f"http://localhost:{_admin_rpc_port(i, 'validator')}"
+        result = _admin_rpc(
+            url, "feature", {"feature": amendment_hash, "vetoed": False}
+        )
+        if result is None:
+            ok = False
+            continue
+        state = result.get(amendment_hash, {})
+        print(
+            f"{bcolors.GREEN}vnode{i}: {amendment_name} vetoed="
+            f"{state.get('vetoed')} enabled={state.get('enabled')}{bcolors.END}"
+        )
+    print(
+        f"{bcolors.CYAN}Validators vote at the next flag ledger; activation follows "
+        f"the supermajority holding for the majority time.{bcolors.END}"
+    )
+    return ok
 
 
 # ---------------------------------------------------------------------------
@@ -590,7 +617,7 @@ def node_stall(
     url = f"http://localhost:{_admin_rpc_port(node_id, node_type)}"
     action = "Clearing stall on" if clear else f"Stalling ({duration_ms}ms)"
     print(f"{bcolors.CYAN}{action} {node_type} {node_id} at {url}...{bcolors.END}")
-    if not _admin_rpc(url, "node_stall", params):
+    if _admin_rpc(url, "node_stall", params) is None:
         return False
     print(f"{bcolors.GREEN}node_stall RPC sent.{bcolors.END}")
     return True
