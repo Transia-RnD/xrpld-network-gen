@@ -270,6 +270,10 @@ class TestHostVars:
         assert data["ssh_port"] == 20
         assert isinstance(data["docker_container_ports"], list)
         assert len(data["docker_container_ports"]) == 5
+        loopback = [
+            p for p in data["docker_container_ports"] if p.startswith("127.0.0.1:")
+        ]
+        assert len(loopback) == 2
 
     def test_host_vars_has_env_variables(self, tmp_path):
         builder = _build_basic(tmp_path)

@@ -102,9 +102,9 @@ class TestAddStandaloneService:
         svc = builder.services["xrpl"]
         expected_ports = [
             "5007:5007",
-            "5005:5005",
+            "127.0.0.1:5005:5005",
             "6008:6008",
-            "6006:6006",
+            "127.0.0.1:6006:6006",
             "51235:51235",
         ]
         assert svc["ports"] == expected_ports
@@ -171,9 +171,9 @@ class TestAddNodeServiceValidator:
         svc = builder.services["vnode1"]
         expected_ports = [
             f"{ports.rpc_public}:{ports.rpc_public}",
-            f"{ports.rpc_admin}:{ports.rpc_admin}",
+            f"127.0.0.1:{ports.rpc_admin}:{ports.rpc_admin}",
             f"{ports.ws_public}:{ports.ws_public}",
-            f"{ports.ws_admin}:{ports.ws_admin}",
+            f"127.0.0.1:{ports.ws_admin}:{ports.ws_admin}",
             f"{ports.peer}:{ports.peer}",
         ]
         assert svc["ports"] == expected_ports

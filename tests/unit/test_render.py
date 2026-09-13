@@ -166,8 +166,9 @@ class TestStandaloneRender:
         assert service["container_name"] == "xrpl"
         rpc_admin = cfg["port_rpc_admin_local"]["port"]
         ws_admin = cfg["port_ws_admin_local"]["port"]
-        assert f"{rpc_admin}:{rpc_admin}" in service["ports"]
-        assert f"{ws_admin}:{ws_admin}" in service["ports"]
+        assert f"127.0.0.1:{rpc_admin}:{rpc_admin}" in service["ports"]
+        assert f"127.0.0.1:{ws_admin}:{ws_admin}" in service["ports"]
+        assert not any(p.startswith(f"{rpc_admin}:") for p in service["ports"])
 
     def test_start_script_is_executable_and_names_the_compose_file(
         self, standalone_tree
@@ -241,7 +242,7 @@ class TestNetworkRender:
             admin_ports.add(rpc_admin)
             service = compose["services"][node]
             assert service["container_name"] == node
-            assert f"{rpc_admin}:{rpc_admin}" in service["ports"]
+            assert f"127.0.0.1:{rpc_admin}:{rpc_admin}" in service["ports"]
             assert f"{peer}:{peer}" in service["ports"]
         assert len(admin_ports) == len(NETWORK_NODES)
 

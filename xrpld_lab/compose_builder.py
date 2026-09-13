@@ -23,14 +23,7 @@ class ComposeBuilder:
     # ------------------------------------------------------------------
 
     def _port_mappings(self, ports: PortSet) -> list[str]:
-        """Return the standard 5-port mapping list."""
-        return [
-            f"{ports.rpc_public}:{ports.rpc_public}",
-            f"{ports.rpc_admin}:{ports.rpc_admin}",
-            f"{ports.ws_public}:{ports.ws_public}",
-            f"{ports.ws_admin}:{ports.ws_admin}",
-            f"{ports.peer}:{ports.peer}",
-        ]
+        return ports.publish_mappings()
 
     # ------------------------------------------------------------------
     # Service builders
