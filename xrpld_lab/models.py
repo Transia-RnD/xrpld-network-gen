@@ -87,6 +87,16 @@ class PortSet:
             peer=_PEER + offset,
         )
 
+    def publish_mappings(self) -> list[str]:
+        """Docker port publications; admin ports bind the host's loopback only."""
+        return [
+            f"{self.rpc_public}:{self.rpc_public}",
+            f"127.0.0.1:{self.rpc_admin}:{self.rpc_admin}",
+            f"{self.ws_public}:{self.ws_public}",
+            f"127.0.0.1:{self.ws_admin}:{self.ws_admin}",
+            f"{self.peer}:{self.peer}",
+        ]
+
 
 # ---------------------------------------------------------------------------
 # Config sub-objects

@@ -153,13 +153,7 @@ class AnsibleBuilder:
                 # docker_container see "same image" and merely restart the stale one).
                 "docker_build_tag": f"{node.name}:{self.build_tag}",
                 "docker_container_name": node.name,
-                "docker_container_ports": [
-                    f"{node.ports.rpc_public}:{node.ports.rpc_public}",
-                    f"{node.ports.rpc_admin}:{node.ports.rpc_admin}",
-                    f"{node.ports.ws_public}:{node.ports.ws_public}",
-                    f"{node.ports.ws_admin}:{node.ports.ws_admin}",
-                    f"{node.ports.peer}:{node.ports.peer}",
-                ],
+                "docker_container_ports": node.ports.publish_mappings(),
                 "docker_env_variables": {
                     "RPC_PUBLIC": str(node.ports.rpc_public),
                     "RPC_ADMIN": str(node.ports.rpc_admin),

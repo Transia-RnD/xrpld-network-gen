@@ -25,6 +25,17 @@ from xrpld_lab.models import (
 
 
 class TestPortSet:
+    def test_publish_mappings_bind_admin_ports_to_loopback(self):
+        ports = PortSet.for_node(1, NodeRole.VALIDATOR)
+        mappings = ports.publish_mappings()
+        assert mappings == [
+            f"{ports.rpc_public}:{ports.rpc_public}",
+            f"127.0.0.1:{ports.rpc_admin}:{ports.rpc_admin}",
+            f"{ports.ws_public}:{ports.ws_public}",
+            f"127.0.0.1:{ports.ws_admin}:{ports.ws_admin}",
+            f"{ports.peer}:{ports.peer}",
+        ]
+
     """Test PortSet.for_node with various node roles and indices."""
 
     def test_validator_index_1(self):

@@ -143,7 +143,7 @@ services:
       ssl_org: MyOrg
     redis: {}
     faucet:
-      ws_url: ws://10.0.0.4:6016
+      ws_url: ws://10.0.0.4:6018
       network_id: "1025"
       seed: sEdxxxxxxxxx
     status:
