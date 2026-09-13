@@ -117,7 +117,6 @@ def standalone_tree(tmp_path):
     lab = _lab_config(["up:standalone"])
     with (
         patch.object(SourceResolver, "resolve_features", return_value=FEATURES_MACRO),
-        patch.object(SourceResolver, "resolve_repo_config", return_value={}),
     ):
         name = LabRunner(lab, Workspace(base=str(tmp_path))).run()
     return name, tmp_path / name
@@ -304,7 +303,6 @@ def test_main_up_standalone_renders_then_starts(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["xrpld-lab", "up:standalone"])
     with (
         patch.object(SourceResolver, "resolve_features", return_value=FEATURES_MACRO),
-        patch.object(SourceResolver, "resolve_repo_config", return_value={}),
         patch("xrpld_lab.cli.run_start_script") as run_start_script,
     ):
         cli.main()
@@ -314,3 +312,25 @@ def test_main_up_standalone_renders_then_starts(tmp_path, monkeypatch):
     assert name == "xrpl-3.3.0"
     assert os.path.realpath(workspace.base) == os.path.realpath(tmp_path / "workspace")
     assert os.path.isfile(os.path.join(workspace.base, name, "start.sh"))
+
+
+class TestConfigOverrides:
+    def test_overrides_file_reaches_the_rendered_cfg(self, tmp_path):
+        overrides = tmp_path / "overrides.yaml"
+        overrides.write_text(
+            "node_size: medium\n"
+            "transaction_queue:\n"
+            "  ledgers_in_queue: 50\n"
+            "  maximum_txn_in_ledger: 5000\n"
+        )
+        lab = _lab_config(["up:standalone", "--config_overrides", str(overrides)])
+        with patch.object(
+            SourceResolver, "resolve_features", return_value=FEATURES_MACRO
+        ):
+            name = LabRunner(lab, Workspace(base=str(tmp_path))).run()
+
+        cfg = parse_xrpld_cfg((tmp_path / name / "config" / "xrpld.cfg").read_text())
+        assert cfg["node_size"] == "medium"
+        assert cfg["transaction_queue"]["ledgers_in_queue"] == "50"
+        assert cfg["transaction_queue"]["maximum_txn_in_ledger"] == "5000"
+        assert "network_id" in cfg

@@ -25,6 +25,7 @@ from xrpld_lab.models import (
 from xrpld_lab.protocol import get_spec
 from xrpld_lab.workspace import Workspace
 from xrpld_lab.node_factory import NodeFactory
+from xrpld_lab.config import apply_overrides
 from xrpld_lab.config_builder import XrpldCfgBuilder, ValidatorsTxtBuilder
 from xrpld_lab.compose_builder import ComposeBuilder
 from xrpld_lab.script_builder import DockerfileBuilder, ScriptBuilder
@@ -131,6 +132,10 @@ class LabRunner:
             self._run_local_network()
         return None
 
+    def _render_cfg(self, node) -> str:
+        """Render the node's xrpld.cfg with the lab's config overrides applied."""
+        return apply_overrides(XrpldCfgBuilder(node).build(), self.lab.config_overrides)
+
     def _stage_binary(self, source, dest: str) -> None:
         """Copy the local binary, or download it from the build server in binary mode.
 
@@ -192,7 +197,7 @@ class LabRunner:
         )
 
         # 3. Build config files
-        cfg_content = XrpldCfgBuilder(node).build()
+        cfg_content = self._render_cfg(node)
         vl_content = ValidatorsTxtBuilder(node, genesis=False).build()
 
         cfg_path = os.path.join(base_dir, "config")
@@ -391,7 +396,7 @@ class LabRunner:
                 self._copy_binary_to_node(staged_binary, node_dir)
 
             # Config
-            cfg_content = XrpldCfgBuilder(node).build()
+            cfg_content = self._render_cfg(node)
             vl_content = ValidatorsTxtBuilder(
                 node, genesis=True, bootstrap_vl=lab.bootstrap_vl
             ).build()
@@ -473,7 +478,7 @@ class LabRunner:
                 self._copy_binary_to_node(staged_binary, node_dir)
 
             # Config
-            cfg_content = XrpldCfgBuilder(node).build()
+            cfg_content = self._render_cfg(node)
             vl_content = ValidatorsTxtBuilder(
                 node, genesis=True, bootstrap_vl=lab.bootstrap_vl
             ).build()
@@ -730,7 +735,7 @@ class LabRunner:
             cfg_path = self.workspace.config_dir(node_dir)
             self.workspace.log_dir(node_dir)
 
-            cfg_content = XrpldCfgBuilder(node).build()
+            cfg_content = self._render_cfg(node)
             vl_content = ValidatorsTxtBuilder(
                 node, genesis=True, bootstrap_vl=lab.bootstrap_vl
             ).build()
@@ -770,7 +775,7 @@ class LabRunner:
             cfg_path = self.workspace.config_dir(node_dir)
             self.workspace.log_dir(node_dir)
 
-            cfg_content = XrpldCfgBuilder(node).build()
+            cfg_content = self._render_cfg(node)
             vl_content = ValidatorsTxtBuilder(
                 node, genesis=True, bootstrap_vl=lab.bootstrap_vl
             ).build()
