@@ -208,7 +208,7 @@ transaction_queue:
 xrpld-lab up:standalone --config_overrides overrides.yaml
 ```
 
-The merge order is: hardcoded defaults -> repo config (downloaded from GitHub at the build commit) -> your local overrides.
+Overrides apply on top of the generated config, section by section: a mapping merges into the section's keys, a list or a scalar replaces the section, and a section the generated config lacks is appended.
 
 ## Architecture
 

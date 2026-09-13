@@ -15,12 +15,9 @@ import requests
 from xrpld_lab.config import (
     parse_xrpld_cfg,
     load_overrides_file,
-    merge_config,
+    apply_overrides,
     _deep_merge,
 )
-from xrpld_lab.source_resolver import SourceResolver
-from xrpld_lab.models import BuildSource, Protocol, BuildType
-from xrpld_lab.protocol import ProtocolSpec
 
 
 # ---------------------------------------------------------------------------
@@ -217,74 +214,64 @@ class TestLoadOverridesFile:
 
 
 # ===========================================================================
-# merge_config / _deep_merge
+# apply_overrides / _deep_merge
 # ===========================================================================
 
 
-class TestMergeConfig:
-    """Merge config layers: hardcoded -> repo -> local overrides."""
+RENDERED = (
+    "[server]\nport_rpc_admin_local\nport_ws_public\n\n"
+    "[node_size]\nhuge\n\n"
+    "[transaction_queue]\nledgers_in_queue = 20\nminimum_queue_size = 2000\n\n"
+    "[ips_fixed]\n10.0.0.1 51235\n10.0.0.2 51235\n\n"
+)
 
-    def test_empty_layers(self):
-        result = merge_config({}, {}, {})
-        assert result == {}
 
-    def test_hardcoded_used_as_base(self):
-        hardcoded = {"node_size": "huge", "log_level": "trace"}
-        result = merge_config(hardcoded, {}, {})
-        assert result == hardcoded
+class TestApplyOverrides:
+    def test_empty_overrides_return_the_text_unchanged(self):
+        assert apply_overrides(RENDERED, {}) == RENDERED
 
-    def test_repo_overrides_hardcoded(self):
-        hardcoded = {"node_size": "huge", "log_level": "trace"}
-        repo = {"node_size": "medium"}
-        result = merge_config(hardcoded, repo, {})
-        assert result["node_size"] == "medium"
-        assert result["log_level"] == "trace"
+    def test_mapping_merges_into_the_section(self):
+        out = apply_overrides(RENDERED, {"transaction_queue": {"ledgers_in_queue": 50}})
+        expected = (
+            "[transaction_queue]\nledgers_in_queue = 50\nminimum_queue_size = 2000\n\n"
+        )
+        assert expected in out
 
-    def test_local_overrides_repo(self):
-        hardcoded = {"node_size": "huge"}
-        repo = {"node_size": "medium"}
-        overrides = {"node_size": "small"}
-        result = merge_config(hardcoded, repo, overrides)
-        assert result["node_size"] == "small"
+    def test_scalar_replaces_the_section(self):
+        out = apply_overrides(RENDERED, {"node_size": "medium"})
+        assert "[node_size]\nmedium\n\n" in out
+        assert "huge" not in out
 
-    def test_nested_deep_merge(self):
-        hardcoded = {
-            "voting": {"account_reserve": 1000000, "owner_reserve": 200000},
+    def test_list_replaces_the_section(self):
+        out = apply_overrides(RENDERED, {"ips_fixed": ["10.9.9.9 51235"]})
+        assert "[ips_fixed]\n10.9.9.9 51235\n\n" in out
+        assert "10.0.0.1" not in out
+
+    def test_unknown_section_is_appended(self):
+        out = apply_overrides(RENDERED, {"network_id": 4242})
+        assert out.startswith(RENDERED)
+        assert out.endswith("[network_id]\n4242\n\n")
+
+    def test_untouched_sections_are_byte_identical(self):
+        out = apply_overrides(RENDERED, {"node_size": "small"})
+        assert "[server]\nport_rpc_admin_local\nport_ws_public\n\n" in out
+        assert "[ips_fixed]\n10.0.0.1 51235\n10.0.0.2 51235\n\n" in out
+
+    def test_round_trip_parses_to_the_merged_values(self):
+        out = apply_overrides(
+            RENDERED,
+            {
+                "transaction_queue": {"maximum_txn_in_ledger": 5000},
+                "node_size": "medium",
+            },
+        )
+        parsed = parse_xrpld_cfg(out)
+        assert parsed["transaction_queue"] == {
+            "ledgers_in_queue": "20",
+            "minimum_queue_size": "2000",
+            "maximum_txn_in_ledger": "5000",
         }
-        repo = {
-            "voting": {"account_reserve": 500000},
-        }
-        result = merge_config(hardcoded, repo, {})
-        assert result["voting"]["account_reserve"] == 500000
-        assert result["voting"]["owner_reserve"] == 200000
-
-    def test_new_keys_from_repo_added(self):
-        hardcoded = {"node_size": "huge"}
-        repo = {"ledger_history": "full"}
-        result = merge_config(hardcoded, repo, {})
-        assert result["node_size"] == "huge"
-        assert result["ledger_history"] == "full"
-
-    def test_full_three_layer_merge(self):
-        hardcoded = {
-            "node_size": "huge",
-            "voting": {"account_reserve": 1000000, "owner_reserve": 200000},
-        }
-        repo = {
-            "node_size": "medium",
-            "voting": {"account_reserve": 500000},
-            "ledger_history": "full",
-        }
-        overrides = {
-            "voting": {"owner_reserve": 100000},
-            "debug_logfile": "/tmp/debug.log",
-        }
-        result = merge_config(hardcoded, repo, overrides)
-        assert result["node_size"] == "medium"
-        assert result["voting"]["account_reserve"] == 500000
-        assert result["voting"]["owner_reserve"] == 100000
-        assert result["ledger_history"] == "full"
-        assert result["debug_logfile"] == "/tmp/debug.log"
+        assert parsed["node_size"] == "medium"
 
 
 class TestDeepMerge:
@@ -309,103 +296,6 @@ class TestDeepMerge:
     def test_overlay_replaces_non_dict_with_dict(self):
         result = _deep_merge({"a": "string"}, {"a": {"nested": True}})
         assert result == {"a": {"nested": True}}
-
-
-# ===========================================================================
-# SourceResolver.resolve_repo_config
-# ===========================================================================
-
-
-class TestResolveRepoConfig:
-    """Test downloading and parsing config from the repo."""
-
-    @patch.object(SourceResolver, "download_file_at_commit")
-    @patch.object(SourceResolver, "get_commit_hash")
-    def test_success_downloads_and_parses(
-        self, mock_hash, mock_download, resolver, xrpl_spec, xrpl_http_source
-    ):
-        mock_hash.return_value = "abc123"
-        cfg_content = b"[node_size]\nhuge\n\n[node_db]\ntype=NuDB\n"
-        mock_download.return_value = cfg_content
-
-        result = resolver.resolve_repo_config(xrpl_http_source, xrpl_spec)
-
-        mock_hash.assert_called_once_with("https://build.example.com", "3.3.0")
-        mock_download.assert_called_once_with(
-            "XRPLF",
-            "rippled",
-            "abc123",
-            "cfg/rippled-example.cfg",
-            fallback_path="cfg/xrpld-example.cfg",
-        )
-        assert result["node_size"] == "huge"
-        assert result["node_db"]["type"] == "NuDB"
-
-    @patch.object(SourceResolver, "download_file_at_commit")
-    @patch.object(SourceResolver, "get_commit_hash")
-    def test_returns_empty_on_http_error(
-        self, mock_hash, mock_download, resolver, xrpl_spec, xrpl_http_source
-    ):
-        mock_hash.return_value = "abc123"
-        mock_download.side_effect = requests.HTTPError("404 Not Found")
-
-        result = resolver.resolve_repo_config(xrpl_http_source, xrpl_spec)
-        assert result == {}
-
-    @patch.object(SourceResolver, "download_file_at_commit")
-    @patch.object(SourceResolver, "get_commit_hash")
-    def test_uses_fallback_paths_from_spec(
-        self, mock_hash, mock_download, resolver, xrpl_spec
-    ):
-        mock_download.return_value = b"[node_size]\nmedium\n"
-
-        source = BuildSource(
-            protocol=Protocol.XRPL,
-            build_type=BuildType.BINARY,
-            build_server="rippleci",
-            build_version="3.1.1",
-            owner="XRPLF",
-            repo="rippled",
-        )
-
-        result = resolver.resolve_repo_config(source, xrpl_spec)
-
-        mock_hash.assert_not_called()
-        mock_download.assert_called_once_with(
-            "XRPLF",
-            "rippled",
-            "3.1.1",
-            "cfg/rippled-example.cfg",
-            fallback_path="cfg/xrpld-example.cfg",
-        )
-        assert result["node_size"] == "medium"
-
-    @patch.object(SourceResolver, "download_file_at_commit")
-    @patch.object(SourceResolver, "get_commit_hash")
-    def test_no_config_paths_returns_empty(
-        self, mock_hash, mock_download, resolver, xrpl_http_source
-    ):
-        """When spec has no config_paths, return empty dict."""
-        spec_no_config = ProtocolSpec(
-            name="test",
-            daemon_name="testd",
-            config_filename="test.cfg",
-            github_owner="TestOwner",
-            github_repo="test-repo",
-            feature_paths=["src/features.cpp"],
-            config_paths=[],
-            entrypoint_file="test.entrypoint",
-            network_entrypoint_file="network.entrypoint",
-            amendment_majority_time="5 minutes",
-            default_build_server="https://test.build",
-            default_build_version="1.0.0",
-            default_network_id=1,
-            default_standalone_network_id=1,
-            default_vl_key="TESTKEY",
-        )
-
-        result = resolver.resolve_repo_config(xrpl_http_source, spec_no_config)
-        assert result == {}
 
 
 # ===========================================================================

@@ -7,7 +7,6 @@ import re
 
 import requests
 
-from xrpld_lab.config import parse_xrpld_cfg
 from xrpld_lab.models import BuildSource
 from xrpld_lab.protocol import ProtocolSpec
 
@@ -142,34 +141,3 @@ class SourceResolver:
             primary_path,
             fallback_path=fallback_path,
         )
-
-    def resolve_repo_config(self, source: BuildSource, spec: ProtocolSpec) -> dict:
-        """Download and parse xrpld config from the repo at the resolved commit.
-
-        Tries known config paths from ``spec.config_paths`` (ordered: primary,
-        then fallback). Returns parsed config dict or empty dict if not found.
-
-        :param source: The build source configuration
-        :param spec: The protocol specification with config paths
-        :return: Parsed config dict, or ``{}`` on failure
-        """
-        if not spec.config_paths:
-            return {}
-
-        try:
-            ref = self.resolve_ref(source)
-
-            primary_path = spec.config_paths[0]
-            fallback_path = spec.config_paths[1] if len(spec.config_paths) > 1 else None
-
-            content = self.download_file_at_commit(
-                source.owner,
-                source.repo,
-                ref,
-                primary_path,
-                fallback_path=fallback_path,
-            )
-
-            return parse_xrpld_cfg(content.decode("utf-8", errors="replace"))
-        except (requests.HTTPError, requests.RequestException, ValueError):
-            return {}

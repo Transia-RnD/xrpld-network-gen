@@ -33,35 +33,9 @@ def parse_xrpld_cfg(content: str) -> Dict[str, Any]:
         nonlocal current_section, section_lines
         if current_section is None:
             return
-
-        # Filter out empty lines
-        lines = [line for line in section_lines if line.strip()]
-
-        if not lines:
-            # Empty section, skip
-            current_section = None
-            section_lines = []
-            return
-
-        # Check if any line contains '='
-        has_kv = any("=" in line for line in lines)
-
-        if has_kv:
-            # Key-value pairs -> dict
-            d: Dict[str, str] = {}
-            for line in lines:
-                if "=" in line:
-                    key, _, value = line.partition("=")
-                    d[key.strip()] = value.strip()
-                # Lines without = in a kv section are ignored
-            result[current_section] = d
-        elif len(lines) == 1:
-            # Single value -> string
-            result[current_section] = lines[0].strip()
-        else:
-            # Multiple lines -> list
-            result[current_section] = [line.strip() for line in lines]
-
+        value = _parse_section_lines(section_lines)
+        if value is not None:
+            result[current_section] = value
         current_section = None
         section_lines = []
 
@@ -90,6 +64,85 @@ def parse_xrpld_cfg(content: str) -> Dict[str, Any]:
     return result
 
 
+def _parse_section_lines(section_lines: list[str]) -> Any:
+    """Structure a section's lines: dict for key=value, str for one, else list."""
+    lines = [line.strip() for line in section_lines if line.strip()]
+    if not lines:
+        return None
+    if any("=" in line for line in lines):
+        d: Dict[str, str] = {}
+        for line in lines:
+            if "=" in line:
+                key, _, value = line.partition("=")
+                d[key.strip()] = value.strip()
+        return d
+    if len(lines) == 1:
+        return lines[0]
+    return lines
+
+
+def _render_section(name: str, value: Any) -> str:
+    """Render one section as INI text with a trailing blank line."""
+    if isinstance(value, dict):
+        body = "".join(f"{k} = {v}\n" for k, v in value.items())
+    elif isinstance(value, (list, tuple)):
+        body = "".join(f"{v}\n" for v in value)
+    else:
+        body = f"{value}\n"
+    return f"[{name}]\n{body}\n"
+
+
+_SECTION_HEADER = re.compile(r"^\[([^\]]+)\]\s*$")
+
+
+def apply_overrides(content: str, overrides: Dict[str, Any]) -> str:
+    """Apply per-section overrides to rendered xrpld.cfg text.
+
+    A mapping merges into the section's keys, a list or scalar replaces the
+    section, and a section the text lacks is appended. Untouched sections
+    keep their exact text.
+    """
+    if not overrides:
+        return content
+    pending = dict(overrides)
+    out: list[str] = []
+    name: str | None = None
+    raw: list[str] = []
+
+    def flush():
+        if name is None:
+            out.extend(raw)
+            return
+        if name in pending:
+            current = _parse_section_lines(raw)
+            new = pending.pop(name)
+            if isinstance(current, dict) and isinstance(new, dict):
+                new = _deep_merge(current, new)
+            out.append(_render_section(name, new))
+        else:
+            out.append(f"[{name}]\n" + "".join(raw))
+
+    for line in content.splitlines(keepends=True):
+        m = _SECTION_HEADER.match(line)
+        if m:
+            flush()
+            name, raw = m.group(1), []
+        elif name is None:
+            out.append(line)
+        else:
+            raw.append(line)
+    flush()
+
+    text = "".join(out)
+    if pending and text and not text.endswith("\n"):
+        text += "\n"
+    for extra, value in pending.items():
+        if not text.endswith("\n\n") and text:
+            text += "\n"
+        text += _render_section(extra, value)
+    return text
+
+
 def load_overrides_file(path: str) -> Dict[str, Any]:
     """Load config overrides from a YAML or JSON file.
 
@@ -111,20 +164,6 @@ def load_overrides_file(path: str) -> Dict[str, Any]:
     # Default: treat as YAML (.yaml, .yml, or anything else)
     result = yaml.safe_load(content)
     return result if result is not None else {}
-
-
-def merge_config(
-    hardcoded: Dict[str, Any],
-    repo: Dict[str, Any],
-    overrides: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Merge config layers: hardcoded defaults -> repo config -> local overrides.
-
-    Later layers override earlier ones. Nested dicts are deep-merged.
-    """
-    result = _deep_merge(hardcoded, repo)
-    result = _deep_merge(result, overrides)
-    return result
 
 
 def _deep_merge(base: dict, overlay: dict) -> dict:

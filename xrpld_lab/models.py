@@ -249,7 +249,6 @@ class BuildSource:
     cluster_name: str = ""
     commit_hash: str = ""
     feature_content: list = field(default_factory=list)
-    repo_config: dict = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
