@@ -736,13 +736,15 @@ class Network:
         ) as pool:
             nodes = list(pool.map(lambda n: self._node(*n), self.nodes))
         validators = [n for n in nodes if n["role"] == "validator"]
-        seqs = {n["validated_ledger"] for n in validators}
+        seqs = [n["validated_ledger"] for n in validators]
+        # Samplers are polled a few seconds apart, so one ledger of lag is normal;
+        # two or more validators further apart than that have diverged.
+        agreement = bool(validators) and None not in seqs and max(seqs) - min(seqs) <= 1
         return {
             "name": self.name,
             "nodes": nodes,
-            # Every validator reports a validated ledger and they all
-            # report the same one.
-            "agreement": bool(validators) and None not in seqs and len(seqs) == 1,
+            "healthy": all(n["healthy"] for n in nodes),
+            "agreement": agreement,
             "validated_ledger": max(
                 (
                     n["validated_ledger"]
