@@ -31,7 +31,7 @@ from xrpld_lab.models import (
     VlConfig,
 )
 from xrpld_lab.operations import (
-    enable_amendment,
+    vote_amendment,
     node_stall,
     remove_network,
     restart_local_node,
@@ -463,12 +463,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "(set this when invoking from outside the lab root)",
     )
 
-    # -- enable:amendment ----------------------------------------------------
-    p = subparsers.add_parser("enable:amendment", help="Enable amendment via RPC")
-    p.add_argument("--name", required=True)
+    # -- vote:amendment ----------------------------------------------------
+    p = subparsers.add_parser(
+        "vote:amendment",
+        help="Lift the veto on an amendment so the validators vote for it; "
+        "activation follows the flag-ledger supermajority",
+    )
+    p.add_argument("--name", required=True, help="Cluster directory name")
     p.add_argument("--amendment_name", required=True)
-    p.add_argument("--node_id", type=int, required=True)
-    p.add_argument("--node_type", required=True, choices=["validator", "peer"])
+    p.add_argument(
+        "--node_id", type=int, default=None, help="One validator instead of all"
+    )
 
     # -- node:stall ----------------------------------------------------------
     p = subparsers.add_parser("node:stall", help="Stall a node (pause consensus)")
@@ -911,13 +916,9 @@ def main() -> None:
             args.build_version,
             image=args.image,
         )
-    elif args.command == "enable:amendment":
-        ok = enable_amendment(
-            args.name,
-            args.amendment_name,
-            args.node_id,
-            args.node_type,
-            workspace,
+    elif args.command == "vote:amendment":
+        ok = vote_amendment(
+            args.name, args.amendment_name, workspace, node_id=args.node_id
         )
     elif args.command == "node:stall":
         ok = node_stall(

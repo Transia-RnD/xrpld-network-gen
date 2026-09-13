@@ -10,7 +10,7 @@ Covers:
 - start_local / stop_local: CWD-based script running
 - update_node_binary: binary sourcing before stop, Dockerfile rewrite, exit codes
 - restart_local_node: docker vs bare-process relaunch and pidfile
-- enable_amendment / node_stall: JSON-RPC dispatch and error reporting
+- vote_amendment / node_stall: JSON-RPC dispatch and error reporting
 - view_local_logs / view_standalone_logs: log file discovery
 """
 
@@ -24,7 +24,7 @@ import requests
 from xrpld_lab.models import NodeRole, PortSet
 from xrpld_lab.operations import (
     _dockerfile_with_binary,
-    enable_amendment,
+    vote_amendment,
     node_stall,
     remove_network,
     restart_local_node,
@@ -619,7 +619,7 @@ class TestRestartLocalNode:
 
 
 # -------------------------------------------------------------------------
-# enable_amendment / node_stall
+# vote_amendment / node_stall
 # -------------------------------------------------------------------------
 
 
@@ -632,34 +632,41 @@ def _rpc_response(status_code: int = 200, result: dict | None = None) -> MagicMo
     return resp
 
 
-class TestEnableAmendment:
-    """Amendment enablement via the feature admin RPC."""
+class TestVoteAmendment:
+    """Veto lifting via the feature admin RPC across the cluster's validators."""
+
+    def _workspace(self, tmp_path, validators):
+        ws = MagicMock()
+        ws.base = str(tmp_path)
+        for i in range(1, validators + 1):
+            (tmp_path / "my-net" / f"vnode{i}").mkdir(parents=True)
+        return ws
 
     @patch("xrpld_lab.operations.requests.post")
-    def test_enable_amendment_sends_rpc(self, mock_post):
+    def test_every_validator_is_asked(self, mock_post, tmp_path, capsys):
         mock_post.return_value = _rpc_response()
 
-        ok = enable_amendment("my-net", "fixNFTokenRemint", 1, "validator", MagicMock())
+        ok = vote_amendment("my-net", "fixNFTokenRemint", self._workspace(tmp_path, 2))
 
         assert ok is True
-        # Validator 1: RPC admin port = 5005 + 1*100 = 5105
-        assert mock_post.call_args.args[0] == "http://localhost:5105"
+        urls = [c.args[0] for c in mock_post.call_args_list]
+        assert urls == ["http://localhost:5105", "http://localhost:5205"]
         body = mock_post.call_args.kwargs["json"]
         assert body["method"] == "feature"
         assert body["params"][0]["vetoed"] is False
+        assert "next flag ledger" in capsys.readouterr().out
 
     @patch("xrpld_lab.operations.requests.post")
-    def test_enable_amendment_peer_port(self, mock_post):
+    def test_node_id_targets_one_validator(self, mock_post, tmp_path):
         mock_post.return_value = _rpc_response()
 
-        enable_amendment("my-net", "SomeAmendment", 2, "peer", MagicMock())
+        vote_amendment("my-net", "X", self._workspace(tmp_path, 3), node_id=2)
 
-        # Peer 2: RPC admin port = 5005 + 2*10 = 5025
-        assert mock_post.call_args.args[0] == "http://localhost:5025"
+        assert mock_post.call_count == 1
+        assert mock_post.call_args.args[0] == "http://localhost:5205"
 
     @patch("xrpld_lab.operations.requests.post")
-    def test_enable_amendment_hash_in_payload(self, mock_post):
-        """The amendment hash is computed and sent as the feature parameter."""
+    def test_hash_in_payload(self, mock_post, tmp_path):
         import hashlib
 
         mock_post.return_value = _rpc_response()
@@ -667,40 +674,46 @@ class TestEnableAmendment:
             hashlib.sha512("fixNFTokenRemint".encode("utf-8")).hexdigest().upper()[:64]
         )
 
-        enable_amendment("my-net", "fixNFTokenRemint", 1, "validator", MagicMock())
+        vote_amendment("my-net", "fixNFTokenRemint", self._workspace(tmp_path, 1))
 
         assert mock_post.call_args.kwargs["json"]["params"][0]["feature"] == expected
 
     @patch("xrpld_lab.operations.requests.post")
-    def test_rpc_error_result_is_a_failure(self, mock_post, capsys):
+    def test_reply_state_is_printed_per_validator(self, mock_post, tmp_path, capsys):
+        import hashlib
+
+        h = hashlib.sha512("X".encode("utf-8")).hexdigest().upper()[:64]
         mock_post.return_value = _rpc_response(
-            result={
-                "status": "error",
-                "error": "badFeature",
-                "error_message": "Feature unknown or ambiguous.",
-            }
+            result={h: {"name": "X", "vetoed": False, "enabled": False}}
         )
 
-        ok = enable_amendment("my-net", "Nope", 1, "validator", MagicMock())
+        vote_amendment("my-net", "X", self._workspace(tmp_path, 1))
 
-        assert ok is False
-        out = capsys.readouterr().out
-        assert "Feature unknown or ambiguous." in out
-        assert "Amendment enabled" not in out
+        assert "vnode1: X vetoed=False enabled=False" in capsys.readouterr().out
 
     @patch("xrpld_lab.operations.requests.post")
-    def test_non_200_is_a_failure(self, mock_post, capsys):
-        mock_post.return_value = _rpc_response(status_code=403)
+    def test_one_failing_validator_fails_the_command(self, mock_post, tmp_path, capsys):
+        mock_post.side_effect = [_rpc_response(status_code=403), _rpc_response()]
 
-        assert enable_amendment("my-net", "X", 1, "validator", MagicMock()) is False
+        ok = vote_amendment("my-net", "X", self._workspace(tmp_path, 2))
+
+        assert ok is False
+        assert mock_post.call_count == 2
         assert "HTTP 403" in capsys.readouterr().out
+
+    def test_no_validators_is_a_failure(self, tmp_path, capsys):
+        ws = MagicMock()
+        ws.base = str(tmp_path)
+
+        assert vote_amendment("missing", "X", ws) is False
+        assert "No validators found" in capsys.readouterr().out
 
     @patch(
         "xrpld_lab.operations.requests.post",
         side_effect=requests.ConnectionError("refused"),
     )
-    def test_unreachable_node_is_a_failure(self, mock_post, capsys):
-        assert enable_amendment("my-net", "X", 1, "validator", MagicMock()) is False
+    def test_unreachable_validator_is_a_failure(self, mock_post, tmp_path, capsys):
+        assert vote_amendment("my-net", "X", self._workspace(tmp_path, 1)) is False
         assert "RPC request failed" in capsys.readouterr().out
 
 
