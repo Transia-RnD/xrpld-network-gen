@@ -1,213 +1,243 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>xrpld network status</title>
 <style>
   :root {
     color-scheme: light dark;
-    --bg: #0f1115; --panel: #171a21; --line: #262b36; --text: #e6e9ef;
-    --dim: #8b93a7; --accent: #4da3ff; --accent2: #ffb454; --ok: #3ddc97;
-    --warn: #ffcc66; --bad: #ff6b6b;
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1d212a; --line: #262b36;
+    --text: #e6e9ef; --dim: #8b93a7; --accent: #4da3ff;
+    --ok: #3ddc97; --ok-bg: rgba(61,220,151,.12);
+    --warn: #ffcc66; --warn-bg: rgba(255,204,102,.14);
+    --bad: #ff6b6b; --bad-bg: rgba(255,107,107,.14);
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
   @media (prefers-color-scheme: light) {
-    :root { --bg: #f6f7f9; --panel: #fff; --line: #e2e5ea; --text: #1a1d23; --dim: #5f6673; }
+    :root { --bg: #f6f7f9; --panel: #ffffff; --panel-2: #f1f3f6; --line: #d9dde5;
+            --text: #1b1f27; --dim: #5d667a; --accent: #1f6fd0;
+            --ok: #1a9c66; --ok-bg: rgba(26,156,102,.12);
+            --warn: #a36a00; --warn-bg: rgba(163,106,0,.12);
+            --bad: #c93c3c; --bad-bg: rgba(201,60,60,.12); }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-  header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
-           padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
-  h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .2px; }
-  .sub { color: var(--dim); font-family: var(--mono); font-size: 12px; }
-  .spacer { flex: 1; }
-  .badge { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 999px;
-           border: 1px solid var(--line); white-space: nowrap; }
-  .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
-  .badge.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
-  .badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
-  main { padding: 16px 20px 40px; }
-  .stats { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-           margin-bottom: 16px; }
-  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-          padding: 10px 12px; }
-  .stat .k { color: var(--dim); font-size: 11px; text-transform: uppercase;
-             letter-spacing: .06em; }
-  .stat .v { font-family: var(--mono); font-size: 18px; margin-top: 3px; }
-  .stat .v small { font-size: 12px; color: var(--dim); }
-  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-          margin-top: 12px; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-           padding: 10px 12px 6px; }
-  .panel h2 { font-size: 12px; margin: 0 0 6px; font-weight: 600; color: var(--dim);
-              text-transform: uppercase; letter-spacing: .06em; }
-  .panel .empty { color: var(--dim); font-family: var(--mono); font-size: 12px; padding: 4px 0 8px; }
-  table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
-  th { text-align: left; color: var(--dim); font-weight: 500; padding: 4px 6px;
-       border-bottom: 1px solid var(--line); text-transform: uppercase; font-size: 11px;
-       letter-spacing: .06em; }
-  td { padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  tr:last-child td { border-bottom: 0; }
-  td.k { color: var(--dim); white-space: nowrap; }
-  .num { text-align: right; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--sans); }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
+  code, .mono { font-family: var(--mono); font-size: 13px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 18px;
+           padding: 18px 24px 10px; }
+  header h1 { font-size: 20px; margin: 0; font-weight: 650; }
+  header .meta { color: var(--dim); font-size: 13px; }
+  header .spacer { flex: 1; }
+  main { padding: 0 24px 40px; max-width: 1400px; margin: 0 auto; }
+  section { margin-top: 22px; }
+  section > h2 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+                 color: var(--dim); margin: 0 0 8px; font-weight: 600; }
+  section > h2 .who { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
+  .cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+  .panel h3 { font-size: 12px; color: var(--dim); font-weight: 600; margin: 0 0 8px; }
+  .stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .stat .k { color: var(--dim); font-size: 12px; }
+  .stat .v { font-family: var(--mono); font-size: 22px; margin-top: 2px; font-weight: 600; }
+  .stat .v small { font-size: 12px; color: var(--dim); font-weight: 400; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px;
+           font-family: var(--mono); font-size: 12px; border: 1px solid transparent; white-space: nowrap; }
+  .badge.ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok); }
+  .badge.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn); }
+  .badge.bad { color: var(--bad); background: var(--bad-bg); border-color: var(--bad); }
+  .badge.dim { color: var(--dim); background: var(--panel-2); border-color: var(--line); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--dim); font-weight: 600; font-size: 11px; text-transform: uppercase;
+       letter-spacing: .05em; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  td.k { color: var(--dim); white-space: nowrap; width: 1%; padding-right: 16px; }
+  td.mono { font-family: var(--mono); overflow-wrap: anywhere; }
   .wrap { overflow-x: auto; }
-  .err { color: var(--bad); font-family: var(--mono); font-size: 12px; }
+  .copy { cursor: pointer; border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+          font-family: var(--mono); font-size: 12px; padding: 3px 8px; border-radius: 6px; overflow-wrap: anywhere; }
+  .copy:hover { border-color: var(--accent); }
+  .copy.done { border-color: var(--ok); }
+  .empty { color: var(--dim); font-family: var(--mono); font-size: 12px; }
+  .cols { columns: 220px; column-gap: 24px; }
+  .cols div { break-inside: avoid; padding: 2px 0; font-family: var(--mono); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); }
+  input[type=search] { background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 6px; padding: 5px 9px; font: 13px var(--sans); width: 240px; max-width: 100%; }
+  .err { color: var(--bad); font-family: var(--mono); font-size: 12px; margin-top: 12px; }
+  @media (max-width: 600px) { header, main { padding-left: 16px; padding-right: 16px; } }
 </style>
-
+</head>
+<body>
 <header>
   <h1 id="name">xrpld network status</h1>
-  <span class="badge" id="health">…</span>
+  <span id="health" class="badge dim">…</span>
+  <span class="meta" id="netid"></span>
+  <span class="meta" id="genesis"></span>
   <span class="spacer"></span>
-  <span class="sub" id="updated"></span>
+  <span class="meta" id="updated"></span>
 </header>
-
 <main>
-  <div class="stats" id="stats"></div>
-  <div class="panel">
-    <h2>Nodes</h2>
-    <div class="wrap"><table id="nodes"></table></div>
-  </div>
-  <div class="grid">
-    <div class="panel"><h2>Last deploy</h2><div id="deploy"></div></div>
-    <div class="panel"><h2>Pinned branches</h2><div id="branches"></div></div>
-    <div class="panel"><h2>Faucet</h2><div id="faucet"></div></div>
-    <div class="panel"><h2>Validator list</h2><div id="vl"></div></div>
-    <div class="panel"><h2>Amendments</h2><div id="amendments"></div></div>
-  </div>
+  <section id="sec-connect">
+    <h2>Connect <span class="who">for developers building on the network</span></h2>
+    <div class="cards">
+      <div class="panel"><h3>Endpoints</h3><table id="endpoints"></table></div>
+      <div class="panel"><h3>Faucet</h3><table id="faucet"></table></div>
+      <div class="panel"><h3>Chain</h3><div class="stats" id="stats"></div></div>
+    </div>
+  </section>
+
+  <section id="sec-deployed">
+    <h2>What is deployed <span class="who">for contributors whose branches ship here</span></h2>
+    <div class="cards">
+      <div class="panel"><h3>Build</h3><table id="deploy"></table></div>
+      <div class="panel" id="integrations" style="grid-column: 1 / -1; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); background: none; border: 0; padding: 0;"></div>
+    </div>
+  </section>
+
+  <section id="sec-amendments">
+    <h2>Amendments <span class="who">enabled on the chain</span> <span id="amcount" class="meta"></span></h2>
+    <div class="panel">
+      <input type="search" id="amfilter" placeholder="filter by name" aria-label="filter amendments">
+      <div class="cols" id="amendments" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <section id="sec-nodes">
+    <h2>Nodes <span class="who">for operators</span></h2>
+    <div class="panel"><div class="wrap"><table id="nodes"></table></div></div>
+    <div class="cards" style="margin-top:12px">
+      <div class="panel"><h3>Validator list</h3><table id="vl"></table></div>
+      <div class="panel"><h3>Last deploy</h3><table id="lastdeploy"></table></div>
+    </div>
+  </section>
   <p class="err" id="err"></p>
 </main>
 
 <script>
-const esc = s => String(s).replace(/[&<>"']/g, c =>
-  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const fmtNum = v => v == null ? '–' : Number(v).toLocaleString();
-const fmtDur = s => {
-  if (s == null) return '–';
-  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
-  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
-};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtNum = n => (n == null || isNaN(n)) ? '–' : Number(n).toLocaleString();
+const short = (sha, n = 12) => sha ? String(sha).slice(0, n) : '–';
+const badge = (cls, label) => `<span class="badge ${cls}">${{ok:'●',warn:'▲',bad:'✕',dim:'·'}[cls]} ${esc(label)}</span>`;
+const stateClass = s => s === 'proposing' || s === 'full' || s === 'validating' ? 'ok' : (s ? 'warn' : 'bad');
+const rows = pairs => pairs.map(([k, v]) => `<tr><td class="k">${esc(k)}</td><td class="mono">${v}</td></tr>`).join('');
+const copy = (text) => `<span class="copy" data-copy="${esc(text)}" title="click to copy">${esc(text)}</span>`;
 const empty = what => `<div class="empty">${esc(what)} not recorded in network.json</div>`;
-const kv = rows => `<table>${rows.map(([k, v]) =>
-  `<tr><td class="k">${esc(k)}</td><td>${v}</td></tr>`).join('')}</table>`;
+const fmtUptime = s => s == null ? '–' : s < 3600 ? `${Math.round(s/60)}m` : s < 86400 ? `${(s/3600).toFixed(1)}h` : `${(s/86400).toFixed(1)}d`;
 
-// proposing (validator) and full (peer) are the healthy states; a state the sampler could
-// not read is bad; anything on the way to full is a warning.
-function stateBadge(node) {
-  const state = node.server_state || (node.error ? 'unreachable' : 'unknown');
-  const cls = node.healthy ? 'ok'
-    : ['unreachable', 'unknown', 'disconnected'].includes(state) ? 'bad' : 'warn';
-  return `<span class="badge ${cls}">${esc(state)}</span>`;
+document.addEventListener('click', e => {
+  const el = e.target.closest('.copy'); if (!el) return;
+  navigator.clipboard?.writeText(el.dataset.copy).then(() => { el.classList.add('done'); setTimeout(() => el.classList.remove('done'), 900); });
+});
+
+let amendmentNames = [];
+function renderAmendments(filter = '') {
+  const am = lastNet?.amendments; const box = document.getElementById('amendments');
+  if (!am || !(am.enabled?.length || am.expected?.length)) { box.innerHTML = empty('amendments'); document.getElementById('amcount').textContent = ''; return; }
+  const enabled = new Set(am.enabled || []);
+  const names = [...new Set([...(am.expected || []), ...(am.enabled || [])])].sort((a, b) => a.localeCompare(b));
+  const f = filter.trim().toLowerCase();
+  const shown = names.filter(n => !f || n.toLowerCase().includes(f));
+  document.getElementById('amcount').textContent = `${enabled.size} enabled` + (am.expected?.length ? `, ${am.expected.filter(n => !enabled.has(n)).length} expected but not enabled` : '');
+  box.innerHTML = shown.length ? shown.map(n => `<div><span class="dot ${enabled.has(n) ? 'ok' : 'warn'}"></span>${esc(n)}${enabled.has(n) ? '' : ' <span class="badge warn">▲ not enabled</span>'}</div>`).join('') : `<div class="empty">no amendment matches</div>`;
 }
+document.getElementById('amfilter').addEventListener('input', e => renderAmendments(e.target.value));
 
-function renderHealth(health, status) {
-  const badge = document.getElementById('health');
-  if (!health) {
-    badge.textContent = 'health unknown';
-    badge.className = 'badge bad';
-    return;
-  }
-  const failing = health.failing || [];
-  badge.textContent = status === 200 ? 'healthy'
-    : `degraded: ${failing.map(f => f.name).join(', ')}`;
-  badge.className = 'badge ' + (status === 200 ? 'ok' : 'bad');
-}
+let lastNet = null;
+function renderNetwork(net, live) {
+  lastNet = net;
+  const ep = net.endpoints || {};
+  const fields = [
+    ['WebSocket', ep.websocket && copy(ep.websocket)],
+    ['JSON-RPC', ep.json_rpc && copy(ep.json_rpc)],
+    ['Network ID', net.network_id != null ? copy(String(net.network_id)) : null],
+    ['Validator list', ep.vl_site && `<a href="${esc(ep.vl_site)}" rel="noopener">${esc(ep.vl_site)}</a>`],
+  ].filter(([, v]) => v);
+  document.getElementById('endpoints').innerHTML = fields.length ? rows(fields) : `<tr><td>${empty('endpoints')}</td></tr>`;
 
-function renderStats(report) {
-  const nodes = report.nodes || [];
-  const validators = nodes.filter(n => n.role === 'validator');
-  const peers = nodes.filter(n => n.role !== 'validator');
-  const healthy = list => list.filter(n => n.healthy).length;
-  const tile = (count, list) =>
-    `${count}<small> / ${list.length}</small>`;
-  const cells = [
-    ['validators healthy', tile(healthy(validators), validators)],
-    ['peers healthy', tile(healthy(peers), peers)],
-    ['validated ledger', fmtNum(report.validated_ledger)],
-    ['agreement', report.agreement
-      ? '<span class="badge ok">all validators agree</span>'
-      : '<span class="badge bad">validators differ</span>'],
-  ];
-  document.getElementById('stats').innerHTML = cells.map(
-    ([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
-}
+  const fa = net.faucet;
+  document.getElementById('faucet').innerHTML = fa ? rows([
+    ['Address', fa.address ? copy(fa.address) : '–'],
+    ['URL', ep.faucet_url ? `<a href="${esc(ep.faucet_url)}" rel="noopener">${esc(ep.faucet_url)}</a>` : '–'],
+    ['Balance', fa.balance_xrp == null ? '–' : `${fmtNum(Math.floor(fa.balance_xrp))} XRP`],
+  ]) : `<tr><td>${empty('faucet')}</td></tr>`;
 
-function renderNodes(nodes) {
-  const head = `<tr><th>node</th><th>role</th><th>state</th><th>build</th>
-    <th class="num">validated ledger</th><th class="num">peers</th><th>uptime</th></tr>`;
-  const rows = nodes.map(n => `<tr>
-    <td><a href="nodes/${encodeURIComponent(n.name)}/">${esc(n.name)}</a></td>
-    <td class="k">${esc(n.role)}</td>
-    <td>${stateBadge(n)}</td>
-    <td>${esc(n.build_version || '–')}</td>
-    <td class="num">${fmtNum(n.validated_ledger)}</td>
-    <td class="num">${fmtNum(n.peers)}</td>
-    <td>${fmtDur(n.uptime)}</td></tr>`).join('');
-  document.getElementById('nodes').innerHTML = head + (rows || '<tr><td>no nodes configured</td></tr>');
-}
+  const d = net.last_deploy;
+  document.getElementById('deploy').innerHTML = d ? rows([
+    ['Build', esc(live.build_version || '–')],
+    ['Composed tree', d.sha ? copy(d.sha) : '–'],
+    ['Image', d.image ? copy(d.image) : '–'],
+    ['Deployed', esc(d.date || '–') + (d.genesis ? ' ' + badge('warn', 'genesis reset') : '')],
+  ]) : `<tr><td>${empty('last deploy')}</td></tr>`;
+  document.getElementById('lastdeploy').innerHTML = d ? rows([
+    ['Date', esc(d.date || '–')], ['Genesis', d.genesis == null ? '–' : d.genesis ? 'yes' : 'no'], ['Operator', esc(d.operator || '–')],
+  ]) : `<tr><td>${empty('last deploy')}</td></tr>`;
 
-function renderNetwork(net) {
-  const deploy = net.last_deploy;
-  document.getElementById('deploy').innerHTML = deploy ? kv([
-    ['date', esc(deploy.date || '–')],
-    ['sha', `<code>${esc(deploy.sha || '–')}</code>`],
-    ['image', esc(deploy.image || '–')],
-    ['genesis', deploy.genesis == null ? '–' : deploy.genesis ? 'yes' : 'no'],
-    ['operator', esc(deploy.operator || '–')],
-  ]) : empty('last deploy');
-
-  const branches = net.branches || [];
-  document.getElementById('branches').innerHTML = branches.length ? `<table>${branches.map(b =>
-    `<tr><td class="k">${esc(b.repo || '')}</td><td>${b.pr_url
-      ? `<a href="${esc(b.pr_url)}" rel="noopener">${esc(b.branch || b.pr_url)}</a>`
-      : esc(b.branch || '–')}</td></tr>`).join('')}</table>` : empty('pinned branches');
-
-  const faucet = net.faucet;
-  document.getElementById('faucet').innerHTML = faucet ? kv([
-    ['address', `<code>${esc(faucet.address || '–')}</code>`],
-    ['balance', faucet.balance_xrp == null ? '–' : `${fmtNum(faucet.balance_xrp)} XRP`],
-  ]) : empty('faucet');
+  const ints = net.integrations || [];
+  document.getElementById('integrations').innerHTML = ints.length ? ints.map(it => {
+    const title = { xrpld: 'xrpld branches', xrpl_js: 'xrpl.js (SDK) branches' }[it.kind] || `${esc(it.kind)} branches`;
+    const head = `<h3>${title} <span class="meta" style="font-weight:400">onto ${esc(it.base || '')}${it.target ? ' → ' + esc(it.target) : ''}</span></h3>`;
+    const body = (it.branches || []).length ? `<div class="wrap"><table><tr><th>Branch</th><th>Merged at</th><th>Outcome</th></tr>${it.branches.map(b =>
+      `<tr><td class="mono">${esc(b.repo || '')} ${b.pr_url ? `<a href="${esc(b.pr_url)}" rel="noopener">${esc(b.branch)}</a>` : esc(b.branch)}${b.pr ? ` <a href="${esc(b.pr)}" rel="noopener">#${esc(b.pr_number || 'PR')}</a>` : ''}</td>` +
+      `<td class="mono">${b.sha ? copy(short(b.sha)) : '–'}</td>` +
+      `<td>${b.outcome ? badge(b.outcome === 'conflict' ? 'bad' : b.outcome === 'ai-resolved' ? 'warn' : 'ok', b.outcome) : '–'}</td></tr>`).join('')}</table></div>` : empty('branches');
+    return `<div class="panel">${head}${body}</div>`;
+  }).join('') : `<div class="panel">${empty('integrations')}</div>`;
 
   const vl = net.vl;
-  document.getElementById('vl').innerHTML = vl ? kv([
-    ['site', vl.site ? `<a href="${esc(vl.site)}" rel="noopener">${esc(vl.site)}</a>` : '–'],
-    ['expiration', esc(vl.expiration || '–')],
-  ]) : empty('validator list');
+  document.getElementById('vl').innerHTML = vl ? rows([
+    ['Site', vl.site ? `<a href="${esc(vl.site)}" rel="noopener">${esc(vl.site)}</a>` : '–'],
+    ['Expiration', esc(vl.expiration || '–')],
+  ]) : `<tr><td>${empty('validator list')}</td></tr>`;
 
-  const am = net.amendments;
-  if (am && (am.enabled || am.expected)) {
-    const enabled = new Set(am.enabled || []);
-    const names = [...new Set([...(am.expected || []), ...(am.enabled || [])])].sort();
-    document.getElementById('amendments').innerHTML = `<table>${names.map(name =>
-      `<tr><td>${esc(name)}</td><td>${enabled.has(name)
-        ? '<span class="badge ok">enabled</span>'
-        : '<span class="badge warn">expected, not enabled</span>'}</td></tr>`).join('')}</table>`;
-  } else {
-    document.getElementById('amendments').innerHTML = empty('amendments');
-  }
+  document.getElementById('netid').textContent = net.network_id != null ? `network ${net.network_id}` : '';
+  document.getElementById('genesis').textContent = d?.genesis && d.date ? `genesis ${d.date.slice(0, 10)}` : '';
+  renderAmendments(document.getElementById('amfilter').value);
+}
+
+function renderLive(data) {
+  const nodes = data.nodes || [];
+  const validators = nodes.filter(n => n.role === 'validator'), peers = nodes.filter(n => n.role === 'peer');
+  const okV = validators.filter(n => n.healthy).length, okP = peers.filter(n => n.healthy).length;
+  const healthy = data.healthy ?? (okV === validators.length && okP === peers.length);
+  document.getElementById('health').outerHTML = `<span id="health" class="badge ${healthy ? 'ok' : (okV >= Math.ceil(validators.length * 0.8) ? 'warn' : 'bad')}">` +
+    `${healthy ? '● healthy' : (okV >= Math.ceil(validators.length * 0.8) ? '▲ degraded' : '✕ down')}</span>`;
+  document.getElementById('stats').innerHTML = [
+    ['Validated ledger', fmtNum(data.validated_ledger)],
+    ['Validators', `${okV}<small> / ${validators.length}</small>`],
+    ['Peers', `${okP}<small> / ${peers.length}</small>`],
+    ['Agreement', data.agreement == null ? '–' : badge(data.agreement ? 'ok' : 'bad', data.agreement ? 'in sync' : 'diverged')],
+  ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+
+  document.getElementById('nodes').innerHTML = `<tr><th>Node</th><th>Role</th><th>State</th><th>Build</th><th style="text-align:right">Validated</th><th style="text-align:right">Peers</th><th style="text-align:right">Uptime</th></tr>` +
+    nodes.map(n => `<tr><td><a href="nodes/${esc(n.name)}/">${esc(n.name)}</a></td><td>${esc(n.role)}</td>` +
+      `<td>${badge(n.healthy ? stateClass(n.server_state) : 'bad', n.server_state || 'unreachable')}</td>` +
+      `<td class="mono">${esc(n.build_version || '–')}</td><td class="num">${fmtNum(n.validated_ledger)}</td>` +
+      `<td class="num">${fmtNum(n.peers)}</td><td class="num">${fmtUptime(n.uptime)}</td></tr>`).join('');
+
+  const live = { build_version: (nodes.find(n => n.build_version) || {}).build_version };
+  renderNetwork(data.network || {}, live);
+  document.getElementById('name').textContent = `${data.name || 'xrpld network'} status`;
+  document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
 }
 
 async function poll() {
   try {
-    const [report, healthResp] = await Promise.all([
-      fetch('api/network').then(r => r.json()),
-      fetch('api/network/health'),
-    ]);
-    const health = await healthResp.json().catch(() => null);
+    const r = await fetch('api/network', { cache: 'no-store' });
+    if (!r.ok) throw new Error(`api/network ${r.status}`);
+    renderLive(await r.json());
     document.getElementById('err').textContent = '';
-    if (report.name) document.getElementById('name').textContent = report.name + ' status';
-    renderHealth(health, healthResp.status);
-    renderStats(report);
-    renderNodes(report.nodes || []);
-    renderNetwork(report.network || {});
-    document.getElementById('updated').textContent = report.generated_at
-      ? 'updated ' + new Date(report.generated_at * 1000).toLocaleTimeString() : '';
-  } catch (err) {
-    document.getElementById('err').textContent = 'cannot reach the status API: ' + err.message;
+  } catch (e) {
+    document.getElementById('err').textContent = String(e);
   }
 }
-
-poll();
-setInterval(poll, 10000);
+poll(); setInterval(poll, 10000);
 </script>
+</body>
+</html>
